@@ -1,3 +1,21 @@
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from "recharts";
+
 function Analytics() {
   const sessions = JSON.parse(
     localStorage.getItem("evSessions") || "[]"
@@ -186,6 +204,38 @@ function Analytics() {
 
   });
 
+  const monthlyChartData = Object.entries(monthlyStats).map(
+    ([month, stats]) => ({
+      month,
+      energy: stats.energy,
+      cost: stats.cost,
+      sessions: stats.sessions,
+    })
+  );
+  
+  const weeklyChartData = Object.entries(weeklyStats).map(
+    ([day, sessions]) => ({
+      day,
+      sessions,
+    })
+  );
+  
+  const chargingTypeData = Object.entries(chargerStats).map(
+    ([name, value]) => ({
+      name,
+      value,
+    })
+  );
+  
+  const COLORS = [
+    "#22c55e",
+    "#3b82f6",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+  ];
+
+
   return (
     <>
       <div className="welcome">
@@ -229,6 +279,74 @@ function Analytics() {
   
       </div>
   
+      <div className="card">
+
+<h3>📈 Monthly Energy Trend</h3>
+<div className="card">
+
+<h3>💰 Monthly Spend Trend</h3>
+
+<ResponsiveContainer
+  width="100%"
+  height={320}
+>
+
+<AreaChart data={monthlyChartData}>
+
+<CartesianGrid strokeDasharray="3 3"/>
+
+<XAxis dataKey="month"/>
+
+<YAxis/>
+
+<Tooltip/>
+
+<Legend/>
+
+<Area
+type="monotone"
+dataKey="cost"
+stroke="#2563eb"
+fill="#93c5fd"
+/>
+
+</AreaChart>
+
+</ResponsiveContainer>
+
+</div>
+
+<ResponsiveContainer
+  width="100%"
+  height={320}
+>
+
+<LineChart data={monthlyChartData}>
+
+<CartesianGrid strokeDasharray="3 3" />
+
+<XAxis dataKey="month" />
+
+<YAxis />
+
+<Tooltip />
+
+<Legend />
+
+<Line
+  type="monotone"
+  dataKey="energy"
+  stroke="#22c55e"
+  strokeWidth={3}
+/>
+
+</LineChart>
+
+</ResponsiveContainer>
+
+</div>
+
+
       {/* Charging Overview */}
   
       <div className="card">
@@ -274,7 +392,38 @@ function Analytics() {
         </table>
   
       </div>
-  
+      <div className="card">
+
+<h3>📅 Weekly Sessions</h3>
+
+<ResponsiveContainer
+width="100%"
+height={320}
+>
+
+<BarChart data={weeklyChartData}>
+
+<CartesianGrid strokeDasharray="3 3"/>
+
+<XAxis dataKey="day"/>
+
+<YAxis/>
+
+<Tooltip/>
+
+<Legend/>
+
+<Bar
+dataKey="sessions"
+fill="#22c55e"
+/>
+
+</BarChart>
+
+</ResponsiveContainer>
+
+</div>
+
       {/* Weekly Summary */}
   
       <div className="card">
@@ -476,38 +625,39 @@ function Analytics() {
 
 <h3>🔌 Charging Type Distribution</h3>
 
-<table className="table">
+<ResponsiveContainer
+width="100%"
+height={350}
+>
 
-  <thead>
+<PieChart>
 
-    <tr>
-      <th>Charging Type</th>
-      <th>Sessions</th>
-    </tr>
+<Pie
+data={chargingTypeData}
+dataKey="value"
+nameKey="name"
+outerRadius={120}
+label
+>
 
-  </thead>
+{chargingTypeData.map((entry,index)=>(
 
-  <tbody>
+<Cell
+key={index}
+fill={COLORS[index % COLORS.length]}
+/>
 
-    {Object.entries(chargerStats).map(
+))}
 
-      ([charger, count]) => (
+</Pie>
 
-        <tr key={charger}>
+<Tooltip/>
 
-          <td>{charger}</td>
+<Legend/>
 
-          <td>{count}</td>
+</PieChart>
 
-        </tr>
-
-      )
-
-    )}
-
-  </tbody>
-
-</table>
+</ResponsiveContainer>
 
 </div>
 
