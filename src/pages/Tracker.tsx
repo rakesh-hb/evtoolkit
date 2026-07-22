@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { vehicles } from "../data/vehicles";
 
 interface Session {
+  id: number;
   vehicle: string;
   charger: string;
   energy: number;
@@ -25,56 +26,126 @@ const chargingStations = [
 ];
 
 function Tracker() {
+
   const defaultVehicle =
-    vehicles.find((v) => v.model === "Curvv EV 55") ?? vehicles[0];
+    vehicles.find(v => v.model === "Curvv EV 55") ??
+    vehicles[0];
 
   const [vehicle, setVehicle] = useState(
     `${defaultVehicle.brand} ${defaultVehicle.model}`
   );
 
-  const [charger, setCharger] = useState("Home AC");
-  const [energy, setEnergy] = useState("");
-  const [cost, setCost] = useState("");
-  const [station, setStation] = useState("");
-  const [date, setDate] = useState("");
+  const [charger, setCharger] =
+    useState("Home AC");
 
-  const [sessions, setSessions] = useState<Session[]>([]);
+  const [energy, setEnergy] =
+    useState("");
+
+  const [cost, setCost] =
+    useState("");
+
+  const [station, setStation] =
+    useState("");
+
+  const [date, setDate] =
+    useState("");
+
+  const [sessions, setSessions] =
+    useState<Session[]>(() => {
+
+      const saved =
+        localStorage.getItem("evSessions");
+
+      return saved
+        ? JSON.parse(saved)
+        : [];
+
+    });
+
+  useEffect(() => {
+
+    localStorage.setItem(
+      "evSessions",
+      JSON.stringify(sessions)
+    );
+
+  }, [sessions]);
 
   const addSession = () => {
-    if (!vehicle || !energy || !cost || !date) {
+
+    if (
+      !vehicle ||
+      !energy ||
+      !cost ||
+      !date
+    ) {
       alert("Please fill all required fields.");
       return;
     }
 
     const newSession: Session = {
+
+      id: Date.now(),
+
       vehicle,
+
       charger,
+
       energy: Number(energy),
+
       cost: Number(cost),
+
       station,
-      date,
+
+      date
+
     };
 
-    setSessions([newSession, ...sessions]);
+    setSessions([
+      newSession,
+      ...sessions
+    ]);
 
-    setVehicle(`${defaultVehicle.brand} ${defaultVehicle.model}`);
+    setVehicle(
+      `${defaultVehicle.brand} ${defaultVehicle.model}`
+    );
+
     setCharger("Home AC");
+
     setEnergy("");
+
     setCost("");
+
     setStation("");
+
     setDate("");
+
+  };
+
+  const deleteSession = (id: number) => {
+
+    if (!window.confirm(
+      "Delete this charging session?"
+    )) return;
+
+    setSessions(
+      sessions.filter(
+        session => session.id !== id
+      )
+    );
+
   };
 
   return (
     <>
       <div className="welcome">
         <h2>📝 Charge Tracker</h2>
-        <p>Record your EV charging sessions.</p>
+        <p>Record and manage your EV charging sessions.</p>
       </div>
-
+  
       <div className="card">
-
         <label>Vehicle</label>
+  
         <select
           value={vehicle}
           onChange={(e) => setVehicle(e.target.value)}
@@ -88,8 +159,9 @@ function Tracker() {
             </option>
           ))}
         </select>
-
+  
         <label>Charging Type</label>
+  
         <select
           value={charger}
           onChange={(e) => setCharger(e.target.value)}
@@ -98,32 +170,36 @@ function Tracker() {
           <option>Public AC</option>
           <option>DC Fast</option>
         </select>
-
+  
         <label>Energy Charged (kWh)</label>
+  
         <input
           type="number"
-          placeholder="Enter kWh"
+          placeholder="Enter energy charged"
           value={energy}
           onChange={(e) => setEnergy(e.target.value)}
         />
-
+  
         <label>Charging Station</label>
+  
         <select
           value={station}
           onChange={(e) => {
             const selected = chargingStations.find(
-              (item) => item.name === e.target.value
+              (s) => s.name === e.target.value
             );
-
+  
             setStation(e.target.value);
-
+  
             if (selected) {
               setCost(selected.amount.toString());
             }
           }}
         >
-          <option value="">Select Charging Station</option>
-
+          <option value="">
+            Select Charging Station
+          </option>
+  
           {chargingStations.map((item) => (
             <option
               key={item.name}
@@ -133,35 +209,36 @@ function Tracker() {
             </option>
           ))}
         </select>
-
+  
         <label>Total Cost (₹)</label>
+  
         <input
           type="number"
           value={cost}
           onChange={(e) => setCost(e.target.value)}
         />
-
+  
         <label>Date</label>
+  
         <input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
         />
-
+  
         <button
           className="primaryButton"
           onClick={addSession}
         >
           Save Session
         </button>
-
       </div>
-
+  
       <div className="card">
         <h3>Recent Sessions</h3>
-
+  
         {sessions.length === 0 ? (
-          <p style={{ marginTop: 12 }}>
+          <p style={{ marginTop: 15 }}>
             No charging sessions recorded.
           </p>
         ) : (
@@ -174,18 +251,48 @@ function Tracker() {
                 <th>Type</th>
                 <th>Energy</th>
                 <th>Cost</th>
+                <th>Action</th>
               </tr>
             </thead>
-
+  
             <tbody>
-              {sessions.map((item, index) => (
-                <tr key={index}>
-                  <td>{item.date}</td>
-                  <td>{item.vehicle}</td>
-                  <td>{item.station || "-"}</td>
-                  <td>{item.charger}</td>
-                  <td>{item.energy} kWh</td>
-                  <td>₹{item.cost.toLocaleString()}</td>
+              {sessions.map((session) => (
+                <tr key={session.id}>
+                  <td>{session.date}</td>
+  
+                  <td>{session.vehicle}</td>
+  
+                  <td>
+                    {session.station || "-"}
+                  </td>
+  
+                  <td>{session.charger}</td>
+  
+                  <td>
+                    {session.energy.toFixed(1)} kWh
+                  </td>
+  
+                  <td>
+                    ₹{session.cost.toLocaleString()}
+                  </td>
+  
+                  <td>
+                    <button
+                      onClick={() =>
+                        deleteSession(session.id)
+                      }
+                      style={{
+                        background: "#ef4444",
+                        color: "white",
+                        border: "none",
+                        padding: "6px 10px",
+                        borderRadius: "8px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      🗑 Delete
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -194,6 +301,7 @@ function Tracker() {
       </div>
     </>
   );
-}
-
-export default Tracker;
+  
+  }
+  
+  export default Tracker;
