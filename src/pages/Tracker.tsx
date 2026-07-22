@@ -12,15 +12,15 @@ interface Session {
 }
 
 const chargingStations = [
-  { name: "Tata Power EZ", amount: 12541 },
-  { name: "Shell Recharge", amount: 3447 },
-  { name: "BESCOM EV Mithra", amount: 2564 },
-  { name: "Static", amount: 1315 },
-  { name: "ChargeZone", amount: 845 },
+  { name: "Tata Power EZ", amount: 0 },
+  { name: "Shell Recharge", amount: 0 },
+  { name: "BESCOM EV Mithra", amount: 0 },
+  { name: "Static", amount: 0 },
+  { name: "ChargeZone", amount: 0 },
   { name: "Zeon", amount: 0 },
-  { name: "BPCL", amount: 853 },
-  { name: "Jio-bp Pulse", amount: 2000 },
-  { name: "EV Dock", amount: 1096 },
+  { name: "BPCL", amount: 0 },
+  { name: "Jio-bp Pulse", amount: 0 },
+  { name: "EV Dock", amount: 0 },
   { name: "eHUB by MG", amount: 0 },
   { name: "Indian Oil", amount: 0 },
 ];
@@ -36,7 +36,7 @@ function Tracker() {
   );
 
   const [charger, setCharger] =
-    useState("Home AC");
+    useState("DC Fast");
 
   const [energy, setEnergy] =
     useState("");
