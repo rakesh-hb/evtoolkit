@@ -282,26 +282,6 @@ function Analytics() {
       <div className="card">
 
 
-      <div className="card">
-  <h3>📈 Monthly Energy Trend</h3>
-
-  <ResponsiveContainer width="100%" height={320}>
-    <LineChart data={monthlyChartData}>
-      ...
-    </LineChart>
-  </ResponsiveContainer>
-</div>
-
-<div className="card">
-  <h3>💰 Monthly Spend Trend</h3>
-
-  <ResponsiveContainer width="100%" height={320}>
-    <AreaChart data={monthlyChartData}>
-      ...
-    </AreaChart>
-  </ResponsiveContainer>
-</div>
-
 <div className="card">
 
 <h3>💰 Monthly Spend Trend</h3>
@@ -689,7 +669,6 @@ label
 <table className="table">
 
   <thead>
-
     <tr>
       <th>Year</th>
       <th>Sessions</th>
