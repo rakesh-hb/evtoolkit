@@ -281,7 +281,27 @@ function Analytics() {
   
       <div className="card">
 
-<h3>📈 Monthly Energy Trend</h3>
+
+      <div className="card">
+  <h3>📈 Monthly Energy Trend</h3>
+
+  <ResponsiveContainer width="100%" height={320}>
+    <LineChart data={monthlyChartData}>
+      ...
+    </LineChart>
+  </ResponsiveContainer>
+</div>
+
+<div className="card">
+  <h3>💰 Monthly Spend Trend</h3>
+
+  <ResponsiveContainer width="100%" height={320}>
+    <AreaChart data={monthlyChartData}>
+      ...
+    </AreaChart>
+  </ResponsiveContainer>
+</div>
+
 <div className="card">
 
 <h3>💰 Monthly Spend Trend</h3>
@@ -640,13 +660,11 @@ outerRadius={120}
 label
 >
 
-{chargingTypeData.map((entry,index)=>(
-
-<Cell
-key={index}
-fill={COLORS[index % COLORS.length]}
-/>
-
+{chargingTypeData.map((_, index) => (
+  <Cell
+    key={index}
+    fill={COLORS[index % COLORS.length]}
+  />
 ))}
 
 </Pie>
