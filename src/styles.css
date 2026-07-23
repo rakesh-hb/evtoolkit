@@ -418,3 +418,11 @@ label {
   }
 
 }
+
+.tableContainer {
+  overflow-x: auto;
+}
+
+.table {
+  min-width: 900px;
+}

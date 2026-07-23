@@ -750,6 +750,8 @@ label
 
 ) : (
 
+  <div className="tableContainer">
+
   <table className="table">
 
     <thead>
@@ -802,7 +804,7 @@ label
 </tbody>
 
   </table>
-
+  </div>
 )}
 
 </div>
