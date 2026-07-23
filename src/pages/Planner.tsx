@@ -69,7 +69,6 @@ function Planner() {
 
     <>
       <div className="welcome">
-
         <h2>
 
           ⚡ Charge Planner
