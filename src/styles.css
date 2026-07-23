@@ -1,3 +1,9 @@
+/* ==========================================
+   EV TOOLKIT - APP.CSS
+   Part 1/4
+   Global Styles + Layout + Cards
+========================================== */
+
 * {
   margin: 0;
   padding: 0;
@@ -5,9 +11,16 @@
   font-family: "Segoe UI", Arial, sans-serif;
 }
 
+html,
 body {
+  width: 100%;
+  min-height: 100%;
   background: #0f172a;
   color: #ffffff;
+}
+
+body {
+  overflow-x: hidden;
 }
 
 #root {
@@ -20,220 +33,239 @@ body {
   flex-direction: column;
 }
 
+/* ==========================================
+   Header
+========================================== */
+
 .header {
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 1000;
+
   background: #111827;
   border-bottom: 1px solid #1f2937;
+
   padding: 18px;
+
   font-size: 22px;
   font-weight: 700;
 }
 
+/* ==========================================
+   Main Content
+========================================== */
+
 .content {
   flex: 1;
+  width: 100%;
   padding: 18px;
   padding-bottom: 90px;
 }
 
+/* ==========================================
+   Cards
+========================================== */
+
 .card {
   background: #1e293b;
   border-radius: 16px;
+
   padding: 18px;
   margin-bottom: 18px;
-  box-shadow: 0 5px 15px rgba(0,0,0,.25);
+
+  box-shadow: 0 5px 15px rgba(0, 0, 0, .25);
+
+  overflow: hidden;
 }
 
 .card h2,
 .card h3 {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+  font-weight: 600;
 }
 
+/* ==========================================
+   Welcome
+========================================== */
+
 .welcome {
-  margin-bottom: 20px;
+  margin-bottom: 22px;
 }
 
 .welcome h2 {
-  font-size: 26px;
-  margin-bottom: 5px;
+  font-size: 28px;
+  margin-bottom: 6px;
 }
 
 .welcome p {
   color: #94a3b8;
+  font-size: 15px;
 }
 
-/* ===========================
-   Stats Cards
-=========================== */
+/* ==========================================
+   Dashboard Statistics
+========================================== */
 
 .statsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 15px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 16px;
   margin-bottom: 20px;
 }
 
 .statCard {
-  background: linear-gradient(135deg, #1e293b, #334155);
+
+  background: linear-gradient(
+      135deg,
+      #1e293b,
+      #334155
+  );
+
   border-radius: 16px;
+
   padding: 18px;
+
   text-align: center;
+
   min-width: 0;
-  overflow-wrap: anywhere;
 }
 
 .statCard h3 {
+
   color: #cbd5e1;
+
   font-size: 14px;
-  margin-bottom: 12px;
+
   font-weight: 500;
+
+  margin-bottom: 10px;
 }
 
 .statCard h1 {
+
   color: #10b981;
+
   font-size: 28px;
-}
 
-/* ===========================
-   KPI Cards
-=========================== */
+  font-weight: 700;
 
-.kpiGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 15px;
-}
-
-.kpiCard {
-  background: #334155;
-  border-radius: 14px;
-  padding: 18px;
-  text-align: center;
-  min-width: 0;
   overflow-wrap: anywhere;
 }
 
+/* ==========================================
+   KPI Cards
+========================================== */
+
+.kpiGrid {
+
+  display: grid;
+
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+
+  gap: 16px;
+}
+
+.kpiCard {
+
+  background: #334155;
+
+  border-radius: 14px;
+
+  padding: 18px;
+
+  text-align: center;
+
+  min-width: 0;
+}
+
 .kpiCard h3 {
+
   color: #cbd5e1;
+
   font-size: 14px;
+
+  font-weight: 500;
 }
 
 .kpiCard h2 {
+
   margin-top: 10px;
+
   color: #10b981;
+
+  font-size: 24px;
+
+  overflow-wrap: anywhere;
 }
 
-/* ===========================
+/* ==========================================
    Forms
-=========================== */
+========================================== */
+
+label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: #e2e8f0;
+}
 
 input,
 select {
   width: 100%;
-  padding: 12px;
+  padding: 12px 14px;
   margin-top: 6px;
   margin-bottom: 14px;
-  border-radius: 10px;
+
   border: none;
+  border-radius: 10px;
+
   background: #334155;
-  color: white;
+  color: #ffffff;
+
+  font-size: 15px;
+
+  outline: none;
+
+  transition: .2s;
+}
+
+input:focus,
+select:focus {
+  box-shadow: 0 0 0 2px #10b981;
 }
 
 input[type="range"] {
   padding: 0;
+  box-shadow: none;
 }
+
+/* ==========================================
+   Buttons
+========================================== */
 
 button {
   cursor: pointer;
+  font-family: inherit;
 }
-
-/* ===========================
-   Tables
-=========================== */
-
-.tableContainer {
-  width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.table {
-  width: 100%;
-  min-width: 850px;
-  border-collapse: collapse;
-}
-
-.table th,
-.table td {
-  padding: 10px;
-  border-bottom: 1px solid #334155;
-  white-space: nowrap;
-}
-
-/* ===========================
-   Bottom Navigation
-=========================== */
-
-.bottomNav {
-  position: fixed;
-  left: 0;
-  bottom: 0;
-  width: 100%;
-  background: #111827;
-  border-top: 1px solid #334155;
-  display: flex;
-  justify-content: space-around;
-  padding: 8px 0;
-  z-index: 1000;
-}
-
-.bottomNav button {
-  flex: 1;
-  background: transparent;
-  border: none;
-  color: #94a3b8;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 8px;
-  cursor: pointer;
-  transition: all .2s ease;
-}
-
-.bottomNav button:hover {
-  color: #ffffff;
-}
-
-.bottomNav button.active {
-  background: #1f2937;
-  color: #ffffff;
-  font-weight: 700;
-  border-radius: 12px;
-  transform: translateY(-2px);
-  box-shadow: 0 2px 8px rgba(16,185,129,.25);
-}
-
-.bottomNav button.active svg,
-.bottomNav button.active span:first-child {
-  color: #10b981;
-}
-
-/* ===========================
-   Primary Button
-=========================== */
 
 .primaryButton {
+
   width: 100%;
+
   padding: 14px;
+
   border: none;
+
   border-radius: 12px;
+
   background: #10b981;
-  color: #ffffff;
+
+  color: white;
+
   font-size: 16px;
+
   font-weight: 600;
+
   transition: .2s;
 }
 
@@ -241,40 +273,36 @@ button {
   background: #059669;
 }
 
-/* ===========================
-   Button Group
-=========================== */
-
 .buttonGroup {
+
   display: flex;
+
   gap: 12px;
+
   margin-top: 20px;
 }
 
 .buttonGroup button {
+
   flex: 1;
+
   border: none;
+
   border-radius: 12px;
-  padding: 14px 18px;
+
+  padding: 14px;
+
   font-size: 16px;
+
   font-weight: 600;
+
   transition: .2s;
 }
 
-/* Save Button */
-
-.buttonGroup .primaryButton {
-  background: #10b981;
-}
-
-.buttonGroup .primaryButton:hover {
-  background: #059669;
-}
-
-/* Reset Button */
-
 .dangerButton {
+
   background: #ef4444;
+
   color: white;
 }
 
@@ -282,49 +310,236 @@ button {
   background: #dc2626;
 }
 
-/* ===========================
-   Labels
-=========================== */
+/* ==========================================
+   Tables
+========================================== */
 
-label {
-  display: block;
-  margin-bottom: 4px;
-  font-weight: 500;
+.tableContainer {
+
+  width: 100%;
+
+  overflow-x: auto;
+
+  overflow-y: hidden;
+
+  -webkit-overflow-scrolling: touch;
+
+  border-radius: 12px;
 }
 
-/* ===========================
-   Desktop Layout
-=========================== */
+/* Nice scrollbar */
 
-@media (min-width: 900px) {
+.tableContainer::-webkit-scrollbar {
+  height: 8px;
+}
+
+.tableContainer::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 10px;
+}
+
+.table {
+
+  width: max-content;
+
+  min-width: 100%;
+
+  border-collapse: collapse;
+
+  table-layout: auto;
+}
+
+.table thead {
+
+  background: #273449;
+
+  position: sticky;
+
+  top: 0;
+}
+
+.table th {
+
+  padding: 12px 16px;
+
+  color: #f1f5f9;
+
+  font-weight: 600;
+
+  text-align: left;
+
+  white-space: nowrap;
+
+  border-bottom: 1px solid #475569;
+}
+
+.table td {
+
+  padding: 12px 16px;
+
+  border-bottom: 1px solid #334155;
+
+  white-space: nowrap;
+
+  color: #f8fafc;
+}
+
+.table tbody tr:hover {
+  background: rgba(255,255,255,.04);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Number column */
+
+.table th:first-child,
+.table td:first-child {
+  text-align: center;
+  width: 70px;
+}
+
+/* Cost column */
+
+.table th:last-child,
+.table td:last-child {
+  text-align: right;
+}
+
+/* Energy column */
+
+.table td:nth-last-child(2) {
+  text-align: right;
+}
+
+/* ==========================================
+   Bottom Navigation
+========================================== */
+
+.bottomNav {
+
+  position: fixed;
+
+  left: 0;
+  right: 0;
+  bottom: 0;
+
+  width: 100%;
+
+  display: flex;
+
+  justify-content: space-around;
+  align-items: center;
+
+  padding: 8px 0;
+
+  background: #111827;
+
+  border-top: 1px solid #334155;
+
+  z-index: 1000;
+}
+
+.bottomNav button {
+
+  flex: 1;
+
+  background: transparent;
+
+  border: none;
+
+  color: #94a3b8;
+
+  display: flex;
+
+  flex-direction: column;
+
+  justify-content: center;
+
+  align-items: center;
+
+  gap: 4px;
+
+  padding: 10px 6px;
+
+  transition: all .25s ease;
+}
+
+.bottomNav button svg {
+  font-size: 20px;
+}
+
+.bottomNav button span {
+  font-size: 12px;
+}
+
+.bottomNav button:hover {
+  color: #ffffff;
+}
+
+.bottomNav button.active {
+
+  color: #ffffff;
+
+  font-weight: 700;
+
+  background: rgba(255,255,255,.08);
+
+  border-radius: 12px;
+
+  transform: translateY(-2px);
+
+  box-shadow: 0 2px 8px rgba(16,185,129,.25);
+}
+
+.bottomNav button.active svg {
+  color: #10b981;
+}
+
+/* ==========================================
+   Desktop Layout
+========================================== */
+
+@media (min-width:900px) {
 
   .content {
-    width: 900px;
+
+    max-width: 1000px;
+
     margin: auto;
   }
 
   .bottomNav {
-    width: 900px;
+
+    max-width: 1000px;
+
     left: 50%;
+
     transform: translateX(-50%);
+
     border-radius: 18px 18px 0 0;
   }
 
 }
 
-/* ===========================
+/* ==========================================
    Mobile Responsive
-=========================== */
+========================================== */
 
-@media (max-width: 768px) {
+@media (max-width:768px) {
 
   .content {
+
     padding: 14px;
+
     padding-bottom: 90px;
   }
 
   .header {
+
     padding: 16px;
+
     font-size: 20px;
   }
 
@@ -336,14 +551,14 @@ label {
     font-size: 14px;
   }
 
-  /* Cards */
-
   .card {
+
     padding: 16px;
   }
 
   .statsGrid,
   .kpiGrid {
+
     grid-template-columns: 1fr;
   }
 
@@ -355,74 +570,204 @@ label {
     font-size: 22px;
   }
 
-  /* Forms */
-
   input,
   select {
+
     font-size: 16px;
   }
 
-  /* Tables */
+  .buttonGroup {
+
+    flex-direction: column;
+  }
+
+  .buttonGroup button {
+
+    width: 100%;
+  }
+
+  /* Table */
 
   .tableContainer {
-    margin: 0 -14px;
-    padding: 0 14px;
+
+    width: 100%;
+
+    overflow-x: auto;
+
+    overflow-y: hidden;
+
+    -webkit-overflow-scrolling: touch;
   }
 
   .table {
-    min-width: 750px;
-    font-size: 13px;
+
+    width: max-content;
+
+    min-width: 100%;
   }
 
   .table th,
   .table td {
-    padding: 8px 10px;
-  }
 
-  /* Buttons */
+    padding: 10px 14px;
 
-  .buttonGroup {
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .buttonGroup button {
-    width: 100%;
-  }
-
-  /* Bottom Navigation */
-
-  .bottomNav {
-    padding: 6px 0;
+    font-size: 13px;
   }
 
   .bottomNav button {
+
     padding: 8px 4px;
-    font-size: 12px;
   }
 
-  .bottomNav button svg {
-    font-size: 20px;
-  }
+  .bottomNav button span {
 
-}
-
-/* ===========================
-   Large Desktop
-=========================== */
-
-@media (min-width: 1200px) {
-
-  .content {
-    max-width: 1100px;
+    font-size: 11px;
   }
 
 }
 
-.tableContainer {
-  overflow-x: auto;
+/* ==========================================
+   Final Polish
+========================================== */
+
+/* Smooth Scrolling */
+
+html {
+  scroll-behavior: smooth;
 }
 
-.table {
-  min-width: 900px;
+/* Selection */
+
+::selection {
+  background: #10b981;
+  color: #ffffff;
+}
+
+/* Images */
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+/* Links */
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Better focus */
+
+button:focus,
+input:focus,
+select:focus {
+  outline: none;
+}
+
+/* Chart Containers */
+
+.recharts-responsive-container {
+  min-height: 300px;
+}
+
+/* Prevent chart overflow */
+
+.recharts-wrapper {
+  overflow: hidden;
+}
+
+/* Card Tables */
+
+.card .tableContainer {
+  margin-top: 10px;
+}
+
+/* Card paragraphs */
+
+.card p {
+  color: #cbd5e1;
+  line-height: 1.6;
+}
+
+/* Empty state */
+
+.emptyState {
+  text-align: center;
+  color: #94a3b8;
+  padding: 24px;
+}
+
+/* Utility */
+
+.textCenter {
+  text-align: center;
+}
+
+.textRight {
+  text-align: right;
+}
+
+.textGreen {
+  color: #10b981;
+}
+
+.textRed {
+  color: #ef4444;
+}
+
+/* Spacing */
+
+.mt10 {
+  margin-top: 10px;
+}
+
+.mt20 {
+  margin-top: 20px;
+}
+
+.mb10 {
+  margin-bottom: 10px;
+}
+
+.mb20 {
+  margin-bottom: 20px;
+}
+
+/* Hide horizontal scrollbar on desktop */
+
+@media (min-width: 769px) {
+
+  .tableContainer {
+
+    overflow-x: visible;
+  }
+
+}
+
+/* Mobile only */
+
+@media (max-width: 768px) {
+
+  /* Tables scroll only on mobile */
+
+  .tableContainer {
+
+    overflow-x: auto;
+  }
+
+  /* Slightly smaller table font */
+
+  .table {
+
+    font-size: 13px;
+  }
+
+  /* Better chart sizing */
+
+  .recharts-responsive-container {
+
+    min-height: 260px;
+  }
+
 }
