@@ -1,24 +1,17 @@
 import { useMemo, useState } from "react";
 import { vehicles } from "../data/vehicles";
+import { chargers } from "../data/chargers";
 
-const STATE_TARIFFS: Record<string, number> = {
-  Karnataka: 8.5,
-  "Tamil Nadu": 8.0,
-  Kerala: 7.5,
-  Telangana: 8.3,
-  "Andhra Pradesh": 7.9,
-  Maharashtra: 9.2,
-  Gujarat: 7.8,
-  Delhi: 8.8,
-  Rajasthan: 8.1,
-  "Uttar Pradesh": 8.4,
-};
+import {
+  STATE_TARIFFS,
+  STATES,
+} from "../data/states";
 
 function Planner() {
 
   const [vehicleId, setVehicleId] = useState(vehicles[0].id);
 
-  const [chargingType, setChargingType] = useState("DC Fast");
+  const [chargerId, setChargerId] = useState(chargers[0].id);
 
   const [state, setState] = useState("Karnataka");
 
@@ -27,18 +20,34 @@ function Planner() {
   const [targetSOC, setTargetSOC] = useState(80);
 
   const vehicle = useMemo(
-    () => vehicles.find(v => v.id === vehicleId)!,
-    [vehicleId]
+  () => vehicles.find(v => v.id === vehicleId)!,
+  [vehicleId]
+);
+
+const charger = useMemo(
+  () => chargers.find((c) => c.id === chargerId)!,
+  [chargerId]
+);
+
+const energyRequired =
+  vehicle.battery *
+  ((targetSOC - currentSOC) / 100);
+
+  const chargerPower = Math.min(
+    charger.power,
+    charger.type === "DC"
+      ? vehicle.dcPower
+      : vehicle.acPower
   );
 
-  const energyRequired =
-    vehicle.battery *
-    ((targetSOC - currentSOC) / 100);
+  const chargingEfficiency =
+  charger.type === "DC"
+    ? 0.95
+    : 0.92;
 
-  const chargerPower =
-    chargingType === "DC Fast"
-      ? vehicle.dcPower
-      : vehicle.acPower;
+const energyFromGrid =
+  energyRequired / chargingEfficiency;
+
 
   const chargingTime =
     energyRequired / chargerPower;
@@ -46,10 +55,10 @@ function Planner() {
   const tariff = STATE_TARIFFS[state];
 
   const baseCost =
-    energyRequired * tariff;
+  energyFromGrid * tariff;
 
-  const gst =
-    chargingType === "DC Fast"
+    const gst =
+    charger.type === "DC"
       ? baseCost * 0.18
       : 0;
 
@@ -116,31 +125,18 @@ function Planner() {
         </label>
 
         <select
-          value={chargingType}
-          onChange={(e)=>
-            setChargingType(e.target.value)
-          }
-        >
-
-          <option>
-
-            Home AC
-
-          </option>
-
-          <option>
-
-            Public AC
-
-          </option>
-
-          <option>
-
-            DC Fast
-
-          </option>
-
-        </select>
+  value={chargerId}
+  onChange={(e) => setChargerId(e.target.value)}
+>
+  {chargers.map((charger) => (
+    <option
+      key={charger.id}
+      value={charger.id}
+    >
+      {charger.name}
+    </option>
+  ))}
+</select>
 
         <label>
 
@@ -155,13 +151,14 @@ function Planner() {
           }
         >
 
-          {Object.keys(STATE_TARIFFS).map(item=>(
+{STATES.map((item) => (
 
-            <option
-              key={item}
-            >
-              {item}
-            </option>
+<option
+key={item}
+value={item}
+>
+{item}
+</option>
 
           ))}
 
@@ -213,74 +210,42 @@ onChange={(e) =>
 </div>
 
 
-
 <div className="kpiGrid">
 
-<div className="kpiCard">
+  <div className="kpiCard">
+    <h3>Energy Required</h3>
+    <h2>{energyRequired.toFixed(1)} kWh</h2>
+  </div>
 
-<h3>
+  <div className="kpiCard">
+    <h3>Grid Energy</h3>
+    <h2>{energyFromGrid.toFixed(1)} kWh</h2>
+  </div>
 
-  Energy Required
+  <div className="kpiCard">
+    <h3>Charging Efficiency</h3>
+    <h2>{(chargingEfficiency * 100).toFixed(0)}%</h2>
+  </div>
 
-</h3>
+  <div className="kpiCard">
+    <h3>Charging Time</h3>
+    <h2>{chargingTime.toFixed(1)} hrs</h2>
+  </div>
 
-<h2>
+  <div className="kpiCard">
+    <h3>Tariff</h3>
+    <h2>₹{tariff.toFixed(2)}/kWh</h2>
+  </div>
 
-  {energyRequired.toFixed(1)} kWh
-
-</h2>
-
-</div>
-
-<div className="kpiCard">
-
-<h3>
-
-  Charging Time
-
-</h3>
-
-<h2>
-
-  {chargingTime.toFixed(1)} hrs
-
-</h2>
-
-</div>
-
-<div className="kpiCard">
-
-<h3>
-
-  Tariff
-
-</h3>
-
-<h2>
-
-  ₹{tariff.toFixed(2)}
-
-</h2>
+  <div className="kpiCard">
+    <h3>Range Added</h3>
+    <h2>{rangeAdded.toFixed(0)} km</h2>
+  </div>
 
 </div>
 
-<div className="kpiCard">
 
-<h3>
 
-  Range Added
-
-</h3>
-
-<h2>
-
-  {rangeAdded.toFixed(0)} km
-
-</h2>
-
-</div>
-
-</div>
 <div className="card">
 
 <h3>
@@ -311,6 +276,22 @@ onChange={(e) =>
 
     <tr>
 
+<td>
+
+  Grid Energy Used
+
+</td>
+
+<td>
+
+  {energyFromGrid.toFixed(1)} kWh
+
+</td>
+
+</tr>
+
+    <tr>
+
       <td>
 
         GST
@@ -319,9 +300,9 @@ onChange={(e) =>
 
       <td>
 
-        {chargingType === "DC Fast"
-          ? `₹${gst.toFixed(2)} (18%)`
-          : "₹0.00"}
+      {charger.type === "DC"
+  ? `₹${gst.toFixed(2)} (18%)`
+  : "₹0.00"}
 
       </td>
 
@@ -379,121 +360,59 @@ onChange={(e) =>
 
 <table className="table">
 
-  <tbody>
+<tbody>
 
-    <tr>
+<tr>
+  <td>Vehicle</td>
+  <td>{vehicle.brand} {vehicle.model}</td>
+</tr>
 
-      <td>
+<tr>
+  <td>Battery Charge</td>
+  <td>{currentSOC}% → {targetSOC}%</td>
+</tr>
 
-        Vehicle
+<tr>
+  <td>Selected Charger</td>
+  <td>{charger.name}</td>
+</tr>
 
-      </td>
+<tr>
+  <td>Effective Charging Speed</td>
+  <td>{chargerPower.toFixed(1)} kW</td>
+</tr>
 
-      <td>
+<tr>
+  <td>Energy Required</td>
+  <td>{energyRequired.toFixed(1)} kWh</td>
+</tr>
 
-        {vehicle.brand} {vehicle.model}
+<tr>
+  <td>Energy From Grid</td>
+  <td>{energyFromGrid.toFixed(1)} kWh</td>
+</tr>
 
-      </td>
+<tr>
+  <td>Charging Efficiency</td>
+  <td>{(chargingEfficiency * 100).toFixed(0)}%</td>
+</tr>
 
-    </tr>
+<tr>
+  <td>Charging Time</td>
+  <td>{chargingTime.toFixed(1)} hours</td>
+</tr>
 
-    <tr>
+<tr>
+  <td>Estimated Range Added</td>
+  <td>{rangeAdded.toFixed(0)} km</td>
+</tr>
 
-      <td>
+<tr>
+  <td>Total Cost</td>
+  <td>₹{totalCost.toFixed(2)}</td>
+</tr>
 
-        Battery Charge
-
-      </td>
-
-      <td>
-
-        {currentSOC}% → {targetSOC}%
-
-      </td>
-
-    </tr>
-
-    <tr>
-
-      <td>
-
-        Charging Type
-
-      </td>
-
-      <td>
-
-        {chargingType}
-
-      </td>
-
-    </tr>
-
-    <tr>
-
-      <td>
-
-        Energy Required
-
-      </td>
-
-      <td>
-
-        {energyRequired.toFixed(1)} kWh
-
-      </td>
-
-    </tr>
-
-    <tr>
-
-      <td>
-
-        Charging Time
-
-      </td>
-
-      <td>
-
-        {chargingTime.toFixed(1)} hours
-
-      </td>
-
-    </tr>
-
-    <tr>
-
-      <td>
-
-        Estimated Range Added
-
-      </td>
-
-      <td>
-
-        {rangeAdded.toFixed(0)} km
-
-      </td>
-
-    </tr>
-
-    <tr>
-
-      <td>
-
-        Total Cost
-
-      </td>
-
-      <td>
-
-        ₹{totalCost.toFixed(2)}
-
-      </td>
-
-    </tr>
-
-  </tbody>
+</tbody>
 
 </table>
 
@@ -560,28 +479,29 @@ Selected Vehicle Specifications
   </tr>
 
   <tr>
+  <td>Vehicle AC Charging Limit</td>
+  <td>{vehicle.acPower} kW</td>
+</tr>
 
-    <td>AC Charging</td>
+<tr>
+  <td>Vehicle DC Charging Limit</td>
+  <td>{vehicle.dcPower} kW</td>
+</tr>
 
-    <td>
+<tr>
+  <td>Selected Charger</td>
+  <td>{charger.name}</td>
+</tr>
 
-      {vehicle.acPower} kW
+<tr>
+  <td>Charger Power</td>
+  <td>{charger.power} kW</td>
+</tr>
 
-    </td>
-
-  </tr>
-
-  <tr>
-
-    <td>DC Fast Charging</td>
-
-    <td>
-
-      {vehicle.dcPower} kW
-
-    </td>
-
-  </tr>
+<tr>
+  <td>Effective Charging Speed</td>
+  <td>{chargerPower.toFixed(1)} kW</td>
+</tr>
 
 </tbody>
 
