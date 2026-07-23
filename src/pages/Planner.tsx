@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { vehicles } from "../data/vehicles";
 import { chargers } from "../data/chargers";
 
@@ -9,9 +9,29 @@ import {
 
 function Planner() {
 
-  const [vehicleId, setVehicleId] = useState(vehicles[0].id);
+  const brands = [...new Set(vehicles.map((v) => v.brand))].sort();
 
-  const [chargerId, setChargerId] = useState(chargers[0].id);
+  const [selectedBrand, setSelectedBrand] = useState(vehicles[0].brand);
+  
+  const brandVehicles = useMemo(
+    () => vehicles.filter((v) => v.brand === selectedBrand),
+    [selectedBrand]
+  );
+  
+  const [vehicleId, setVehicleId] = useState(
+    () => brandVehicles[0]?.id ?? vehicles[0].id
+  );
+  
+  useEffect(() => {
+    if (
+      brandVehicles.length > 0 &&
+      !brandVehicles.some((v) => v.id === vehicleId)
+    ) {
+      setVehicleId(brandVehicles[0].id);
+    }
+  }, [brandVehicles, vehicleId]);
+
+const [chargerId, setChargerId] = useState(chargers[0].id);
 
   const [state, setState] = useState("Karnataka");
 
@@ -20,9 +40,9 @@ function Planner() {
   const [targetSOC, setTargetSOC] = useState(80);
 
   const vehicle = useMemo(
-  () => vehicles.find(v => v.id === vehicleId)!,
-  [vehicleId]
-);
+    () => vehicles.find((v) => v.id === vehicleId)!,
+    [vehicleId]
+  );
 
 const charger = useMemo(
   () => chargers.find((c) => c.id === chargerId)!,
@@ -94,29 +114,34 @@ const energyFromGrid =
 
       <div className="card">
 
-        <label>
+      <label>Brand</label>
 
-          Select Vehicle
+<select
+  value={selectedBrand}
+  onChange={(e) => setSelectedBrand(e.target.value)}
+>
+  {brands.map((brand) => (
+    <option key={brand} value={brand}>
+      {brand}
+    </option>
+  ))}
+</select>
 
-        </label>
+<label>Model</label>
 
-        <select
-          value={vehicleId}
-          onChange={(e)=>
-            setVehicleId(Number(e.target.value))
-          }
-        >
-
-          {vehicles.map(vehicle=>(
-            <option
-              key={vehicle.id}
-              value={vehicle.id}
-            >
-              {vehicle.brand} {vehicle.model}
-            </option>
-          ))}
-
-        </select>
+<select
+  value={vehicleId}
+  onChange={(e) => setVehicleId(Number(e.target.value))}
+>
+  {brandVehicles.map((vehicle) => (
+    <option
+      key={vehicle.id}
+      value={vehicle.id}
+    >
+      {vehicle.model}
+    </option>
+  ))}
+</select>
 
         <label>
 

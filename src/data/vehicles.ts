@@ -1,12 +1,73 @@
 export interface Vehicle {
+  // Basic Information
   id: number;
   brand: string;
   model: string;
-  battery: number;
-  efficiency: number;
-  acPower: number;
-  dcPower: number;
-  range: number;
+  year?: number;
+  country?: string;
+
+// Battery & Range
+battery: number;              // kWh
+range: number;                // km
+certifiedEfficiency: number;           // Certified efficiency (km/kWh)
+realWorldEfficiency?: number; // Typical real-world efficiency (km/kWh)
+
+batteryChemistry?: "LFP" | "LMFP" | "NMC" | "NCA";
+architecture?: 400 | 800;
+
+  // Charging
+  acPower: number;              // kW
+  dcPower: number;              // kW
+  connectorAC?: string;
+  connectorDC?: string;
+  chargingPortLocation?:
+    | "Front Left"
+    | "Front Right"
+    | "Rear Left"
+    | "Rear Right"
+    | "Front Center"
+    | "Rear Center";
+  fastCharge10to80?: number;    // minutes
+
+  // Powertrain
+  motorType?:
+    | "Single Motor"
+    | "Dual Motor"
+    | "Tri Motor"
+    | "Quad Motor";
+  drivetrain?: "FWD" | "RWD" | "AWD";
+  maxPower?: number;            // kW
+  maxTorque?: number;           // Nm
+  acceleration0to100?: number;  // seconds
+  topSpeed?: number;            // km/h
+
+  // Vehicle
+  bodyType?:
+    | "Hatchback"
+    | "Sedan"
+    | "SUV"
+    | "SUV Coupe"
+    | "Crossover"
+    | "MPV"
+    | "Pickup"
+    | "Van"
+    | "Sports Sedan"
+    | "Luxury Sedan"
+    | "Luxury SUV";
+  seats?: number;
+  bootSpace?: number;           // litres
+  kerbWeight?: number;          // kg
+  groundClearance?: number;     // mm
+  wheelbase?: number;           // mm
+  towingCapacity?: number;      // kg
+  vehicleClass?: "Passenger" | "Commercial";
+
+  // Features
+  adasLevel?: "None" | "Level 1" | "Level 2" | "Level 2+" | "Level 3";
+
+  // Warranty
+  warrantyBattery?: string;
+  warrantyVehicle?: string;
 }
 
 export const vehicles: Vehicle[] = [
