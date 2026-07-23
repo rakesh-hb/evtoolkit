@@ -313,3 +313,38 @@ input[type="range"] {
   }
 
 }
+
+.buttonGroup {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.buttonGroup button {
+  flex: 1;
+  border: none;
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.primaryButton {
+  background: #10b981;
+  color: white;
+}
+
+.primaryButton:hover {
+  background: #059669;
+}
+
+.dangerButton {
+  background: #ef4444;
+  color: white;
+}
+
+.dangerButton:hover {
+  background: #dc2626;
+}

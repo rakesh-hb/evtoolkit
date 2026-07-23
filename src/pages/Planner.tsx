@@ -18,7 +18,7 @@ function Planner() {
 
   const [vehicleId, setVehicleId] = useState(vehicles[0].id);
 
-  const [chargingType, setChargingType] = useState("Home AC");
+  const [chargingType, setChargingType] = useState("DC Fast");
 
   const [state, setState] = useState("Karnataka");
 

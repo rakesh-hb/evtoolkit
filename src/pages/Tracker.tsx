@@ -113,7 +113,7 @@ function Tracker() {
       setVehicle(
         `${defaultVehicle.brand} ${defaultVehicle.model}`
       );
-      setCharger("Home AC");
+      setCharger("DC Fast");
       setEnergy("");
       setCost("");
       setStation("");
@@ -121,8 +121,11 @@ function Tracker() {
     };
 
     const deleteSession = async (id: number) => {
-
-      if (!window.confirm("Delete this charging session?")) {
+      const confirmed = window.confirm(
+        "Are you sure you want to delete this charging session?\n\nThis action cannot be undone."
+      );
+    
+      if (!confirmed) {
         return;
       }
     
@@ -133,14 +136,32 @@ function Tracker() {
     
       if (error) {
         console.error(error);
-        alert("Failed to delete session");
+        alert("Failed to delete the charging session.");
         return;
       }
     
       setSessions((prev) =>
         prev.filter((session) => session.id !== id)
       );
+    
+      alert("Charging session deleted successfully.");
     };
+
+    const resetForm = () => {
+      const confirmed = window.confirm(
+        "⚠️ Reset all entered values?\n\nAll unsaved information will be cleared."
+      );
+    
+      if (!confirmed) return;
+    
+      setVehicle(`${defaultVehicle.brand} ${defaultVehicle.model}`);
+      setCharger("DC Fast");
+      setEnergy("");
+      setCost("");
+      setStation("");
+      setDate("");
+    };
+
 
   return (
     <>
@@ -191,16 +212,8 @@ function Tracker() {
         <select
           value={station}
           onChange={(e) => {
-            const selected = chargingStations.find(
-              (s) => s.name === e.target.value
-            );
-  
             setStation(e.target.value);
-  
-            if (selected) {
-              setCost(selected.amount.toString());
-            }
-          }}
+        }}
         >
           <option value="">
             Select Charging Station
@@ -232,12 +245,22 @@ function Tracker() {
           onChange={(e) => setDate(e.target.value)}
         />
   
-        <button
-          className="primaryButton"
-          onClick={addSession}
-        >
-          Save Session
-        </button>
+  <div className="buttonGroup">
+  <button
+    className="primaryButton"
+    onClick={addSession}
+  >
+    💾 Save Session
+  </button>
+
+  <button
+    className="dangerButton"
+    onClick={resetForm}
+  >
+    🔄 Reset Form
+  </button>
+</div>
+
       </div>
   
       <div className="card">
@@ -251,6 +274,7 @@ function Tracker() {
           <table className="table">
             <thead>
               <tr>
+              <th>No.</th>
                 <th>Date</th>
                 <th>Vehicle</th>
                 <th>Station</th>
@@ -262,8 +286,9 @@ function Tracker() {
             </thead>
   
             <tbody>
-              {sessions.map((session) => (
+            {sessions.map((session, index) => (
                 <tr key={session.id}>
+<td>{sessions.length - index}</td>
                   <td>{session.date}</td>
   
                   <td>{session.vehicle}</td>

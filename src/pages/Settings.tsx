@@ -1,30 +1,9 @@
-import { supabase } from "../lib/supabase";
-
 import { useState } from "react";
 
 function Settings() {
   const [currency, setCurrency] = useState("INR (₹)");
-  const [tariff, setTariff] = useState(8);
+  const [tariff, setTariff] = useState(7);
   const [distanceUnit, setDistanceUnit] = useState("km");
-
-  const resetData = async () => {
-    if (!window.confirm("Delete all charging sessions?")) {
-      return;
-    }
-  
-    const { error } = await supabase
-      .from("charging_sessions")
-      .delete()
-      .neq("id", 0);
-  
-    if (error) {
-      console.error(error);
-      alert("Failed to delete charging data.");
-      return;
-    }
-  
-    alert("All charging sessions have been deleted.");
-  };
 
   return (
     <>
@@ -81,17 +60,6 @@ function Settings() {
       </div>
 
       <div className="card">
-        <h3>Storage</h3>
-
-        <button
-          className="primaryButton"
-          onClick={resetData}
-        >
-          Reset All Data
-        </button>
-      </div>
-
-      <div className="card">
         <h3>About</h3>
 
         <table className="table">
@@ -103,22 +71,39 @@ function Settings() {
 
             <tr>
               <td>Version</td>
-              <td>2.0</td>
+              <td>3.0</td>
             </tr>
 
             <tr>
               <td>Platform</td>
-              <td>React + Vite</td>
+              <td>React + Vite + TypeScript</td>
+            </tr>
+
+            <tr>
+              <td>Database</td>
+              <td>Supabase PostgreSQL</td>
+            </tr>
+
+            <tr>
+              <td>Hosting</td>
+              <td>Cloudflare Workers</td>
             </tr>
 
             <tr>
               <td>Storage</td>
-              <td>Supabase Cloud Database</td>
+              <td>Cloud Database</td>
             </tr>
+
+            <tr>
+              <td>Owner and Developer</td>
+              <td>Rakesh HB</td>
+            </tr>
+
           </tbody>
         </table>
       </div>
     </>
   );
 }
+
 export default Settings;
