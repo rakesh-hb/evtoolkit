@@ -267,68 +267,56 @@ function Tracker() {
         <h3>Recent Sessions</h3>
   
         {sessions.length === 0 ? (
-          <p style={{ marginTop: 15 }}>
-            No charging sessions recorded.
-          </p>
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-              <th>No.</th>
-                <th>Date</th>
-                <th>Vehicle</th>
-                <th>Station</th>
-                <th>Type</th>
-                <th>Energy</th>
-                <th>Cost</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-  
-            <tbody>
-            {sessions.map((session, index) => (
-                <tr key={session.id}>
-<td>{sessions.length - index}</td>
-                  <td>{session.date}</td>
-  
-                  <td>{session.vehicle}</td>
-  
-                  <td>
-                    {session.station || "-"}
-                  </td>
-  
-                  <td>{session.charger}</td>
-  
-                  <td>
-                    {session.energy.toFixed(1)} kWh
-                  </td>
-  
-                  <td>
-                    ₹{session.cost.toLocaleString()}
-                  </td>
-  
-                  <td>
-                    <button
-                      onClick={() =>
-                        deleteSession(session.id)
-                      }
-                      style={{
-                        background: "#ef4444",
-                        color: "white",
-                        border: "none",
-                        padding: "6px 10px",
-                        borderRadius: "8px",
-                        cursor: "pointer",
-                      }}
-                    >
-                      🗑 Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+  <p style={{ marginTop: 15 }}>
+    No charging sessions recorded.
+  </p>
+) : (
+  <div className="tableContainer">
+    <table className="table">
+      <thead>
+        <tr>
+          <th>No.</th>
+          <th>Date</th>
+          <th>Vehicle</th>
+          <th>Station</th>
+          <th>Type</th>
+          <th>Energy</th>
+          <th>Cost</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {sessions.map((session, index) => (
+          <tr key={session.id}>
+            <td>{sessions.length - index}</td>
+            <td>{session.date}</td>
+            <td>{session.vehicle}</td>
+            <td>{session.station || "-"}</td>
+            <td>{session.charger}</td>
+            <td>{session.energy.toFixed(1)} kWh</td>
+            <td>₹{session.cost.toLocaleString()}</td>
+            <td>
+              <button
+                onClick={() => deleteSession(session.id)}
+                style={{
+                  background: "#ef4444",
+                  color: "white",
+                  border: "none",
+                  padding: "6px 10px",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                }}
+              >
+                🗑 Delete
+              </button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+)}
       </div>
     </>
   );
