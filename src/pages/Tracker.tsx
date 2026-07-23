@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { supabase } from "../lib/supabase";
 import { vehicles } from "../data/vehicles";
 
 interface Session {
@@ -50,91 +51,96 @@ function Tracker() {
   const [date, setDate] =
     useState("");
 
-  const [sessions, setSessions] =
-    useState<Session[]>(() => {
+    const [sessions, setSessions] = useState<Session[]>([]);
 
-      const saved =
-        localStorage.getItem("evSessions");
-
-      return saved
-        ? JSON.parse(saved)
-        : [];
-
-    });
-
-  useEffect(() => {
-
-    localStorage.setItem(
-      "evSessions",
-      JSON.stringify(sessions)
-    );
-
-  }, [sessions]);
-
-  const addSession = () => {
-
-    if (
-      !vehicle ||
-      !energy ||
-      !cost ||
-      !date
-    ) {
-      alert("Please fill all required fields.");
-      return;
+    useEffect(() => {
+      loadSessions();
+    }, []);
+    
+    async function loadSessions() {
+      const { data, error } = await supabase
+        .from("charging_sessions")
+        .select("*")
+        .order("date", { ascending: false });
+    
+      if (error) {
+        console.error(error);
+        return;
+      }
+    
+      setSessions(data as Session[]);
     }
 
-    const newSession: Session = {
 
-      id: Date.now(),
+    const addSession = async () => {
 
-      vehicle,
-
-      charger,
-
-      energy: Number(energy),
-
-      cost: Number(cost),
-
-      station,
-
-      date
-
+      if (
+        !vehicle ||
+        !energy ||
+        !cost ||
+        !date
+      ) {
+        alert("Please fill all required fields.");
+        return;
+      }
+    
+      const newSession = {
+        vehicle,
+        charger,
+        energy: Number(energy),
+        cost: Number(cost),
+        station,
+        date,
+      };
+    
+      const { data, error } = await supabase
+        .from("charging_sessions")
+        .insert([newSession])
+        .select();
+    
+      if (error) {
+        console.error(error);
+        alert("Failed to save session");
+        return;
+      }
+    
+      setSessions((prev) => [
+        ...(data as Session[]),
+        ...prev,
+      ]);
+    
+      // Reset form
+      setVehicle(
+        `${defaultVehicle.brand} ${defaultVehicle.model}`
+      );
+      setCharger("Home AC");
+      setEnergy("");
+      setCost("");
+      setStation("");
+      setDate("");
     };
 
-    setSessions([
-      newSession,
-      ...sessions
-    ]);
+    const deleteSession = async (id: number) => {
 
-    setVehicle(
-      `${defaultVehicle.brand} ${defaultVehicle.model}`
-    );
-
-    setCharger("Home AC");
-
-    setEnergy("");
-
-    setCost("");
-
-    setStation("");
-
-    setDate("");
-
-  };
-
-  const deleteSession = (id: number) => {
-
-    if (!window.confirm(
-      "Delete this charging session?"
-    )) return;
-
-    setSessions(
-      sessions.filter(
-        session => session.id !== id
-      )
-    );
-
-  };
+      if (!window.confirm("Delete this charging session?")) {
+        return;
+      }
+    
+      const { error } = await supabase
+        .from("charging_sessions")
+        .delete()
+        .eq("id", id);
+    
+      if (error) {
+        console.error(error);
+        alert("Failed to delete session");
+        return;
+      }
+    
+      setSessions((prev) =>
+        prev.filter((session) => session.id !== id)
+      );
+    };
 
   return (
     <>

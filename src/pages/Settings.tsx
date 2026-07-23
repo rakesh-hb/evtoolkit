@@ -1,3 +1,5 @@
+import { supabase } from "../lib/supabase";
+
 import { useState } from "react";
 
 function Settings() {
@@ -5,11 +7,23 @@ function Settings() {
   const [tariff, setTariff] = useState(8);
   const [distanceUnit, setDistanceUnit] = useState("km");
 
-  const resetData = () => {
-    if (window.confirm("Delete all saved charging data?")) {
-      localStorage.clear();
-      alert("All local data has been cleared.");
+  const resetData = async () => {
+    if (!window.confirm("Delete all charging sessions?")) {
+      return;
     }
+  
+    const { error } = await supabase
+      .from("charging_sessions")
+      .delete()
+      .neq("id", 0);
+  
+    if (error) {
+      console.error(error);
+      alert("Failed to delete charging data.");
+      return;
+    }
+  
+    alert("All charging sessions have been deleted.");
   };
 
   return (
@@ -99,7 +113,7 @@ function Settings() {
 
             <tr>
               <td>Storage</td>
-              <td>Local Browser Storage</td>
+              <td>Supabase Cloud Database</td>
             </tr>
           </tbody>
         </table>

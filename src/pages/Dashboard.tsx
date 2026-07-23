@@ -1,22 +1,51 @@
+import { useEffect, useState } from "react";
+import { supabase } from "../lib/supabase";
+
+interface Session {
+  id: number;
+  vehicle: string;
+  charger: string;
+  energy: number;
+  cost: number;
+  station: string;
+  date: string;
+}
+
 function Dashboard() {
-  const sessions = JSON.parse(
-    localStorage.getItem("evSessions") || "[]"
-  );
+  const [sessions, setSessions] = useState<Session[]>([]);
+
+  useEffect(() => {
+    loadSessions();
+  }, []);
+
+  async function loadSessions() {
+    const { data, error } = await supabase
+      .from("charging_sessions")
+      .select("*")
+      .order("date", { ascending: false });
+
+    if (error) {
+      console.error("Error loading sessions:", error);
+      return;
+    }
+
+    setSessions(data as Session[]);
+  }
 
   const totalSessions = sessions.length;
 
   const totalEnergy = sessions.reduce(
-    (sum: number, item: any) => sum + item.energy,
+    (sum, item) => sum + item.energy,
     0
   );
 
   const totalCost = sessions.reduce(
-    (sum: number, item: any) => sum + item.cost,
+    (sum, item) => sum + item.cost,
     0
   );
 
   const rangeAdded = sessions.reduce(
-    (sum: number, item: any) => sum + item.energy * 6,
+    (sum, item) => sum + item.energy * 6,
     0
   );
 
@@ -86,17 +115,12 @@ function Dashboard() {
 
             <tr>
               <td>Average Cost / Session</td>
-              <td>
-                ₹
-                {averageCost.toFixed(2)}
-              </td>
+              <td>₹{averageCost.toFixed(2)}</td>
             </tr>
 
             <tr>
               <td>Estimated Range Added</td>
-              <td>
-                {rangeAdded.toFixed(0)} km
-              </td>
+              <td>{rangeAdded.toFixed(0)} km</td>
             </tr>
 
           </tbody>
@@ -132,24 +156,17 @@ function Dashboard() {
 
               <tr>
                 <td>Station</td>
-                <td>
-                  {lastSession.station || "-"}
-                </td>
+                <td>{lastSession.station || "-"}</td>
               </tr>
 
               <tr>
                 <td>Energy</td>
-                <td>
-                  {lastSession.energy} kWh
-                </td>
+                <td>{lastSession.energy.toFixed(1)} kWh</td>
               </tr>
 
               <tr>
                 <td>Cost</td>
-                <td>
-                  ₹
-                  {lastSession.cost.toLocaleString()}
-                </td>
+                <td>₹{lastSession.cost.toLocaleString()}</td>
               </tr>
 
             </tbody>

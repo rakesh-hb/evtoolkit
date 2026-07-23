@@ -1,3 +1,6 @@
+import { useEffect, useState } from "react";
+import { supabase } from "../lib/supabase";
+
 import {
   ResponsiveContainer,
   LineChart,
@@ -16,10 +19,38 @@ import {
   Legend,
 } from "recharts";
 
+interface Session {
+  id: number;
+  vehicle: string;
+  charger: string;
+  energy: number;
+  cost: number;
+  station: string;
+  date: string;
+}
+
+
 function Analytics() {
-  const sessions = JSON.parse(
-    localStorage.getItem("evSessions") || "[]"
-  );
+
+  const [sessions, setSessions] = useState<Session[]>([]);
+
+  useEffect(() => {
+    loadSessions();
+  }, []);
+
+  async function loadSessions() {
+    const { data, error } = await supabase
+      .from("charging_sessions")
+      .select("*")
+      .order("date", { ascending: false });
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    setSessions(data as Session[]);
+  }
 
   const totalSessions = sessions.length;
 
