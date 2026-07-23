@@ -24,12 +24,9 @@ body {
   position: sticky;
   top: 0;
   z-index: 100;
-
   background: #111827;
   border-bottom: 1px solid #1f2937;
-
   padding: 18px;
-
   font-size: 22px;
   font-weight: 700;
 }
@@ -45,7 +42,6 @@ body {
   border-radius: 16px;
   padding: 18px;
   margin-bottom: 18px;
-
   box-shadow: 0 5px 15px rgba(0,0,0,.25);
 }
 
@@ -67,107 +63,148 @@ body {
   color: #94a3b8;
 }
 
+/* ===========================
+   Stats Cards
+=========================== */
+
 .statsGrid {
-
   display: grid;
-
-  grid-template-columns: repeat(2,1fr);
-
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 15px;
-
   margin-bottom: 20px;
-
 }
 
 .statCard {
-
-  background: linear-gradient(
-      135deg,
-      #1e293b,
-      #334155
-  );
-
+  background: linear-gradient(135deg, #1e293b, #334155);
   border-radius: 16px;
-
   padding: 18px;
-
   text-align: center;
-
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .statCard h3 {
-
   color: #cbd5e1;
-
   font-size: 14px;
-
   margin-bottom: 12px;
-
   font-weight: 500;
-
 }
 
 .statCard h1 {
-
   color: #10b981;
-
   font-size: 28px;
-
 }
 
-.bottomNav {
+/* ===========================
+   KPI Cards
+=========================== */
 
-  position: fixed;
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 15px;
+}
 
-  left: 0;
+.kpiCard {
+  background: #334155;
+  border-radius: 14px;
+  padding: 18px;
+  text-align: center;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 
-  bottom: 0;
+.kpiCard h3 {
+  color: #cbd5e1;
+  font-size: 14px;
+}
 
+.kpiCard h2 {
+  margin-top: 10px;
+  color: #10b981;
+}
+
+/* ===========================
+   Forms
+=========================== */
+
+input,
+select {
   width: 100%;
+  padding: 12px;
+  margin-top: 6px;
+  margin-bottom: 14px;
+  border-radius: 10px;
+  border: none;
+  background: #334155;
+  color: white;
+}
 
+input[type="range"] {
+  padding: 0;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* ===========================
+   Tables
+=========================== */
+
+.tableContainer {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table {
+  width: 100%;
+  min-width: 850px;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 10px;
+  border-bottom: 1px solid #334155;
+  white-space: nowrap;
+}
+
+/* ===========================
+   Bottom Navigation
+=========================== */
+
+.bottomNav {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: 100%;
   background: #111827;
-
   border-top: 1px solid #334155;
-
   display: flex;
-
   justify-content: space-around;
-
   padding: 8px 0;
-
+  z-index: 1000;
 }
 
 .bottomNav button {
-
   flex: 1;
-
   background: transparent;
-
   border: none;
-
   color: #94a3b8;
-
   display: flex;
-
   flex-direction: column;
-
   align-items: center;
-
   justify-content: center;
-
   gap: 4px;
-
-  cursor: pointer;
-
-  transition: .2s;
-
   padding: 8px;
-
+  cursor: pointer;
+  transition: all .2s ease;
 }
 
 .bottomNav button:hover {
-  color: white;
-
+  color: #ffffff;
 }
 
 .bottomNav button.active {
@@ -176,7 +213,7 @@ body {
   font-weight: 700;
   border-radius: 12px;
   transform: translateY(-2px);
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
+  box-shadow: 0 2px 8px rgba(16,185,129,.25);
 }
 
 .bottomNav button.active svg,
@@ -184,142 +221,29 @@ body {
   color: #10b981;
 }
 
-button {
-
-  cursor: pointer;
-
-}
-
-input,
-select {
-
-  width: 100%;
-
-  padding: 12px;
-
-  margin-top: 6px;
-
-  margin-bottom: 14px;
-
-  border-radius: 10px;
-
-  border: none;
-
-  background: #334155;
-
-  color: white;
-
-}
-
-input[type="range"] {
-
-  padding: 0;
-
-}
+/* ===========================
+   Primary Button
+=========================== */
 
 .primaryButton {
-
   width: 100%;
-
   padding: 14px;
-
   border: none;
-
   border-radius: 12px;
-
   background: #10b981;
-
-  color: white;
-
+  color: #ffffff;
   font-size: 16px;
-
-  font-weight: bold;
-
+  font-weight: 600;
+  transition: .2s;
 }
 
 .primaryButton:hover {
-
   background: #059669;
-
 }
 
-.kpiGrid {
-
-  display: grid;
-
-  grid-template-columns: repeat(2,1fr);
-
-  gap: 15px;
-
-}
-
-.kpiCard {
-
-  background: #334155;
-
-  border-radius: 14px;
-
-  padding: 18px;
-
-  text-align: center;
-
-}
-
-.kpiCard h3 {
-
-  color: #cbd5e1;
-
-  font-size: 14px;
-
-}
-
-.kpiCard h2 {
-
-  margin-top: 10px;
-
-  color: #10b981;
-
-}
-
-.table {
-
-  width: 100%;
-
-  border-collapse: collapse;
-
-}
-
-.table td {
-
-  padding: 10px;
-
-  border-bottom: 1px solid #334155;
-
-}
-
-@media (min-width:900px) {
-
-  .content {
-
-    width: 900px;
-
-    margin: auto;
-
-  }
-
-  .bottomNav {
-
-    width: 900px;
-
-    left: 50%;
-
-    transform: translateX(-50%);
-
-    border-radius: 18px 18px 0 0;
-
-  }
-
-}
+/* ===========================
+   Button Group
+=========================== */
 
 .buttonGroup {
   display: flex;
@@ -330,22 +254,24 @@ input[type="range"] {
 .buttonGroup button {
   flex: 1;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 14px 18px;
   font-size: 16px;
   font-weight: 600;
-  cursor: pointer;
-  transition: 0.2s;
+  transition: .2s;
 }
 
-.primaryButton {
+/* Save Button */
+
+.buttonGroup .primaryButton {
   background: #10b981;
-  color: white;
 }
 
-.primaryButton:hover {
+.buttonGroup .primaryButton:hover {
   background: #059669;
 }
+
+/* Reset Button */
 
 .dangerButton {
   background: #ef4444;
@@ -354,4 +280,141 @@ input[type="range"] {
 
 .dangerButton:hover {
   background: #dc2626;
+}
+
+/* ===========================
+   Labels
+=========================== */
+
+label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+/* ===========================
+   Desktop Layout
+=========================== */
+
+@media (min-width: 900px) {
+
+  .content {
+    width: 900px;
+    margin: auto;
+  }
+
+  .bottomNav {
+    width: 900px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: 18px 18px 0 0;
+  }
+
+}
+
+/* ===========================
+   Mobile Responsive
+=========================== */
+
+@media (max-width: 768px) {
+
+  .content {
+    padding: 14px;
+    padding-bottom: 90px;
+  }
+
+  .header {
+    padding: 16px;
+    font-size: 20px;
+  }
+
+  .welcome h2 {
+    font-size: 22px;
+  }
+
+  .welcome p {
+    font-size: 14px;
+  }
+
+  /* Cards */
+
+  .card {
+    padding: 16px;
+  }
+
+  .statsGrid,
+  .kpiGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .statCard h1 {
+    font-size: 24px;
+  }
+
+  .kpiCard h2 {
+    font-size: 22px;
+  }
+
+  /* Forms */
+
+  input,
+  select {
+    font-size: 16px;
+  }
+
+  /* Tables */
+
+  .tableContainer {
+    margin: 0 -14px;
+    padding: 0 14px;
+  }
+
+  .table {
+    min-width: 750px;
+    font-size: 13px;
+  }
+
+  .table th,
+  .table td {
+    padding: 8px 10px;
+  }
+
+  /* Buttons */
+
+  .buttonGroup {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .buttonGroup button {
+    width: 100%;
+  }
+
+  /* Bottom Navigation */
+
+  .bottomNav {
+    padding: 6px 0;
+  }
+
+  .bottomNav button {
+    padding: 8px 4px;
+    font-size: 12px;
+  }
+
+  .bottomNav button svg {
+    font-size: 20px;
+  }
+
+}
+
+/* ===========================
+   Large Desktop
+=========================== */
+
+@media (min-width: 1200px) {
+
+  .content {
+    max-width: 1100px;
+  }
+
 }

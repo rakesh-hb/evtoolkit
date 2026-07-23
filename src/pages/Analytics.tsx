@@ -755,7 +755,7 @@ label
     <thead>
 
       <tr>
-
+        <th>No.</th>
         <th>Date</th>
 
         <th>Vehicle</th>
@@ -774,30 +774,32 @@ label
 
     <tbody>
 
-      {sessions
-        .slice()
-        .reverse()
-        .map((session: any) => (
+  {sessions
+    .slice()
+    .reverse()
+    .map((session: any, index: number) => (
 
-          <tr key={session.id}>
+      <tr key={session.id}>
 
-            <td>{session.date}</td>
+<td>{sessions.length - index}</td>
 
-            <td>{session.vehicle}</td>
+        <td>{session.date}</td>
 
-            <td>{session.station || "-"}</td>
+        <td>{session.vehicle}</td>
 
-            <td>{session.charger}</td>
+        <td>{session.station || "-"}</td>
 
-            <td>{session.energy.toFixed(1)} kWh</td>
+        <td>{session.charger}</td>
 
-            <td>₹{session.cost.toLocaleString()}</td>
+        <td>{session.energy.toFixed(1)} kWh</td>
 
-          </tr>
+        <td>₹{session.cost.toLocaleString()}</td>
 
-        ))}
+      </tr>
 
-    </tbody>
+    ))}
+
+</tbody>
 
   </table>
 
