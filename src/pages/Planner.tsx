@@ -68,7 +68,6 @@ function Planner() {
   return (
 
     <>
-
       <div className="welcome">
 
         <h2>
