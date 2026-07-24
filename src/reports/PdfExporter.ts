@@ -92,16 +92,11 @@ function defaultTableTheme() {
     headStyles: {
       fillColor: COLORS.primary,
       textColor: 255,
-      fontStyle: "bold",
+      fontStyle: "bold" as const,
     },
 
     alternateRowStyles: {
       fillColor: COLORS.light,
-    },
-
-    margin: {
-      left: MARGIN,
-      right: MARGIN,
     },
   };
 }
@@ -377,7 +372,7 @@ autoTable(pdf, {
   footStyles: {
     fillColor: [235,235,235],
     textColor: 0,
-    fontStyle: "bold",
+    fontStyle: "bold" as const,
   },
 
   ...defaultTableTheme(),
@@ -432,7 +427,7 @@ autoTable(pdf, {
   footStyles: {
     fillColor: [235,235,235],
     textColor: 0,
-    fontStyle: "bold",
+    fontStyle: "bold" as const,
   },
 
   ...defaultTableTheme(),
@@ -602,7 +597,7 @@ autoTable(pdf, {
   headStyles: {
     fillColor: COLORS.primary,
     textColor: 255,
-    fontStyle: "bold",
+    fontStyle: "bold" as const,
   },
 
   alternateRowStyles: {
