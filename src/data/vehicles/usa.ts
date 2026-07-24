@@ -1,4 +1,5 @@
-import type { Vehicle } from "../vehicles";
+import type { Vehicle } from "../types";
+
 
 export const usaVehicles: Vehicle[] = [
 
