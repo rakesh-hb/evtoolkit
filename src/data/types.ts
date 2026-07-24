@@ -14,7 +14,7 @@ export interface Vehicle {
   
     batteryChemistry?: "LFP" | "LMFP" | "NMC" | "NCA";
     architecture?: number;
-      
+
     // Charging
     acPower: number;
     dcPower: number;
@@ -48,17 +48,18 @@ export interface Vehicle {
   
     // Dimensions & Body
     bodyType?:
-      | "Hatchback"
-      | "Sedan"
-      | "SUV"
-      | "SUV Coupe"
-      | "Crossover"
-      | "MPV"
-      | "Pickup"
-      | "Van"
-      | "Sports Sedan"
-      | "Luxury Sedan"
-      | "Luxury SUV";
+  | "Hatchback"
+  | "Sedan"
+  | "SUV"
+  | "SUV Coupe"
+  | "Coupe"
+  | "Crossover"
+  | "MPV"
+  | "Pickup"
+  | "Van"
+  | "Sports Sedan"
+  | "Luxury Sedan"
+  | "Luxury SUV";
   
     seats?: number;
     bootSpace?: number;

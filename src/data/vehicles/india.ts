@@ -1057,7 +1057,7 @@ export const indiaVehicles: Vehicle[] = [
         connectorAC: "Type 2",
         connectorDC: "Not Supported",
     
-        chargingPortLocation: "Front",
+        chargingPortLocation: "Front Left",
         fastCharge10to80: 0,
     
         motorType: "Single Motor",
@@ -2906,7 +2906,7 @@ export const indiaVehicles: Vehicle[] = [
         chargingPortLocation: "Rear Left",
         fastCharge10to80: 18,
     
-        motorType: "Triple Motor",
+        motorType: "Tri Motor",
         drivetrain: "AWD",
     
         maxPower: 560,
