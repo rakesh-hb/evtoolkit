@@ -1,3 +1,5 @@
+import { Vehicle } from "../types";
+
 export const indiaVehicles: Vehicle[] = [
 
     {
@@ -3151,7 +3153,7 @@ export const indiaVehicles: Vehicle[] = [
         warrantyVehicle: "3 years / 100,000 km",
       },
 
-      
+
 
 
   ];

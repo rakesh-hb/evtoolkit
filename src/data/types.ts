@@ -13,8 +13,8 @@ export interface Vehicle {
     realWorldEfficiency?: number;
   
     batteryChemistry?: "LFP" | "LMFP" | "NMC" | "NCA";
-    architecture?: 400 | 800;
-  
+    architecture?: number;
+      
     // Charging
     acPower: number;
     dcPower: number;
