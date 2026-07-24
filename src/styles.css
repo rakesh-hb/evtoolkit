@@ -96,6 +96,32 @@ body {
   font-weight: 700;
 }
 
+.headerMenuButton {
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 28px;
+  cursor: pointer;
+
+  width: 44px;
+  height: 44px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 10px;
+}
+
+.headerMenuButton:hover {
+  background: rgba(255,255,255,.08);
+}
+
+.headerMenuButton:active {
+  background: rgba(255,255,255,.15);
+}
+
+
 /* ==========================================
    Main Content
 ========================================== */
@@ -814,5 +840,36 @@ select:focus {
 
     min-height: 260px;
   }
+
+  .formGrid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:16px;
+    margin-bottom:16px;
+}
+
+.formGrid label{
+    display:block;
+    margin-bottom:6px;
+    font-weight:600;
+}
+
+.formGrid input,
+.formGrid select,
+textarea{
+    width:100%;
+    padding:10px;
+    border:1px solid #d0d0d0;
+    border-radius:8px;
+    box-sizing:border-box;
+}
+
+textarea{
+    resize:vertical;
+}
+
+button{
+    cursor:pointer;
+}
 
 }

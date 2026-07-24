@@ -1,13 +1,20 @@
+import SideDrawer from "./components/SideDrawer";
 import { useState } from "react";
 
-import Planner from "./pages/Planner";
 import Dashboard from "./pages/Dashboard";
+import Planner from "./pages/Planner";
 import Tracker from "./pages/Tracker";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 
+import ServiceHistory from "./pages/ServiceHistory";
+import TyreHistory from "./pages/TyreHistory";
+import Insurance from "./pages/Insurance";
+
 function App() {
   const [page, setPage] = useState("dashboard");
+
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const renderPage = () => {
     switch (page) {
@@ -23,6 +30,15 @@ function App() {
       case "analytics":
         return <Analytics />;
 
+      case "service":
+        return <ServiceHistory />;
+
+      case "tyres":
+        return <TyreHistory />;
+
+      case "insurance":
+        return <Insurance />;
+
       case "settings":
         return <Settings />;
 
@@ -33,51 +49,86 @@ function App() {
 
   return (
     <div className="app">
-      <header className="header">⚡ EV Toolkit</header>
+<header
+  className="header"
+  style={{
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+  }}
+>
+<button
+  onClick={() => setDrawerOpen(true)}
+  style={{
+    border: "none",
+    background: "transparent",
+    color: "#ffffff",
+    fontSize: "28px",
+    cursor: "pointer",
+    width: "40px",
+    height: "40px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  }}
+>
+  ☰
+</button>
 
-      <main className="content">{renderPage()}</main>
+  <h2 style={{ margin: 0 }}>⚡ EV Toolkit</h2>
 
-      <nav className="bottomNav">
-        <button
-          className={page === "dashboard" ? "active" : ""}
-          onClick={() => setPage("dashboard")}
-        >
-          <span style={{ fontSize: 20 }}>🏠</span>
-          <span>Home</span>
-        </button>
+  <div style={{ width: 24 }} />
+</header>
 
-        <button
-          className={page === "planner" ? "active" : ""}
-          onClick={() => setPage("planner")}
-        >
-          <span style={{ fontSize: 20 }}>⚡</span>
-          <span>Planner</span>
-        </button>
+<SideDrawer
+  open={drawerOpen}
+  currentPage={page}
+  onClose={() => setDrawerOpen(false)}
+  onNavigate={setPage}
+/>
 
-        <button
-          className={page === "tracker" ? "active" : ""}
-          onClick={() => setPage("tracker")}
-        >
-          <span style={{ fontSize: 20 }}>📝</span>
-          <span>Tracker</span>
-        </button>
+      <main className="content">
+      {renderPage()}
 
-        <button
-          className={page === "analytics" ? "active" : ""}
-          onClick={() => setPage("analytics")}
-        >
-          <span style={{ fontSize: 20 }}>📊</span>
-          <span>Analytics</span>
-        </button>
+</main>
+<nav className="bottomNav">
+  <button
+    className={page === "dashboard" ? "active" : ""}
+    onClick={() => setPage("dashboard")}
+  >
+    🏠
+    <span>Home</span>
+  </button>
 
-        <button
-          className={page === "settings" ? "active" : ""}
-          onClick={() => setPage("settings")}
-        >
-          <span style={{ fontSize: 20 }}>⚙️</span>
-          <span>Settings</span>
-        </button>
-      </nav>
+  <button
+    className={page === "planner" ? "active" : ""}
+    onClick={() => setPage("planner")}
+  >
+    ⚡
+    <span>Planner</span>
+  </button>
+
+  <button
+    className={page === "tracker" ? "active" : ""}
+    onClick={() => setPage("tracker")}
+  >
+    🔋
+    <span>Charging</span>
+  </button>
+
+  <button
+    className={page === "analytics" ? "active" : ""}
+    onClick={() => setPage("analytics")}
+  >
+    📊
+    <span>Analytics</span>
+  </button>
+
+  <button onClick={() => setDrawerOpen(true)}>
+    ☰
+    <span>More</span>
+  </button>
+</nav>
     </div>
   );
 }
