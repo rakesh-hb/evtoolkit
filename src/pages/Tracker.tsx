@@ -12,18 +12,114 @@ interface Session {
   date: string;
 }
 
-const chargingStations = [
-  { name: "Tata Power EZ", amount: 0 },
-  { name: "Shell Recharge", amount: 0 },
-  { name: "BESCOM EV Mithra", amount: 0 },
-  { name: "Static", amount: 0 },
-  { name: "ChargeZone", amount: 0 },
-  { name: "Zeon", amount: 0 },
-  { name: "BPCL", amount: 0 },
-  { name: "Jio-bp Pulse", amount: 0 },
-  { name: "EV Dock", amount: 0 },
-  { name: "eHUB by MG", amount: 0 },
-  { name: "Indian Oil", amount: 0 },
+export interface ChargingStationOption {
+  name: string;
+  category:
+    | "Home"
+    | "Public"
+    | "Office"
+    | "Fleet"
+    | "Highway"
+    | "Commercial"
+    | "OEM"
+    | "Utility"
+    | "Fuel Station"
+    | "Other";
+}
+
+export const chargingStations: ChargingStationOption[] = [
+  // -------------------------
+  // Home
+  // -------------------------
+  { name: "Home Charging", category: "Home" },
+  { name: "Home 3.3kw", category: "Home" },
+  { name: "Home 7.2kw", category: "Home" },
+  { name: "Home 7.4kw", category: "Home" },
+  { name: "Home 11kw", category: "Home" },
+  { name: "Home 22kw", category: "Home" },
+  { name: "Apartment/Residential/Society Charger", category: "Home" },
+
+  // -------------------------
+  // Public CPOs
+  // -------------------------
+  { name: "Tata Power EZ Charge", category: "Public" },
+  { name: "Statiq", category: "Public" },
+  { name: "ChargeZone", category: "Public" },
+  { name: "Jio-bp Pulse", category: "Public" },
+  { name: "Bolt.Earth", category: "Public" },
+  { name: "Kazam", category: "Public" },
+  { name: "ThunderPlus", category: "Public" },
+  { name: "ElectreeFi", category: "Public" },
+  { name: "EV Dock", category: "Public" },
+  { name: "ChargeMOD", category: "Public" },
+  { name: "Glida", category: "Public" },
+  { name: "Fortum Charge & Drive", category: "Public" },
+  { name: "Relux Electric", category: "Public" },
+  { name: "ElectricPe", category: "Public" },
+  { name: "EVRE", category: "Public" },
+  { name: "EV91", category: "Public" },
+  { name: "PlugNGo", category: "Public" },
+  { name: "GO EC", category: "Public" },
+
+  // -------------------------
+  // Fuel Retailers
+  // -------------------------
+  { name: "Indian Oil", category: "Fuel Station" },
+  { name: "BPCL", category: "Fuel Station" },
+  { name: "HPCL", category: "Fuel Station" },
+  { name: "Shell Recharge", category: "Fuel Station" },
+
+  // -------------------------
+  // State Utilities
+  // -------------------------
+  { name: "BESCOM EV Mithra", category: "Utility" },
+  //{ name: "KSEB", category: "Utility" },
+  //{ name: "MSEDCL", category: "Utility" },
+  //{ name: "TANGEDCO", category: "Utility" },
+  //{ name: "UPPCL", category: "Utility" },
+ // { name: "GUVNL", category: "Utility" },
+ // { name: "WBSEDCL", category: "Utility" },
+  //{ name: "TSNPDCL", category: "Utility" },
+ // { name: "TSSPDCL", category: "Utility" },
+  //{ name: "APSPDCL", category: "Utility" },
+  //{ name: "APEPDCL", category: "Utility" },
+  //{ name: "NTPC", category: "Utility" },
+  //{ name: "NHPC", category: "Utility" },
+  //{ name: "PowerGrid", category: "Utility" },
+  //{ name: "EESL", category: "Utility" },
+
+  // -------------------------
+  // OEM Networks
+  // -------------------------
+  { name: "Ather Grid", category: "OEM" },
+  { name: "Hyundai EV Charging", category: "OEM" },
+  { name: "MG ChargeHub", category: "OEM" },
+  { name: "Mahindra Charging", category: "OEM" },
+  { name: "BYD Charging", category: "OEM" },
+  { name: "BMW Charging", category: "OEM" },
+  { name: "Mercedes-Benz Charging", category: "OEM" },
+  { name: "Audi Charging", category: "OEM" },
+  { name: "Kia EV Charging", category: "OEM" },
+  { name: "Volvo Charging", category: "OEM" },
+
+  // -------------------------
+  // Office
+  // -------------------------
+  { name: "Office Charger", category: "Office" },
+
+  // -------------------------
+  // Commercial Locations
+  // -------------------------
+  { name: "Mall Charging", category: "Commercial" },
+  { name: "Hotel/Restaurant Charging", category: "Commercial" },
+  { name: "Airport Charging", category: "Commercial" },
+  { name: "Metro Station Charging", category: "Commercial" },
+  { name: "Hospital Charging", category: "Commercial" },
+
+  // -------------------------
+  // Generic
+  // -------------------------
+  { name: "Other", category: "Other" }
 ];
 
 function Tracker() {

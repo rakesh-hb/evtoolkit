@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import ReportToolbar from "../components/reports/ReportToolbar";
 
 import {
   ResponsiveContainer,
@@ -227,12 +228,34 @@ function Analytics() {
     "#84cc16",
   ];
 
+  const reportData = {
+    totalSessions,
+    totalEnergy,
+    totalCost,
+    averageEnergy,
+    averageCost,
+    estimatedRange,
+  
+    vehicleStats,
+    stationStats,
+    monthlyStats,
+    yearlyStats,
+    weeklyStats,
+  
+    sessions,
+  };
+
   return (
     <>
       <div className="welcome">
-        <h2>📊 Analytics Dashboard</h2>
-        <p>Detailed insights into your EV charging history.</p>
+  <h2>📊 Analytics Dashboard</h2>
+  <p>Detailed insights into your EV charging history.</p>
+
+  <div style={{ marginTop: "16px" }}>
+  <ReportToolbar reportData={reportData} />
+  
       </div>
+</div>
 
       <div className="statsGrid">
         <div className="statCard">
@@ -266,8 +289,8 @@ function Analytics() {
         </div>
       </div>
 
-      <div className="card">
-        <h3>💰 Monthly Spend Trend</h3>
+      <div id="monthlySpendChart" className="card">
+  <h3>💰 Monthly Spend Trend</h3>
 
         <ResponsiveContainer width="100%" height={320}>
           <AreaChart data={monthlyChartData}>
@@ -287,8 +310,8 @@ function Analytics() {
         </ResponsiveContainer>
       </div>
 
-      <div className="card">
-        <h3>⚡ Monthly Energy Trend</h3>
+      <div id="monthlyEnergyChart" className="card">
+  <h3>⚡ Monthly Energy Trend</h3>
 
         <ResponsiveContainer width="100%" height={320}>
           <LineChart data={monthlyChartData}>
@@ -348,8 +371,8 @@ function Analytics() {
         </div>
       </div>
 
-      <div className="card">
-        <h3>📅 Weekly Sessions</h3>
+      <div id="weeklyChart" className="card">
+  <h3>📅 Weekly Sessions</h3>
 
         <ResponsiveContainer width="100%" height={320}>
           <BarChart data={weeklyChartData}>
@@ -487,8 +510,8 @@ function Analytics() {
         )}
       </div>
 
-      <div className="card">
-        <h3>🔌 Charging Type Distribution</h3>
+      <div id="chargingTypeChart" className="card">
+  <h3>🔌 Charging Type Distribution</h3>
 
         <ResponsiveContainer width="100%" height={350}>
           <PieChart>

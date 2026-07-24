@@ -11,16 +11,20 @@ function Planner() {
 
   const brands = [...new Set(vehicles.map((v) => v.brand))].sort();
 
-  const [selectedBrand, setSelectedBrand] = useState(vehicles[0].brand);
+  const [selectedBrand, setSelectedBrand] = useState("Tata");
   
   const brandVehicles = useMemo(
     () => vehicles.filter((v) => v.brand === selectedBrand),
     [selectedBrand]
   );
   
-  const [vehicleId, setVehicleId] = useState(
-    () => brandVehicles[0]?.id ?? vehicles[0].id
-  );
+  const defaultVehicle =
+  vehicles.find((v) =>
+    v.brand === "Tata" &&
+    v.model.toLowerCase().includes("curvv")
+  ) ?? vehicles[0];
+
+const [vehicleId, setVehicleId] = useState(defaultVehicle.id);
   
   useEffect(() => {
     if (
@@ -31,7 +35,14 @@ function Planner() {
     }
   }, [brandVehicles, vehicleId]);
 
-const [chargerId, setChargerId] = useState(chargers[0].id);
+  const defaultCharger =
+  chargers.find(
+    (c) =>
+      c.power === 3.3 &&
+      c.name.toLowerCase().includes("home")
+  ) ?? chargers[0];
+
+const [chargerId, setChargerId] = useState(defaultCharger.id);
 
   const [state, setState] = useState("Karnataka");
 

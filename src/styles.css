@@ -34,6 +34,51 @@ body {
 }
 
 /* ==========================================
+   Report Toolbar
+========================================== */
+
+.reportToolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+.reportButton {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  background: linear-gradient(135deg, #10b981, #059669);
+
+  color: white;
+
+  border: none;
+  border-radius: 12px;
+
+  padding: 12px 18px;
+
+  font-size: 15px;
+  font-weight: 600;
+
+  transition: all .25s ease;
+
+  box-shadow: 0 5px 15px rgba(16,185,129,.25);
+}
+
+.reportButton:hover {
+  transform: translateY(-2px);
+
+  background: linear-gradient(135deg,#059669,#047857);
+
+  box-shadow: 0 8px 18px rgba(16,185,129,.35);
+}
+
+.reportButton:active {
+  transform: scale(.98);
+}
+
+
+/* ==========================================
    Header
 ========================================== */
 
