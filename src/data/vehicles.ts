@@ -6,20 +6,22 @@ export interface Vehicle {
   year?: number;
   country?: string;
 
-// Battery & Range
-battery: number;              // kWh
-range: number;                // km
-certifiedEfficiency: number;           // Certified efficiency (km/kWh)
-realWorldEfficiency?: number; // Typical real-world efficiency (km/kWh)
+  // Battery & Range
+  battery: number;
+  range: number;
+  efficiency: number;
+  realWorldEfficiency?: number;
 
-batteryChemistry?: "LFP" | "LMFP" | "NMC" | "NCA";
-architecture?: 400 | 800;
+  batteryChemistry?: "LFP" | "LMFP" | "NMC" | "NCA";
+  architecture?: 400 | 800;
 
   // Charging
-  acPower: number;              // kW
-  dcPower: number;              // kW
+  acPower: number;
+  dcPower: number;
+
   connectorAC?: string;
   connectorDC?: string;
+
   chargingPortLocation?:
     | "Front Left"
     | "Front Right"
@@ -27,7 +29,8 @@ architecture?: 400 | 800;
     | "Rear Right"
     | "Front Center"
     | "Rear Center";
-  fastCharge10to80?: number;    // minutes
+
+  fastCharge10to80?: number;
 
   // Powertrain
   motorType?:
@@ -35,13 +38,15 @@ architecture?: 400 | 800;
     | "Dual Motor"
     | "Tri Motor"
     | "Quad Motor";
-  drivetrain?: "FWD" | "RWD" | "AWD";
-  maxPower?: number;            // kW
-  maxTorque?: number;           // Nm
-  acceleration0to100?: number;  // seconds
-  topSpeed?: number;            // km/h
 
-  // Vehicle
+  drivetrain?: "FWD" | "RWD" | "AWD";
+
+  maxPower?: number;
+  maxTorque?: number;
+  acceleration0to100?: number;
+  topSpeed?: number;
+
+  // Dimensions & Body
   bodyType?:
     | "Hatchback"
     | "Sedan"
@@ -54,16 +59,23 @@ architecture?: 400 | 800;
     | "Sports Sedan"
     | "Luxury Sedan"
     | "Luxury SUV";
+
   seats?: number;
-  bootSpace?: number;           // litres
-  kerbWeight?: number;          // kg
-  groundClearance?: number;     // mm
-  wheelbase?: number;           // mm
-  towingCapacity?: number;      // kg
+  bootSpace?: number;
+  kerbWeight?: number;
+  groundClearance?: number;
+  wheelbase?: number;
+  towingCapacity?: number;
+
   vehicleClass?: "Passenger" | "Commercial";
 
-  // Features
-  adasLevel?: "None" | "Level 1" | "Level 2" | "Level 2+" | "Level 3";
+  // Driver Assistance
+  adasLevel?:
+    | "None"
+    | "Level 1"
+    | "Level 2"
+    | "Level 2+"
+    | "Level 3";
 
   // Warranty
   warrantyBattery?: string;
