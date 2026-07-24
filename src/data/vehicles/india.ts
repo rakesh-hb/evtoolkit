@@ -292,7 +292,7 @@ export const indiaVehicles: Vehicle[] = [
     connectorAC: "Type 2",
     connectorDC: "CCS2",
   
-    bodyType: "CUV",
+    bodyType: "Crossover",
     drivetrain: "FWD",
   
     seats: 5,
@@ -361,7 +361,7 @@ export const indiaVehicles: Vehicle[] = [
     connectorAC: "Type 2",
     connectorDC: "CCS2",
   
-    bodyType: "CUV",
+    bodyType: "Crossover",
     drivetrain: "RWD",
   
     seats: 5,
@@ -933,5 +933,5 @@ export const indiaVehicles: Vehicle[] = [
     country: "India",
   },
 
-  
+
 ];

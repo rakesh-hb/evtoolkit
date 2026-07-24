@@ -132,7 +132,7 @@ export const usaVehicles: Vehicle[] = [
     connectorAC: "NACS",
     connectorDC: "NACS",
 
-    bodyType: "Performance SUV",
+    bodyType: "Luxury SUV",
     drivetrain: "AWD",
 
     seats: 5,
@@ -178,7 +178,7 @@ export const usaVehicles: Vehicle[] = [
     connectorAC: "NACS",
     connectorDC: "NACS",
 
-    bodyType: "Performance Sedan",
+    bodyType: "Sports Sedan",
     drivetrain: "AWD",
 
     seats: 5,
@@ -224,7 +224,7 @@ export const usaVehicles: Vehicle[] = [
     connectorAC: "NACS",
     connectorDC: "NACS",
 
-    bodyType: "Performance SUV",
+    bodyType: "Luxury SUV",
     drivetrain: "AWD",
 
     seats: 7,
