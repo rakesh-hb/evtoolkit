@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { TyreRecord } from "../../types/tyre";
+import type { TyreRecord } from "../types/tyre";
 
 const STORAGE_KEY = "evtoolkit_tyres";
 
