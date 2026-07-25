@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ServiceRecord } from "../types/service";
-import { test, loadData, saveData } from "../utils/storage";
+import {
+  getServiceRecords,
+  addServiceRecord,
+  updateServiceRecord,
+  deleteServiceRecord,
+} from "../services/serviceHistoryService";
 
-console.log(test);
-
+import { vehicles } from "../data/vehicles";
 import ReceiptUploader from "../components/ReceiptUploader";
 
-const STORAGE_KEY = "serviceHistory";
 
 const emptyRecord: ServiceRecord = {
   id: 0,
+  vehicle: "",
   date: "",
   odometer: 0,
   serviceType: "",
@@ -28,13 +32,19 @@ export default function ServiceHistory() {
 
   const [editingId, setEditingId] = useState<number | null>(null);
 
+  async function loadRecords() {
+    try {
+      const data = await getServiceRecords();
+      setRecords(data);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to load service history.");
+    }
+  }
+  
   useEffect(() => {
-    setRecords(loadData<ServiceRecord[]>(STORAGE_KEY, []));
+    loadRecords();
   }, []);
-
-  useEffect(() => {
-    saveData(STORAGE_KEY, records);
-  }, [records]);
 
   const filtered = useMemo(() => {
     const text = search.toLowerCase();
@@ -61,8 +71,6 @@ export default function ServiceHistory() {
 
       <div className="card">
 
-      <label>Invoice / Receipt</label>
-
 <ReceiptUploader
   value={form.attachment}
   onChange={(attachment) =>
@@ -73,7 +81,11 @@ export default function ServiceHistory() {
   }
 />
 
-  <h3>Add Service Record</h3>
+<h3>
+  {editingId !== null
+    ? "Edit Service Record"
+    : "Add Service Record"}
+</h3>
 
   <div className="formGrid">
 
@@ -87,6 +99,32 @@ export default function ServiceHistory() {
         }
       />
     </div>
+
+    <div>
+  <label>Vehicle</label>
+
+  <select
+    value={form.vehicle}
+    onChange={(e) =>
+      setForm({
+        ...form,
+        vehicle: e.target.value,
+      })
+    }
+    disabled={editingId !== null}
+  >
+    <option value="">Select Vehicle</option>
+
+    {vehicles.map((vehicle) => (
+      <option
+        key={`${vehicle.country}-${vehicle.id}`}
+        value={`${vehicle.brand} ${vehicle.model}`}
+      >
+        {vehicle.brand} {vehicle.model}
+      </option>
+    ))}
+  </select>
+</div>
 
     <div>
       <label>Odometer (km)</label>
@@ -214,9 +252,9 @@ export default function ServiceHistory() {
   <br />
 
   <button
-  onClick={() => {
-
+  onClick={async () => {
     if (
+      !form.vehicle ||
       !form.date ||
       !form.serviceType ||
       !form.serviceCenter
@@ -225,32 +263,29 @@ export default function ServiceHistory() {
       return;
     }
 
-    if (editingId !== null) {
+    try {
+      if (editingId !== null) {
+        await updateServiceRecord({
+          ...form,
+          id: editingId,
+        });
 
-      setRecords(
-        records.map((r) =>
-          r.id === editingId
-            ? { ...form, id: editingId }
-            : r
-        )
-      );
+        alert("Service updated successfully.");
+      } else {
+        const { id, ...newRecord } = form;
+await addServiceRecord(newRecord);
+
+        alert("Service record added successfully.");
+      }
+
+      await loadRecords();
 
       setEditingId(null);
-
-    } else {
-
-      setRecords([
-        ...records,
-        {
-          ...form,
-          id: Date.now(),
-        },
-      ]);
-
+      setForm(emptyRecord);
+    } catch (error) {
+      console.error(error);
+      alert("Failed to save service record.");
     }
-
-    setForm(emptyRecord);
-
   }}
 >
   {editingId !== null
@@ -337,11 +372,13 @@ export default function ServiceHistory() {
     <button
       className="editButton"
       onClick={() => {
-
         setEditingId(record.id);
-
         setForm(record);
-
+      
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
       }}
     >
       Edit
@@ -351,23 +388,21 @@ export default function ServiceHistory() {
 
     <button
   className="deleteButton"
-  onClick={() => {
-
-        if (
-          window.confirm(
-            "Delete this service record?"
-          )
-        ) {
-
-          setRecords(
-            records.filter(
-              (r) => r.id !== record.id
-            )
-          );
-
-        }
-
-      }}
+  onClick={async () => {
+    if (!window.confirm("Delete this service record?")) {
+      return;
+    }
+  
+    try {
+      await deleteServiceRecord(record.id);
+      await loadRecords();
+  
+      alert("Service record deleted successfully.");
+    } catch (error) {
+      console.error(error);
+      alert("Failed to delete service record.");
+    }
+  }}
     >
       Delete
     </button>
