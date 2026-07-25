@@ -132,6 +132,9 @@ function Tracker() {
     `${defaultVehicle.brand} ${defaultVehicle.model}`
   );
 
+  const [sessions, setSessions] =
+  useState<Session[]>([]);
+
   const [charger, setCharger] =
     useState("DC Fast");
 
@@ -147,7 +150,9 @@ function Tracker() {
   const [date, setDate] =
     useState("");
 
-    const [sessions, setSessions] = useState<Session[]>([]);
+    const [editingId, setEditingId] =
+    useState<number | null>(null);
+
 
     useEffect(() => {
       loadSessions();
@@ -168,7 +173,7 @@ function Tracker() {
     }
 
 
-    const addSession = async () => {
+    const saveSession = async () => {
 
       if (
         !vehicle ||
@@ -180,7 +185,8 @@ function Tracker() {
         return;
       }
     
-      const newSession = {
+      
+      const session = {
         vehicle,
         charger,
         energy: Number(energy),
@@ -188,32 +194,54 @@ function Tracker() {
         station,
         date,
       };
-    
-      const { data, error } = await supabase
-        .from("charging_sessions")
-        .insert([newSession])
-        .select();
-    
-      if (error) {
-        console.error(error);
-        alert("Failed to save session");
-        return;
+      
+      if (editingId !== null) {
+      
+        const { error } = await supabase
+          .from("charging_sessions")
+          .update(session)
+          .eq("id", editingId);
+      
+        if (error) {
+          console.error(error);
+          alert("Failed to update session");
+          return;
+        }
+      
+      } else {
+      
+        const { error } = await supabase
+          .from("charging_sessions")
+          .insert([session]);
+      
+        if (error) {
+          console.error(error);
+          alert("Failed to save session");
+          return;
+        }
+      
       }
-    
-      setSessions((prev) => [
-        ...(data as Session[]),
-        ...prev,
-      ]);
-    
-      // Reset form
+      
+      await loadSessions();
+      
+      if (editingId !== null) {
+        alert("Charging session updated successfully.");
+      } else {
+        alert("Charging session added successfully.");
+      }
+
+      setEditingId(null);
+      
       setVehicle(
         `${defaultVehicle.brand} ${defaultVehicle.model}`
       );
+      
       setCharger("DC Fast");
       setEnergy("");
       setCost("");
       setStation("");
       setDate("");
+
     };
 
     const deleteSession = async (id: number) => {
@@ -236,11 +264,10 @@ function Tracker() {
         return;
       }
     
-      setSessions((prev) =>
-        prev.filter((session) => session.id !== id)
-      );
-    
-      alert("Charging session deleted successfully.");
+      await loadSessions();
+
+alert("Charging session deleted successfully.");
+
     };
 
     const resetForm = () => {
@@ -249,15 +276,18 @@ function Tracker() {
       );
     
       if (!confirmed) return;
-    
+      setEditingId(null);
+
       setVehicle(`${defaultVehicle.brand} ${defaultVehicle.model}`);
       setCharger("DC Fast");
       setEnergy("");
       setCost("");
       setStation("");
       setDate("");
+      
     };
-
+    
+    
 
   return (
     <>
@@ -267,12 +297,20 @@ function Tracker() {
       </div>
   
       <div className="card">
-        <label>Vehicle</label>
+
+  <h3>
+    {editingId !== null
+      ? "✏️ Edit Charging Session"
+      : "➕ New Charging Session"}
+  </h3>
+
+  <label>Vehicle</label>
   
         <select
-          value={vehicle}
-          onChange={(e) => setVehicle(e.target.value)}
-        >
+  value={vehicle}
+  disabled={editingId !== null}
+  onChange={(e) => setVehicle(e.target.value)}
+>
           {vehicles.map((v) => (
             <option
               key={v.id}
@@ -283,6 +321,18 @@ function Tracker() {
           ))}
         </select>
   
+        {editingId !== null && (
+  <p
+    style={{
+      marginTop: "6px",
+      fontSize: "0.9rem",
+      color: "#666",
+    }}
+  >
+    Vehicle cannot be changed while editing a charging session.
+  </p>
+)}
+
         <label>Charging Type</label>
   
         <select
@@ -344,10 +394,10 @@ function Tracker() {
   <div className="buttonGroup">
   <button
     className="primaryButton"
-    onClick={addSession}
-  >
-    💾 Save Session
-  </button>
+    onClick={() => void saveSession()}  >
+{editingId !== null
+  ? "💾 Update Session"
+  : "💾 Save Session"}  </button>
 
   <button
     className="dangerButton"
@@ -393,20 +443,40 @@ function Tracker() {
             <td>{session.energy.toFixed(1)} kWh</td>
             <td>₹{session.cost.toLocaleString()}</td>
             <td>
-              <button
-                onClick={() => deleteSession(session.id)}
-                style={{
-                  background: "#ef4444",
-                  color: "white",
-                  border: "none",
-                  padding: "6px 10px",
-                  borderRadius: "8px",
-                  cursor: "pointer",
-                }}
-              >
-                🗑 Delete
-              </button>
-            </td>
+  <div className="actionButtons">
+
+    <button
+      className="editButton"
+      onClick={() => {
+
+        setEditingId(session.id);
+
+        setVehicle(session.vehicle);
+        setCharger(session.charger);
+        setEnergy(session.energy.toString());
+        setCost(session.cost.toString());
+        setStation(session.station);
+        setDate(session.date);
+
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+
+      }}
+    >
+      Edit
+    </button>
+
+    <button
+      className="deleteButton"
+      onClick={() => deleteSession(session.id)}
+    >
+      Delete
+    </button>
+
+  </div>
+</td>
           </tr>
         ))}
       </tbody>

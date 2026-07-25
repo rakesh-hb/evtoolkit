@@ -332,7 +332,10 @@ export default function ServiceHistory() {
 
   <td>
 
+  <div className="actionButtons">
+
     <button
+      className="editButton"
       onClick={() => {
 
         setEditingId(record.id);
@@ -347,7 +350,8 @@ export default function ServiceHistory() {
     {" "}
 
     <button
-      onClick={() => {
+  className="deleteButton"
+  onClick={() => {
 
         if (
           window.confirm(
@@ -367,7 +371,7 @@ export default function ServiceHistory() {
     >
       Delete
     </button>
-
+    </div>
   </td>
 
 </tr>

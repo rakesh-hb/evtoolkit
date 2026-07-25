@@ -4,7 +4,7 @@ import type { Vehicle } from "../types";
 export const usaVehicles: Vehicle[] = [
 
   {
-    id: 1001,
+    id: 2001,
     brand: "Tesla",
     model: "Model 3 RWD",
 
@@ -27,7 +27,7 @@ export const usaVehicles: Vehicle[] = [
   },
 
   {
-    id: 1002,
+    id: 2002,
     brand: "Tesla",
     model: "Model 3 Long Range AWD",
 
@@ -50,7 +50,7 @@ export const usaVehicles: Vehicle[] = [
   },
 
   {
-    id: 1003,
+    id: 2003,
     brand: "Tesla",
     model: "Model 3 Performance",
 
@@ -73,7 +73,7 @@ export const usaVehicles: Vehicle[] = [
   },
 
   {
-    id: 1004,
+    id: 2004,
     brand: "Tesla",
     model: "Model Y RWD",
 
@@ -96,7 +96,7 @@ export const usaVehicles: Vehicle[] = [
   },
 
   {
-    id: 1005,
+    id: 2005,
     brand: "Tesla",
     model: "Model Y Long Range AWD",
 
@@ -119,7 +119,7 @@ export const usaVehicles: Vehicle[] = [
   },
 
   {
-    id: 1006,
+    id: 2006,
     brand: "Tesla",
     model: "Model Y Performance",
 
@@ -142,7 +142,7 @@ export const usaVehicles: Vehicle[] = [
   },
 
   {
-    id: 1007,
+    id: 2007,
     brand: "Tesla",
     model: "Model S Dual Motor",
 
@@ -165,7 +165,7 @@ export const usaVehicles: Vehicle[] = [
   },
 
   {
-    id: 1008,
+    id: 2008,
     brand: "Tesla",
     model: "Model S Plaid",
 
@@ -188,7 +188,7 @@ export const usaVehicles: Vehicle[] = [
   },
 
   {
-    id: 1009,
+    id: 2009,
     brand: "Tesla",
     model: "Model X",
 
@@ -211,7 +211,7 @@ export const usaVehicles: Vehicle[] = [
   },
 
   {
-    id: 1010,
+    id: 2010,
     brand: "Tesla",
     model: "Model X Plaid",
 

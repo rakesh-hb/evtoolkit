@@ -121,6 +121,41 @@ body {
   background: rgba(255,255,255,.15);
 }
 
+.actionButtons{
+  display:flex;
+  gap:8px;
+  justify-content:flex-end;
+}
+
+.editButton{
+  background:#10b981;
+  color:#fff;
+  border:none;
+  border-radius:8px;
+  padding:8px 14px;
+  font-weight:600;
+  cursor:pointer;
+  transition:.2s;
+}
+
+.editButton:hover{
+  background:#059669;
+}
+
+.deleteButton{
+  background:#ef4444;
+  color:#fff;
+  border:none;
+  border-radius:8px;
+  padding:8px 14px;
+  font-weight:600;
+  cursor:pointer;
+  transition:.2s;
+}
+
+.deleteButton:hover{
+  background:#dc2626;
+}
 
 /* ==========================================
    Main Content
