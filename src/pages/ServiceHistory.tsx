@@ -301,9 +301,9 @@ await addServiceRecord(newRecord);
           onChange={(e) => setSearch(e.target.value)}
         />
 
-<div className="tableContainer">
   
-</div>
+<div className="tableContainer">
+
         <table className="table">
 
         <thead>
@@ -402,6 +402,7 @@ await addServiceRecord(newRecord);
           </tbody>
 
         </table>
+        </div>
 
       </div>
     </>
