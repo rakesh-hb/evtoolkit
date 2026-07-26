@@ -1,9 +1,24 @@
 import { supabase } from "../lib/supabase";
 
-import { restoreChargingSessions } from "./chargingService";
-import { restoreServiceRecords } from "./serviceHistoryService";
-import { restoreTyres } from "./tyreService";
-import { restoreDocuments } from "./documentVaultService";
+import {
+  getChargingSessions,
+  restoreChargingSessions,
+} from "./chargingService";
+
+import {
+  getServiceRecords,
+  restoreServiceRecords,
+} from "./serviceHistoryService";
+
+import {
+  getTyres,
+  restoreTyres,
+} from "./tyreService";
+
+import {
+  getDocuments,
+  restoreDocuments,
+} from "./documentVaultService";
 
 
 export async function createBackup() {
