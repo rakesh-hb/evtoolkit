@@ -64,3 +64,27 @@ export async function deleteDocument(id: number) {
 
   if (error) throw error;
 }
+
+
+export async function restoreDocuments(
+    documents: Omit<DocumentRecord, "id">[]
+  ) {
+    if (documents.length === 0) return;
+  
+    const { error } = await supabase
+      .from("document_vault")
+      .insert(
+        documents.map((document) => ({
+          title: document.title,
+          category: document.category,
+          vehicle: document.vehicle,
+          document_date: document.documentDate,
+          file: document.file,
+          notes: document.notes,
+        }))
+      );
+  
+    if (error) throw error;
+  }
+
+  

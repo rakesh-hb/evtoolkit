@@ -1,7 +1,10 @@
-import { getChargingSessions } from "./chargingService";
-import { getServiceRecords } from "./serviceHistoryService";
-import { getTyres } from "./tyreService";
-import { getDocuments } from "./documentVaultService";
+import { supabase } from "../lib/supabase";
+
+import { restoreChargingSessions } from "./chargingService";
+import { restoreServiceRecords } from "./serviceHistoryService";
+import { restoreTyres } from "./tyreService";
+import { restoreDocuments } from "./documentVaultService";
+
 
 export async function createBackup() {
   try {
@@ -61,3 +64,50 @@ export async function createBackup() {
 
   }
 }
+
+export async function restoreBackup(file: File) {
+    const text = await file.text();
+  
+    const backup = JSON.parse(text);
+  
+    // Validate backup
+    if (
+      backup.app !== "EV Toolkit" ||
+      !backup.createdAt
+    ) {
+      throw new Error("Invalid backup file.");
+    }
+  
+    const confirmed = window.confirm(
+      "This will DELETE all existing data and restore the selected backup.\n\nDo you want to continue?"
+    );
+  
+    if (!confirmed) return;
+  
+    // Delete existing data
+    const tables = [
+      "charging_sessions",
+      "service_history",
+      "tyres",
+      "document_vault",
+    ];
+  
+    for (const table of tables) {
+      const { error } = await supabase
+        .from(table)
+        .delete()
+        .neq("id", 0);
+  
+      if (error) throw error;
+    }
+  
+    // Restore
+    await restoreChargingSessions(backup.charging ?? []);
+    await restoreServiceRecords(backup.service ?? []);
+    await restoreTyres(backup.tyres ?? []);
+    await restoreDocuments(backup.documents ?? []);
+  
+    alert("Backup restored successfully.\n\nPlease refresh the application");
+  
+    window.location.reload();
+  }

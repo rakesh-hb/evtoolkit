@@ -1,10 +1,17 @@
-import { useState } from "react";
+//import { useState } from "react";
 import { createBackup } from "../services/backupService";
+//import { useRef } from "react";
+import { restoreBackup } from "../services/backupService";
+import { useState, useRef } from "react";
+
 
 function Settings() {
   const [currency, setCurrency] = useState("INR (₹)");
   const [tariff, setTariff] = useState(7);
   const [distanceUnit, setDistanceUnit] = useState("km");
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
 
   return (
     <>
@@ -46,8 +53,6 @@ function Settings() {
 
       <div className="card">
 
-      <div className="card">
-
   <h3>💾 Backup & Restore</h3>
 
   <p>
@@ -70,14 +75,35 @@ function Settings() {
     📥 Create Backup
   </button>
 
-  <button
-    className="restoreButton"
-    onClick={() => {
-      // Restore logic
-    }}
-  >
-    📤 Restore Backup
-  </button>
+  <input
+  ref={fileInputRef}
+  type="file"
+  accept=".json"
+  style={{ display: "none" }}
+  onChange={async (e) => {
+    const file = e.target.files?.[0];
+
+    if (!file) return;
+
+    try {
+      await restoreBackup(file);
+    } catch (err) {
+      console.error(err);
+      alert("Invalid backup file.");
+    }
+
+    e.target.value = "";
+  }}
+/>
+
+<button
+  className="restoreButton"
+  onClick={() => fileInputRef.current?.click()}
+>
+  📤 Restore Backup
+</button>
+
+
 </div>
 
   <p
@@ -91,22 +117,23 @@ function Settings() {
     Document Vault and future supported modules.
   </p>
 
+  </div>
+
+<div className="card">
+  <h3>GST Information</h3>
+
+  <p style={{ marginTop: 12 }}>
+    • Home AC Charging : No GST
+  </p>
+
+  <p style={{ marginTop: 8 }}>
+    • Public AC Charging : As per operator pricing
+  </p>
+
+  <p style={{ marginTop: 8 }}>
+    • DC Fast Charging : 18% GST applied
+  </p>
 </div>
-
-        <h3>GST Information</h3>
-
-        <p style={{ marginTop: 12 }}>
-          • Home AC Charging : No GST
-        </p>
-
-        <p style={{ marginTop: 8 }}>
-          • Public AC Charging : As per operator pricing
-        </p>
-
-        <p style={{ marginTop: 8 }}>
-          • DC Fast Charging : 18% GST applied
-        </p>
-      </div>
 
       <div className="card">
         <h3>About</h3>

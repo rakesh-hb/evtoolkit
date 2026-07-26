@@ -63,3 +63,26 @@ export async function deleteServiceRecord(id: number) {
 
   if (error) throw error;
 }
+
+export async function restoreServiceRecords(
+    records: Omit<ServiceRecord, "id">[]
+  ) {
+    if (records.length === 0) return;
+  
+    const { error } = await supabase
+      .from("service_history")
+      .insert(
+        records.map((record) => ({
+          vehicle: record.vehicle,
+          service_date: record.date,
+          odometer: record.odometer,
+          service_type: record.serviceType,
+          workshop: record.serviceCenter,
+          cost: record.amount,
+          notes: record.notes,
+          attachment: record.attachment,
+        }))
+      );
+  
+    if (error) throw error;
+  }

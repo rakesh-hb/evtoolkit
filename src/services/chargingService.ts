@@ -51,3 +51,16 @@ export async function deleteChargingSession(id: number) {
 
   if (error) throw error;
 }
+
+export async function restoreChargingSessions(
+    sessions: Omit<ChargingSession, "id">[]
+  ) {
+    if (sessions.length === 0) return;
+  
+    const { error } = await supabase
+      .from("charging_sessions")
+      .insert(sessions);
+  
+    if (error) throw error;
+  }
+  

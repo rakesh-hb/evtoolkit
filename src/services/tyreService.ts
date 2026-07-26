@@ -98,3 +98,16 @@ export async function deleteTyre(id: number) {
 
   if (error) throw error;
 }
+
+
+export async function restoreTyres(records: TyreInput[]) {
+    if (records.length === 0) return;
+  
+    const { error } = await supabase
+      .from("tyres")
+      .insert(records.map(mapInputToDb));
+  
+    if (error) throw error;
+  }
+
+  
