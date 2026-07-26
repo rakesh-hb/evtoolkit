@@ -1,5 +1,5 @@
-export interface Insurance {
-  id?: number;
+export interface InsuranceRecord {
+  id: number;
   vehicle: string;
   company: string;
   policy_number: string;
@@ -15,4 +15,3 @@ export interface Insurance {
   attachment: string;
   created_at?: string;
 }
-
