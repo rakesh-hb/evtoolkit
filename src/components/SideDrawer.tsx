@@ -17,9 +17,11 @@ interface SideDrawerProps {
       items: [
         { key: "service", icon: "🔧", label: "Service History" },
         { key: "tyres", icon: "🛞", label: "Tyre History" },
+        { key: "documents", icon: "📁", label: "Document Vault" },
         { key: "insurance", icon: "🛡️", label: "Insurance" },
       ],
     },
+    
     {
       title: "System",
       items: [

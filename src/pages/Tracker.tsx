@@ -1,16 +1,24 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
+//import { supabase } from "../lib/supabase";
+import {
+  getChargingSessions,
+  addChargingSession,
+  updateChargingSession,
+  deleteChargingSession,
+  type ChargingSession,
+} from "../services/chargingService";
+
 import { vehicles } from "../data/vehicles";
 
-interface Session {
-  id: number;
-  vehicle: string;
-  charger: string;
-  energy: number;
-  cost: number;
-  station: string;
-  date: string;
-}
+//interface Session {
+//  id: number;
+ // vehicle: string;
+//  charger: string;
+//  energy: number;
+//  cost: number;
+ // station: string;
+//  date: string;
+//}
 
 export interface ChargingStationOption {
   name: string;
@@ -133,7 +141,7 @@ function Tracker() {
   );
 
   const [sessions, setSessions] =
-  useState<Session[]>([]);
+  useState<ChargingSession[]>([]);
 
   const [charger, setCharger] =
     useState("DC Fast");
@@ -159,90 +167,65 @@ function Tracker() {
     }, []);
     
     async function loadSessions() {
-      const { data, error } = await supabase
-        .from("charging_sessions")
-        .select("*")
-        .order("date", { ascending: false });
-    
-      if (error) {
+      try {
+        const data = await getChargingSessions();
+        setSessions(data);
+      } catch (error) {
         console.error(error);
-        return;
+        alert("Failed to load charging sessions.");
       }
-    
-      setSessions(data as Session[]);
     }
-
+    
 
     const saveSession = async () => {
-
-      if (
-        !vehicle ||
-        !energy ||
-        !cost ||
-        !date
-      ) {
+      if (!vehicle || !energy || !cost || !date) {
         alert("Please fill all required fields.");
         return;
       }
     
-      
-      const session = {
-        vehicle,
-        charger,
-        energy: Number(energy),
-        cost: Number(cost),
-        station,
-        date,
-      };
-      
-      if (editingId !== null) {
-      
-        const { error } = await supabase
-          .from("charging_sessions")
-          .update(session)
-          .eq("id", editingId);
-      
-        if (error) {
-          console.error(error);
-          alert("Failed to update session");
-          return;
+      try {
+        const session = {
+          vehicle,
+          charger,
+          energy: Number(energy),
+          cost: Number(cost),
+          station,
+          date,
+        };
+    
+        if (editingId !== null) {
+          await updateChargingSession(editingId, session);
+        } else {
+          await addChargingSession(session);
         }
-      
-      } else {
-      
-        const { error } = await supabase
-          .from("charging_sessions")
-          .insert([session]);
-      
-        if (error) {
-          console.error(error);
-          alert("Failed to save session");
-          return;
-        }
-      
+    
+        await loadSessions();
+    
+        alert(
+          editingId !== null
+            ? "Charging session updated successfully."
+            : "Charging session added successfully."
+        );
+    
+        setEditingId(null);
+    
+        setVehicle(`${defaultVehicle.brand} ${defaultVehicle.model}`);
+        setCharger("DC Fast");
+        setEnergy("");
+        setCost("");
+        setStation("");
+        setDate("");
+      } catch (error) {
+        console.error(error);
+    
+        alert(
+          editingId !== null
+            ? "Failed to update session."
+            : "Failed to save session."
+        );
       }
-      
-      await loadSessions();
-      
-      if (editingId !== null) {
-        alert("Charging session updated successfully.");
-      } else {
-        alert("Charging session added successfully.");
-      }
-
-      setEditingId(null);
-      
-      setVehicle(
-        `${defaultVehicle.brand} ${defaultVehicle.model}`
-      );
-      
-      setCharger("DC Fast");
-      setEnergy("");
-      setCost("");
-      setStation("");
-      setDate("");
-
     };
+    
 
     const deleteSession = async (id: number) => {
       const confirmed = window.confirm(
@@ -253,20 +236,15 @@ function Tracker() {
         return;
       }
     
-      const { error } = await supabase
-        .from("charging_sessions")
-        .delete()
-        .eq("id", id);
-    
-      if (error) {
+      try {
+        await deleteChargingSession(id);
+        await loadSessions();
+      
+        alert("Charging session deleted successfully.");
+      } catch (error) {
         console.error(error);
         alert("Failed to delete the charging session.");
-        return;
       }
-    
-      await loadSessions();
-
-alert("Charging session deleted successfully.");
 
     };
 

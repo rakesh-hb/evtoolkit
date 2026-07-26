@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createBackup } from "../services/backupService";
 
 function Settings() {
   const [currency, setCurrency] = useState("INR (₹)");
@@ -44,6 +45,54 @@ function Settings() {
       </div>
 
       <div className="card">
+
+      <div className="card">
+
+  <h3>💾 Backup & Restore</h3>
+
+  <p>
+    Export all your EV Toolkit data into a single backup file or restore it
+    later on any device.
+  </p>
+
+  <div
+  style={{
+    display: "flex",
+    gap: "12px",
+    marginTop: "20px",
+    alignItems: "center",
+  }}
+>
+  <button
+    className="primaryButton"
+    onClick={() => void createBackup()}
+  >
+    📥 Create Backup
+  </button>
+
+  <button
+    className="restoreButton"
+    onClick={() => {
+      // Restore logic
+    }}
+  >
+    📤 Restore Backup
+  </button>
+</div>
+
+  <p
+    style={{
+      fontSize: "12px",
+      color: "#6b7280",
+      marginTop: "12px",
+    }}
+  >
+    Backup includes Charging History, Service History, Tyre History,
+    Document Vault and future supported modules.
+  </p>
+
+</div>
+
         <h3>GST Information</h3>
 
         <p style={{ marginTop: 12 }}>

@@ -10,6 +10,7 @@ import Settings from "./pages/Settings";
 import ServiceHistory from "./pages/ServiceHistory";
 import TyreHistory from "./pages/TyreHistory";
 import Insurance from "./pages/Insurance";
+import DocumentVault from "./pages/DocumentVault";
 
 function App() {
   const [page, setPage] = useState("dashboard");
@@ -38,6 +39,9 @@ function App() {
 
       case "insurance":
         return <Insurance />;
+
+        case "documents":
+  return <DocumentVault />;
 
       case "settings":
         return <Settings />;

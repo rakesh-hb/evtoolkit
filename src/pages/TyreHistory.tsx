@@ -443,30 +443,13 @@ onChange={(receipt) =>
 
             <td>
   {record.receipt ? (
-    record.receipt.startsWith("data:image") ? (
-      <a
-        href={record.receipt}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        🖼️ View Image
-      </a>
-    ) : record.receipt.startsWith("data:application/pdf") ? (
-      <a
-        href={record.receipt}
-        download="tyre-receipt.pdf"
-      >
-        📄 Download PDF
-      </a>
-    ) : (
-      <a
-        href={record.receipt}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        View
-      </a>
-    )
+    <a
+      href={record.receipt}
+      download={`${record.brand}-${record.model}-Receipt`}
+      className="downloadButton"
+    >
+      ⬇ Download
+    </a>
   ) : (
     "-"
   )}

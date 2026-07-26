@@ -259,9 +259,15 @@ await addServiceRecord(newRecord);
 
       setEditingId(null);
       setForm(emptyRecord);
-    } catch (error) {
-      console.error(error);
-      alert("Failed to save service record.");
+    } catch (error: any) {
+      console.error("Supabase error:", error);
+    
+      alert(
+        error?.message ||
+        error?.details ||
+        error?.hint ||
+        JSON.stringify(error)
+      );
     }
   }}
 >
@@ -330,30 +336,13 @@ await addServiceRecord(newRecord);
 
   <td>
   {record.attachment ? (
-    record.attachment.startsWith("data:image") ? (
-      <a
-        href={record.attachment}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        🖼️ View Image
-      </a>
-    ) : record.attachment.startsWith("data:application/pdf") ? (
-      <a
-        href={record.attachment}
-        download="receipt.pdf"
-      >
-        📄 Download PDF
-      </a>
-    ) : (
-      <a
-        href={record.attachment}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        View
-      </a>
-    )
+    <a
+      href={record.attachment}
+      download={`${record.vehicle}-${record.serviceType}-Receipt`}
+      className="downloadButton"
+    >
+      ⬇ Download
+    </a>
   ) : (
     "-"
   )}

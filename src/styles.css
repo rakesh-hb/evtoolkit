@@ -355,24 +355,15 @@ button {
 }
 
 .primaryButton {
-
-  width: 100%;
-
-  padding: 14px;
-
+  padding: 14px 20px;
   border: none;
-
   border-radius: 12px;
-
   background: #10b981;
-
   color: white;
-
   font-size: 16px;
-
   font-weight: 600;
-
   transition: .2s;
+  cursor: pointer;
 }
 
 .primaryButton:hover {
@@ -920,6 +911,38 @@ button{
 
 .saveButton:hover {
   background: #15803d;
+}
+
+.downloadButton {
+  display: inline-block;
+  background: #16a34a;
+  color: white;
+  padding: 6px 14px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.downloadButton:hover {
+  background: #15803d;
+}
+
+.restoreButton {
+  padding: 14px 20px;
+  border: none;
+  border-radius: 12px;
+  background: #2563eb;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: .2s;
+}
+
+.restoreButton:hover {
+  background: #1d4ed8;
 }
 
 }
