@@ -6,8 +6,6 @@ export interface ServiceRecord {
   serviceType: string;
   serviceCenter: string;
   amount: number;
-  nextServiceKm: number;
-  nextServiceDate: string;
   notes?: string;
   attachment?: string;
 }

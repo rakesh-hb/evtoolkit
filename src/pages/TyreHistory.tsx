@@ -288,6 +288,17 @@ onChange={(receipt) =>
 }
 />
 
+<p
+  style={{
+    fontSize: "12px",
+    color: "#6b7280",
+    marginTop: "6px",
+  }}
+>
+  Supported file types: PDF, images, and other document formats. Recommended
+  maximum file size: <strong>5 MB</strong> per file for optimal performance.
+</p>
+
 <br /> 
 <button
   className="primaryButton"
@@ -431,24 +442,35 @@ onChange={(receipt) =>
             <td>{record.warrantyMonths} Months</td>
 
             <td>
-
-              {record.receipt ? (
-
-                <a
-                  href={record.receipt}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  View
-                </a>
-
-              ) : (
-
-                "-"
-
-              )}
-
-            </td>
+  {record.receipt ? (
+    record.receipt.startsWith("data:image") ? (
+      <a
+        href={record.receipt}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        🖼️ View Image
+      </a>
+    ) : record.receipt.startsWith("data:application/pdf") ? (
+      <a
+        href={record.receipt}
+        download="tyre-receipt.pdf"
+      >
+        📄 Download PDF
+      </a>
+    ) : (
+      <a
+        href={record.receipt}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        View
+      </a>
+    )
+  ) : (
+    "-"
+  )}
+</td>
 
             <td>
   <div className="actionButtons">

@@ -33,7 +33,7 @@ export default function ReceiptUploader({
       <input
         ref={fileRef}
         type="file"
-        accept=".pdf,image/*"
+        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,image/*"
         onChange={handleFile}
       />
 

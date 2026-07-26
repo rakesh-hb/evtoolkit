@@ -17,8 +17,6 @@ export async function getServiceRecords(): Promise<ServiceRecord[]> {
     serviceType: row.service_type,
     serviceCenter: row.workshop,
     amount: Number(row.cost ?? 0),
-    nextServiceKm: row.next_service_km ?? 0,
-    nextServiceDate: row.next_service_date ?? "",
     notes: row.notes ?? "",
     attachment: row.attachment ?? "",
   }));
@@ -32,8 +30,6 @@ export async function addServiceRecord(record: Omit<ServiceRecord, "id">) {
     service_type: record.serviceType,
     workshop: record.serviceCenter,
     cost: record.amount,
-    next_service_km: record.nextServiceKm,
-    next_service_date: record.nextServiceDate || null,
     notes: record.notes,
     attachment: record.attachment,
   });
@@ -51,8 +47,6 @@ export async function updateServiceRecord(record: ServiceRecord) {
       service_type: record.serviceType,
       workshop: record.serviceCenter,
       cost: record.amount,
-      next_service_km: record.nextServiceKm,
-      next_service_date: record.nextServiceDate || null,
       notes: record.notes,
       attachment: record.attachment,
     })

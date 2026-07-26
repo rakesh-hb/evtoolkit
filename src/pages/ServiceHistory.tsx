@@ -214,6 +214,17 @@ export default function ServiceHistory() {
   }
 />
 
+<p
+  style={{
+    fontSize: "12px",
+    color: "#6b7280",
+    marginTop: "6px",
+  }}
+>
+  Supported file types: PDF, images, and other document formats. Recommended
+  maximum file size: <strong>5 MB</strong> per file for optimal performance.
+</p>
+
   <br />
 
   <button
@@ -318,7 +329,23 @@ await addServiceRecord(newRecord);
   <td>INR {record.amount.toFixed(2)}</td>
 
   <td>
-    {record.attachment ? (
+  {record.attachment ? (
+    record.attachment.startsWith("data:image") ? (
+      <a
+        href={record.attachment}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        🖼️ View Image
+      </a>
+    ) : record.attachment.startsWith("data:application/pdf") ? (
+      <a
+        href={record.attachment}
+        download="receipt.pdf"
+      >
+        📄 Download PDF
+      </a>
+    ) : (
       <a
         href={record.attachment}
         target="_blank"
@@ -326,10 +353,11 @@ await addServiceRecord(newRecord);
       >
         View
       </a>
-    ) : (
-      "-"
-    )}
-  </td>
+    )
+  ) : (
+    "-"
+  )}
+</td>
 
   <td>
 
