@@ -36,12 +36,25 @@ export default function ServiceHistory() {
     try {
       const data = await getServiceRecords();
       setRecords(data);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to load service history.");
+    } catch (err: any) {
+      console.error("Failed to load service history:", err);
+    
+      setRecords([]);
+    
+      alert(
+        JSON.stringify(
+          {
+            message: err?.message,
+            details: err?.details,
+            hint: err?.hint,
+            code: err?.code,
+          },
+          null,
+          2
+        )
+      );
     }
   }
-  
   useEffect(() => {
     loadRecords();
   }, []);

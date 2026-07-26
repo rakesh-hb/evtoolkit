@@ -1,3 +1,4 @@
+import { getCurrentUserId } from "./authHelper";
 import { supabase } from "../lib/supabase";
 import type { TyreRecord } from "../types/tyre";
 
@@ -56,9 +57,12 @@ function mapInputToDb(record: TyreInput) {
 }
 
 export async function getTyres(): Promise<TyreRecord[]> {
+  const userId = await getCurrentUserId();
+
   const { data, error } = await supabase
     .from("tyres")
     .select("*")
+    .eq("user_id", userId)
     .order("install_date", { ascending: false });
 
   if (error) throw error;
@@ -67,11 +71,14 @@ export async function getTyres(): Promise<TyreRecord[]> {
 }
 
 export async function addTyre(record: TyreInput) {
+  const userId = await getCurrentUserId();
+
   const { error } = await supabase
     .from("tyres")
     .insert([
       {
         ...mapInputToDb(record),
+        user_id: userId,
       },
     ]);
 
@@ -79,35 +86,45 @@ export async function addTyre(record: TyreInput) {
 }
 
 export async function updateTyre(record: TyreRecord) {
+  const userId = await getCurrentUserId();
+
   const { error } = await supabase
     .from("tyres")
     .update({
       ...mapInputToDb(record),
       updated_at: new Date().toISOString(),
     })
-    .eq("id", record.id);
+    .eq("id", record.id)
+    .eq("user_id", userId);
 
   if (error) throw error;
 }
 
 export async function deleteTyre(id: number) {
+  const userId = await getCurrentUserId();
+
   const { error } = await supabase
     .from("tyres")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .eq("user_id", userId);
 
   if (error) throw error;
 }
 
-
 export async function restoreTyres(records: TyreInput[]) {
-    if (records.length === 0) return;
-  
-    const { error } = await supabase
-      .from("tyres")
-      .insert(records.map(mapInputToDb));
-  
-    if (error) throw error;
-  }
+  if (records.length === 0) return;
 
-  
+  const userId = await getCurrentUserId();
+
+  const { error } = await supabase
+    .from("tyres")
+    .insert(
+      records.map((record) => ({
+        ...mapInputToDb(record),
+        user_id: userId,
+      }))
+    );
+
+  if (error) throw error;
+}

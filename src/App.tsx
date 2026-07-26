@@ -1,3 +1,6 @@
+import Login from "./pages/Login";
+import { useAuth } from "./context/AuthContext";
+
 import SideDrawer from "./components/SideDrawer";
 import { useState } from "react";
 
@@ -13,6 +16,30 @@ import Insurance from "./pages/Insurance";
 import DocumentVault from "./pages/DocumentVault";
 
 function App() {
+
+  const { session, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          height: "100vh",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          fontSize: "20px",
+        }}
+      >
+        ⚡ Loading EV Toolkit...
+      </div>
+    );
+  }
+
+if (!session) {
+  return <Login />;
+}
+
+
   const [page, setPage] = useState("dashboard");
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -51,6 +78,7 @@ function App() {
     }
   };
 
+  
   return (
     <div className="app">
 <header
