@@ -1,25 +1,9 @@
 import { supabase } from "../lib/supabase";
 
-import {
-  getChargingSessions,
-  restoreChargingSessions,
-} from "./chargingService";
-
-import {
-  getServiceRecords,
-  restoreServiceRecords,
-} from "./serviceHistoryService";
-
-import {
-  getTyres,
-  restoreTyres,
-} from "./tyreService";
-
-import {
-  getDocuments,
-  restoreDocuments,
-} from "./documentVaultService";
-
+import { getChargingSessions } from "./chargingService";
+import { getServiceRecords } from "./serviceHistoryService";
+import { getTyres } from "./tyreService";
+import { getDocuments } from "./documentVaultService";
 
 export async function createBackup() {
   try {
@@ -37,8 +21,8 @@ export async function createBackup() {
 
     const backup = {
       app: "EV Toolkit",
-      version: "3.0",
-      backupDate: new Date().toISOString(),
+      version: 1,
+      createdAt: new Date().toISOString(),
 
       charging,
       service,
@@ -70,59 +54,81 @@ export async function createBackup() {
     URL.revokeObjectURL(url);
 
     alert("Backup created successfully.");
-
   } catch (err) {
-
     console.error(err);
-
     alert("Failed to create backup.");
-
   }
 }
 
 export async function restoreBackup(file: File) {
-    const text = await file.text();
-  
-    const backup = JSON.parse(text);
-  
-    // Validate backup
-    if (
-      backup.app !== "EV Toolkit" ||
-      !backup.createdAt
-    ) {
-      throw new Error("Invalid backup file.");
-    }
-  
-    const confirmed = window.confirm(
-      "This will DELETE all existing data and restore the selected backup.\n\nDo you want to continue?"
-    );
-  
-    if (!confirmed) return;
-  
-    // Delete existing data
-    const tables = [
-      "charging_sessions",
-      "service_history",
-      "tyres",
-      "document_vault",
-    ];
-  
-    for (const table of tables) {
-      const { error } = await supabase
-        .from(table)
-        .delete()
-        .neq("id", 0);
-  
-      if (error) throw error;
-    }
-  
-    // Restore
-    await restoreChargingSessions(backup.charging ?? []);
-    await restoreServiceRecords(backup.service ?? []);
-    await restoreTyres(backup.tyres ?? []);
-    await restoreDocuments(backup.documents ?? []);
-  
-    alert("Backup restored successfully.\n\nPlease refresh the application");
-  
-    window.location.reload();
+  const text = await file.text();
+  const backup = JSON.parse(text);
+
+  if (backup.app !== "EV Toolkit") {
+    throw new Error("Invalid backup file.");
   }
+
+  if (backup.version !== 1) {
+    throw new Error("Unsupported backup version.");
+  }
+
+  const confirmed = window.confirm(
+    "Merge this backup with your existing data?\n\n" +
+      "• Existing records will be kept.\n" +
+      "• New records will be imported.\n" +
+      "• Duplicate records will be skipped."
+  );
+
+  if (!confirmed) return;
+
+  const mappedCharging = backup.charging ?? [];
+
+  const mappedService = (backup.service ?? []).map((r: any) => ({
+    vehicle: r.vehicle,
+    service_date: r.date,
+    odometer: r.odometer,
+    service_type: r.serviceType,
+    workshop: r.serviceCenter,
+    cost: r.amount,
+    notes: r.notes ?? "",
+    attachment: r.attachment ?? "",
+  }));
+
+  const mappedTyres = (backup.tyres ?? []).map((r: any) => ({
+    brand: r.brand,
+    model: r.model,
+    size: r.size,
+    purchase_date: r.purchaseDate,
+    install_date: r.installDate,
+    odometer: r.odometer,
+    cost: r.cost,
+    dealer: r.dealer,
+    warranty_months: r.warrantyMonths,
+    receipt: r.receipt ?? "",
+    notes: r.notes ?? "",
+  }));
+
+  const mappedDocuments = (backup.documents ?? []).map((r: any) => ({
+    title: r.title,
+    category: r.category,
+    vehicle: r.vehicle,
+    document_date: r.documentDate,
+    file: r.file,
+    notes: r.notes ?? "",
+  }));
+
+  const { error } = await supabase.rpc("restore_backup", {
+    charging: mappedCharging,
+    service: mappedService,
+    tyres: mappedTyres,
+    documents: mappedDocuments,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  alert("Backup restored successfully.");
+
+  window.location.reload();
+}
