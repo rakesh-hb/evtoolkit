@@ -301,6 +301,9 @@ await addServiceRecord(newRecord);
           onChange={(e) => setSearch(e.target.value)}
         />
 
+<div className="tableContainer">
+  
+</div>
         <table className="table">
 
         <thead>
