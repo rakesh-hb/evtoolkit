@@ -4,6 +4,7 @@ import { getChargingSessions } from "./chargingService";
 import { getServiceRecords } from "./serviceHistoryService";
 import { getTyres } from "./tyreService";
 import { getDocuments } from "./documentVaultService";
+import { getInsurance } from "./insuranceService";
 
 export async function createBackup() {
   try {
@@ -12,11 +13,13 @@ export async function createBackup() {
       service,
       tyres,
       documents,
+      insurance,
     ] = await Promise.all([
       getChargingSessions(),
       getServiceRecords(),
       getTyres(),
       getDocuments(),
+      getInsurance(),
     ]);
 
     const backup = {
@@ -28,6 +31,7 @@ export async function createBackup() {
       service,
       tyres,
       documents,
+      insurance,
     };
 
     const json = JSON.stringify(backup, null, 2);
@@ -40,7 +44,9 @@ export async function createBackup() {
 
     const a = document.createElement("a");
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date()
+      .toISOString()
+      .split("T")[0];
 
     a.href = url;
     a.download = `EVToolkit_Backup_${today}.json`;
@@ -62,6 +68,7 @@ export async function createBackup() {
 
 export async function restoreBackup(file: File) {
   const text = await file.text();
+
   const backup = JSON.parse(text);
 
   if (backup.app !== "EV Toolkit") {
@@ -117,11 +124,28 @@ export async function restoreBackup(file: File) {
     notes: r.notes ?? "",
   }));
 
+  const mappedInsurance = (backup.insurance ?? []).map((p: any) => ({
+    vehicle: p.vehicle,
+    company: p.company,
+    policy_number: p.policy_number,
+    policy_type: p.policy_type,
+    start_date: p.start_date,
+    expiry_date: p.expiry_date,
+    premium: p.premium,
+    idv: p.idv,
+    addons: p.addons,
+    agent: p.agent,
+    contact_number: p.contact_number,
+    notes: p.notes ?? "",
+    attachment: p.attachment ?? "",
+  }));
+
   const { error } = await supabase.rpc("restore_backup", {
     charging: mappedCharging,
     service: mappedService,
     tyres: mappedTyres,
     documents: mappedDocuments,
+    insurance: mappedInsurance,
   });
 
   if (error) {
