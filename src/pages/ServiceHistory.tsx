@@ -19,8 +19,8 @@ const emptyRecord: ServiceRecord = {
   serviceType: "",
   serviceCenter: "",
   amount: 0,
-  nextServiceKm: 0,
-  nextServiceDate: "",
+  //nextServiceKm: 0,
+  //nextServiceDate: "",
   notes: "",
   attachment: "",
 };
@@ -71,15 +71,6 @@ export default function ServiceHistory() {
 
       <div className="card">
 
-<ReceiptUploader
-  value={form.attachment}
-  onChange={(attachment) =>
-    setForm({
-      ...form,
-      attachment,
-    })
-  }
-/>
 
 <h3>
   {editingId !== null
@@ -192,33 +183,7 @@ export default function ServiceHistory() {
       />
     </div>
 
-    <div>
-      <label>Next Service (km)</label>
-      <input
-        type="number"
-        value={form.nextServiceKm}
-        onChange={(e) =>
-          setForm({
-            ...form,
-            nextServiceKm: Number(e.target.value),
-          })
-        }
-      />
-    </div>
-
-    <div>
-      <label>Next Service Date</label>
-      <input
-        type="date"
-        value={form.nextServiceDate}
-        onChange={(e) =>
-          setForm({
-            ...form,
-            nextServiceDate: e.target.value,
-          })
-        }
-      />
-    </div>
+  
 
   </div>
 
@@ -252,6 +217,7 @@ export default function ServiceHistory() {
   <br />
 
   <button
+  className="saveButton"
   onClick={async () => {
     if (
       !form.vehicle ||
