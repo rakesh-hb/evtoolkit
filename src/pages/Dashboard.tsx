@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { getCurrentUserId } from "../services/authHelper";
 
 interface Session {
   id: number;
@@ -19,17 +20,42 @@ function Dashboard() {
   }, []);
 
   async function loadSessions() {
-    const { data, error } = await supabase
-      .from("charging_sessions")
-      .select("*")
-      .order("date", { ascending: false });
+    try {
+      const userId = await getCurrentUserId();
 
-    if (error) {
-      console.error("Error loading sessions:", error);
-      return;
+      const { data, error } = await supabase
+        .from("charging_sessions")
+        .select("*")
+        .eq("user_id", userId)
+        .order("date", { ascending: false });
+
+      if (error) {
+        console.error(
+          "Error loading sessions:",
+          error
+        );
+        return;
+      }
+
+      setSessions(
+        (data ?? []).map((row) => ({
+          id: row.id,
+          vehicle: row.vehicle ?? "",
+          charger: row.charger ?? "",
+          energy: Number(row.energy ?? 0),
+          cost: Number(row.cost ?? 0),
+          station: row.station ?? "",
+          date: row.date ?? "",
+        }))
+      );
+    } catch (error) {
+      console.error(
+        "Error loading dashboard:",
+        error
+      );
+
+      setSessions([]);
     }
-
-    setSessions(data as Session[]);
   }
 
   const totalSessions = sessions.length;
@@ -41,11 +67,6 @@ function Dashboard() {
 
   const totalCost = sessions.reduce(
     (sum, item) => sum + item.cost,
-    0
-  );
-
-  const rangeAdded = sessions.reduce(
-    (sum, item) => sum + item.energy * 6,
     0
   );
 
@@ -63,26 +84,35 @@ function Dashboard() {
     <>
       <div className="welcome">
         <h2>Welcome 👋</h2>
-        <p>Manage your EV charging from one place.</p>
+
+        <p>
+          Manage your EV charging from one place.
+        </p>
       </div>
 
       <div className="statsGrid">
 
         <div className="statCard">
           <h3>Total Cost</h3>
-          <h1>₹{totalCost.toLocaleString()}</h1>
+
+          <h1>
+            ₹{totalCost.toLocaleString()}
+          </h1>
         </div>
 
         <div className="statCard">
           <h3>Energy</h3>
-          <h1>{totalEnergy.toFixed(1)} kWh</h1>
+
+          <h1>
+            {totalEnergy.toFixed(1)} kWh
+          </h1>
         </div>
 
         <div className="statCard">
           <h3>Sessions</h3>
+
           <h1>{totalSessions}</h1>
         </div>
-
 
       </div>
 
@@ -96,22 +126,34 @@ function Dashboard() {
 
             <tr>
               <td>Total Sessions</td>
+
               <td>{totalSessions}</td>
             </tr>
 
             <tr>
               <td>Total Energy Charged</td>
-              <td>{totalEnergy.toFixed(1)} kWh</td>
+
+              <td>
+                {totalEnergy.toFixed(1)} kWh
+              </td>
             </tr>
 
             <tr>
               <td>Total Spend</td>
-              <td>₹{totalCost.toLocaleString()}</td>
+
+              <td>
+                ₹{totalCost.toLocaleString()}
+              </td>
             </tr>
 
             <tr>
-              <td>Average Cost / Session</td>
-              <td>₹{averageCost.toFixed(2)}</td>
+              <td>
+                Average Cost / Session
+              </td>
+
+              <td>
+                ₹{averageCost.toFixed(2)}
+              </td>
             </tr>
 
           </tbody>
@@ -132,32 +174,50 @@ function Dashboard() {
 
               <tr>
                 <td>Vehicle</td>
-                <td>{lastSession.vehicle}</td>
+
+                <td>
+                  {lastSession.vehicle}
+                </td>
               </tr>
 
               <tr>
                 <td>Date</td>
-                <td>{lastSession.date}</td>
+
+                <td>
+                  {lastSession.date}
+                </td>
               </tr>
 
               <tr>
                 <td>Charging Type</td>
-                <td>{lastSession.charger}</td>
+
+                <td>
+                  {lastSession.charger}
+                </td>
               </tr>
 
               <tr>
                 <td>Station</td>
-                <td>{lastSession.station || "-"}</td>
+
+                <td>
+                  {lastSession.station || "-"}
+                </td>
               </tr>
 
               <tr>
                 <td>Energy</td>
-                <td>{lastSession.energy.toFixed(1)} kWh</td>
+
+                <td>
+                  {lastSession.energy.toFixed(1)} kWh
+                </td>
               </tr>
 
               <tr>
                 <td>Cost</td>
-                <td>₹{lastSession.cost.toLocaleString()}</td>
+
+                <td>
+                  ₹{lastSession.cost.toLocaleString()}
+                </td>
               </tr>
 
             </tbody>
@@ -178,7 +238,6 @@ function Dashboard() {
         )}
 
       </div>
-
     </>
   );
 }
