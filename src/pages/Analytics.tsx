@@ -274,12 +274,12 @@ function Analytics() {
         </div>
 
         <div className="statCard">
-          <h3>Average Cost</h3>
+          <h3>Avg. Cost / Session</h3>
           <h1>₹{averageCost.toFixed(2)}</h1>
         </div>
 
         <div className="statCard">
-          <h3>Average Energy</h3>
+          <h3>Avg. Energy / Session</h3>
           <h1>{averageEnergy.toFixed(1)} kWh</h1>
         </div>
 
