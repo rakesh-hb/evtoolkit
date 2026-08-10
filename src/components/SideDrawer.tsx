@@ -20,7 +20,10 @@ const menu = [
   },
   {
     title: "System",
-    items: [{ key: "settings", icon: "⚙️", label: "Settings" }],
+    items: [
+      { key: "settings", icon: "⚙️", label: "Settings" },
+      { key: "about", icon: "ℹ️", label: "About EV Toolkit" },
+    ],
   },
 ];
 

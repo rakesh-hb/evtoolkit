@@ -14,7 +14,7 @@ import ServiceHistory from "./pages/ServiceHistory";
 import TyreHistory from "./pages/TyreHistory";
 import Insurance from "./pages/Insurance";
 import DocumentVault from "./pages/DocumentVault";
-
+import About from "./pages/About";
 function App() {
 
   const { session, loading } = useAuth();
@@ -73,6 +73,9 @@ if (!session) {
       case "settings":
         return <Settings />;
 
+        case "about":
+  return <About />;
+  
       default:
         return <Dashboard />;
     }
