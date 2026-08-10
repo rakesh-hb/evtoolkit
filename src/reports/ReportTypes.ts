@@ -37,4 +37,5 @@ export interface SummaryStats {
     weekly: Record<string, number>;
   
     sessions: ChargingSessionReport[];
+    
   }
