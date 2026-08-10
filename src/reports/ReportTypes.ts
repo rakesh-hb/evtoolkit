@@ -22,7 +22,6 @@ export interface SummaryStats {
       totalCost: number;
       averageEnergy: number;
       averageCost: number;
-      estimatedRange: number;
       petrolSaved: number;
       carbonSaved: number;
     };
