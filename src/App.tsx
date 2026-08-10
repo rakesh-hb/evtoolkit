@@ -1,8 +1,12 @@
+import { useState } from "react";
+
 import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+
 import { useAuth } from "./context/AuthContext";
 
 import SideDrawer from "./components/SideDrawer";
-import { useState } from "react";
 
 import Dashboard from "./pages/Dashboard";
 import Planner from "./pages/Planner";
@@ -15,9 +19,26 @@ import TyreHistory from "./pages/TyreHistory";
 import Insurance from "./pages/Insurance";
 import DocumentVault from "./pages/DocumentVault";
 import About from "./pages/About";
-function App() {
+import UserProfile from "./pages/UserProfile";
 
-  const { session, loading } = useAuth();
+function App() {
+  const { session, loading } =
+    useAuth();
+
+  const [page, setPage] =
+    useState("dashboard");
+
+  const [drawerOpen, setDrawerOpen] =
+    useState(false);
+
+  const [authPage, setAuthPage] =
+    useState<"login" | "forgot">(
+      "login"
+    );
+
+  const isResetPassword =
+    window.location.pathname ===
+    "/reset-password";
 
   if (loading) {
     return (
@@ -27,7 +48,7 @@ function App() {
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
-          fontSize: "20px",
+          fontSize: 20,
         }}
       >
         ⚡ Loading EV Toolkit...
@@ -35,16 +56,50 @@ function App() {
     );
   }
 
-if (!session) {
-  return <Login />;
-}
+  /*
+   * Password recovery must be handled
+   * before the normal login check.
+   */
+  if (isResetPassword) {
+    return (
+      <ResetPassword
+        onComplete={() => {
+          window.history.replaceState(
+            {},
+            "",
+            "/"
+          );
 
+          window.location.reload();
+        }}
+      />
+    );
+  }
 
-  const [page, setPage] = useState("dashboard");
+  /*
+   * Not authenticated
+   */
+  if (!session) {
+    if (authPage === "forgot") {
+      return (
+        <ForgotPassword
+          onBack={() =>
+            setAuthPage("login")
+          }
+        />
+      );
+    }
 
-  const [drawerOpen, setDrawerOpen] = useState(false);
+    return (
+      <Login
+        onForgotPassword={() =>
+          setAuthPage("forgot")
+        }
+      />
+    );
+  }
 
-  const renderPage = () => {
+  function renderPage() {
     switch (page) {
       case "dashboard":
         return <Dashboard />;
@@ -67,104 +122,107 @@ if (!session) {
       case "insurance":
         return <Insurance />;
 
-        case "documents":
-  return <DocumentVault />;
+      case "documents":
+        return <DocumentVault />;
 
       case "settings":
         return <Settings />;
 
-        case "about":
-  return <About />;
-  
+      case "about":
+        return <About />;
+
+      case "profile":
+        return <UserProfile />;
+
       default:
         return <Dashboard />;
     }
-  };
+  }
 
-  
   return (
-    <div className="app">
-<header
-  className="header"
-  style={{
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-  }}
->
-<button
-  onClick={() => setDrawerOpen(true)}
-  style={{
-    border: "none",
-    background: "transparent",
-    color: "#ffffff",
-    fontSize: "28px",
-    cursor: "pointer",
-    width: "40px",
-    height: "40px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  }}
->
-  ☰
-</button>
-
-  <h2 style={{ margin: 0 }}>⚡ EV Toolkit</h2>
-
-  <div style={{ width: 24 }} />
-</header>
-
-<SideDrawer
-  open={drawerOpen}
-  currentPage={page}
-  onClose={() => setDrawerOpen(false)}
-  onNavigate={setPage}
-/>
+    <>
+      <SideDrawer
+        open={drawerOpen}
+        currentPage={page}
+        onClose={() =>
+          setDrawerOpen(false)
+        }
+        onNavigate={(selectedPage) => {
+          setPage(selectedPage);
+        }}
+      />
 
       <main className="content">
-      {renderPage()}
+        {renderPage()}
+      </main>
 
-</main>
-<nav className="bottomNav">
-  <button
-    className={page === "dashboard" ? "active" : ""}
-    onClick={() => setPage("dashboard")}
-  >
-    🏠
-    <span>Home</span>
-  </button>
+      <nav className="bottomNav">
+        <button
+          className={
+            page === "dashboard"
+              ? "active"
+              : ""
+          }
+          onClick={() =>
+            setPage("dashboard")
+          }
+        >
+          <span>🏠</span>
+          <span>Home</span>
+        </button>
 
-  <button
-    className={page === "planner" ? "active" : ""}
-    onClick={() => setPage("planner")}
-  >
-    ⚡
-    <span>Planner</span>
-  </button>
+        <button
+          className={
+            page === "planner"
+              ? "active"
+              : ""
+          }
+          onClick={() =>
+            setPage("planner")
+          }
+        >
+          <span>⚡</span>
+          <span>Planner</span>
+        </button>
 
-  <button
-    className={page === "tracker" ? "active" : ""}
-    onClick={() => setPage("tracker")}
-  >
-    🔋
-    <span>Charging</span>
-  </button>
+        <button
+          className={
+            page === "tracker"
+              ? "active"
+              : ""
+          }
+          onClick={() =>
+            setPage("tracker")
+          }
+        >
+          <span>🔋</span>
+          <span>Charging</span>
+        </button>
 
-  <button
-    className={page === "analytics" ? "active" : ""}
-    onClick={() => setPage("analytics")}
-  >
-    📊
-    <span>Analytics</span>
-  </button>
+        <button
+          className={
+            page === "analytics"
+              ? "active"
+              : ""
+          }
+          onClick={() =>
+            setPage("analytics")
+          }
+        >
+          <span>📊</span>
+          <span>Analytics</span>
+        </button>
 
-  <button onClick={() => setDrawerOpen(true)}>
-    ☰
-    <span>More</span>
-  </button>
-</nav>
-    </div>
+        <button
+          onClick={() =>
+            setDrawerOpen(true)
+          }
+        >
+          <span>☰</span>
+          <span>More</span>
+        </button>
+      </nav>
+    </>
   );
 }
 
