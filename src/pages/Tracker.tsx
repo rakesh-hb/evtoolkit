@@ -1,24 +1,18 @@
 import { useEffect, useState } from "react";
-//import { supabase } from "../lib/supabase";
+
 import {
   getChargingSessions,
   addChargingSession,
   updateChargingSession,
   deleteChargingSession,
+  getChargingStations,
+  addChargingStation,
   type ChargingSession,
+  type ChargingStation,
 } from "../services/chargingService";
 
 import { vehicles } from "../data/vehicles";
-
-//interface Session {
-//  id: number;
- // vehicle: string;
-//  charger: string;
-//  energy: number;
-//  cost: number;
- // station: string;
-//  date: string;
-//}
+import ReceiptUploader from "../components/ReceiptUploader";
 
 export interface ChargingStationOption {
   name: string;
@@ -36,20 +30,17 @@ export interface ChargingStationOption {
 }
 
 export const chargingStations: ChargingStationOption[] = [
-  // -------------------------
-  // Home
-  // -------------------------
   { name: "Home Charging", category: "Home" },
   { name: "Home 3.3kw", category: "Home" },
   { name: "Home 7.2kw", category: "Home" },
   { name: "Home 7.4kw", category: "Home" },
   { name: "Home 11kw", category: "Home" },
   { name: "Home 22kw", category: "Home" },
-  { name: "Apartment/Residential/Society Charger", category: "Home" },
+  {
+    name: "Apartment/Residential/Society Charger",
+    category: "Home",
+  },
 
-  // -------------------------
-  // Public CPOs
-  // -------------------------
   { name: "Tata Power EZ Charge", category: "Public" },
   { name: "Statiq", category: "Public" },
   { name: "ChargeZone", category: "Public" },
@@ -69,36 +60,13 @@ export const chargingStations: ChargingStationOption[] = [
   { name: "PlugNGo", category: "Public" },
   { name: "GO EC", category: "Public" },
 
-  // -------------------------
-  // Fuel Retailers
-  // -------------------------
   { name: "Indian Oil", category: "Fuel Station" },
   { name: "BPCL", category: "Fuel Station" },
   { name: "HPCL", category: "Fuel Station" },
   { name: "Shell Recharge", category: "Fuel Station" },
 
-  // -------------------------
-  // State Utilities
-  // -------------------------
   { name: "BESCOM EV Mithra", category: "Utility" },
-  //{ name: "KSEB", category: "Utility" },
-  //{ name: "MSEDCL", category: "Utility" },
-  //{ name: "TANGEDCO", category: "Utility" },
-  //{ name: "UPPCL", category: "Utility" },
- // { name: "GUVNL", category: "Utility" },
- // { name: "WBSEDCL", category: "Utility" },
-  //{ name: "TSNPDCL", category: "Utility" },
- // { name: "TSSPDCL", category: "Utility" },
-  //{ name: "APSPDCL", category: "Utility" },
-  //{ name: "APEPDCL", category: "Utility" },
-  //{ name: "NTPC", category: "Utility" },
-  //{ name: "NHPC", category: "Utility" },
-  //{ name: "PowerGrid", category: "Utility" },
-  //{ name: "EESL", category: "Utility" },
 
-  // -------------------------
-  // OEM Networks
-  // -------------------------
   { name: "Ather Grid", category: "OEM" },
   { name: "Hyundai EV Charging", category: "OEM" },
   { name: "MG ChargeHub", category: "OEM" },
@@ -110,185 +78,243 @@ export const chargingStations: ChargingStationOption[] = [
   { name: "Kia EV Charging", category: "OEM" },
   { name: "Volvo Charging", category: "OEM" },
 
-  // -------------------------
-  // Office
-  // -------------------------
   { name: "Office Charger", category: "Office" },
 
-  // -------------------------
-  // Commercial Locations
-  // -------------------------
   { name: "Mall Charging", category: "Commercial" },
   { name: "Hotel/Restaurant Charging", category: "Commercial" },
   { name: "Airport Charging", category: "Commercial" },
   { name: "Metro Station Charging", category: "Commercial" },
   { name: "Hospital Charging", category: "Commercial" },
 
-  // -------------------------
-  // Generic
-  // -------------------------
-  { name: "Other", category: "Other" }
+  { name: "Other", category: "Other" },
 ];
 
 function Tracker() {
-
   const defaultVehicle =
-    vehicles.find(v => v.model === "Curvv EV 55") ??
+    vehicles.find((v) => v.model === "Curvv EV 55") ??
     vehicles[0];
 
   const [vehicle, setVehicle] = useState(
     `${defaultVehicle.brand} ${defaultVehicle.model}`
   );
 
-  const [sessions, setSessions] =
-  useState<ChargingSession[]>([]);
+  const [sessions, setSessions] = useState<ChargingSession[]>([]);
 
-  const [charger, setCharger] =
-    useState("DC Fast");
+  const [charger, setCharger] = useState("DC Fast");
+  const [energy, setEnergy] = useState("");
+  const [cost, setCost] = useState("");
+  const [station, setStation] = useState("");
+  const [date, setDate] = useState("");
+  const [invoice, setInvoice] = useState("");
+const [invoiceResetKey, setInvoiceResetKey] = useState(0);
 
-  const [energy, setEnergy] =
+  const [editingId, setEditingId] = useState<number | null>(null);
+
+  const [customStations, setCustomStations] = useState<
+    ChargingStation[]
+  >([]);
+
+  const [showAddStation, setShowAddStation] =
+    useState(false);
+
+  const [newStationName, setNewStationName] =
     useState("");
 
-  const [cost, setCost] =
-    useState("");
+  const [newStationCategory, setNewStationCategory] =
+    useState("Other");
 
-  const [station, setStation] =
-    useState("");
+  const [savingStation, setSavingStation] =
+    useState(false);
 
-  const [date, setDate] =
-    useState("");
+  useEffect(() => {
+    loadSessions();
+    loadStations();
+  }, []);
 
-    const [editingId, setEditingId] =
-    useState<number | null>(null);
-
-
-    useEffect(() => {
-      loadSessions();
-    }, []);
-    
-    async function loadSessions() {
-      try {
-        const data = await getChargingSessions();
-        setSessions(data);
-      } catch (error) {
-        console.error(error);
-        alert("Failed to load charging sessions.");
-      }
+  async function loadSessions() {
+    try {
+      const data = await getChargingSessions();
+      setSessions(data);
+    } catch (error) {
+      console.error("Failed to load charging sessions:", error);
+      alert("Failed to load charging sessions.");
     }
-    
+  }
 
-    const saveSession = async () => {
-      if (!vehicle || !energy || !cost || !date) {
-        alert("Please fill all required fields.");
-        return;
-      }
-    
-      try {
-        const session = {
-          vehicle,
-          charger,
-          energy: Number(energy),
-          cost: Number(cost),
-          station,
-          date,
-        };
-    
-        if (editingId !== null) {
-          await updateChargingSession(editingId, session);
-        } else {
-          await addChargingSession(session);
-        }
-    
-        await loadSessions();
-    
+  async function loadStations() {
+    try {
+      const data = await getChargingStations();
+      setCustomStations(data);
+    } catch (error) {
+      console.error("Failed to load charging stations:", error);
+    }
+  }
+
+  async function handleAddStation() {
+    const name = newStationName.trim();
+
+    if (!name) {
+      alert("Please enter a charging station name.");
+      return;
+    }
+
+    try {
+      setSavingStation(true);
+
+      const newStation = await addChargingStation(
+        name,
+        newStationCategory
+      );
+
+      setCustomStations((current) => [
+        ...current,
+        newStation,
+      ]);
+
+      setStation(newStation.name);
+
+      setNewStationName("");
+      setNewStationCategory("Other");
+      setShowAddStation(false);
+
+      alert("Charging station added successfully.");
+    } catch (error: any) {
+      console.error(error);
+
+      if (
+        error?.code === "23505" ||
+        error?.message?.includes("duplicate")
+      ) {
+        alert("This charging station already exists.");
+      } else {
         alert(
-          editingId !== null
-            ? "Charging session updated successfully."
-            : "Charging session added successfully."
+          error?.message ||
+            "Failed to add charging station."
         );
-    
-        setEditingId(null);
-    
-        setVehicle(`${defaultVehicle.brand} ${defaultVehicle.model}`);
-        setCharger("DC Fast");
-        setEnergy("");
-        setCost("");
-        setStation("");
-        setDate("");
-      } catch (error) {
-        console.error(error);
-    
-        alert(
-          editingId !== null
+      }
+    } finally {
+      setSavingStation(false);
+    }
+  }
+
+  async function saveSession() {
+    if (!vehicle || !energy || !cost || !date) {
+      alert("Please fill all required fields.");
+      return;
+    }
+
+    try {
+      const session = {
+        vehicle,
+        charger,
+        energy: Number(energy),
+        cost: Number(cost),
+        station,
+        date,
+        invoice,
+      };
+
+      if (editingId !== null) {
+        await updateChargingSession(
+          editingId,
+          session
+        );
+      } else {
+        await addChargingSession(session);
+      }
+
+      await loadSessions();
+
+      alert(
+        editingId !== null
+          ? "Charging session updated successfully."
+          : "Charging session added successfully."
+      );
+
+      resetFormWithoutConfirmation();
+    } catch (error: any) {
+      console.error(error);
+
+      alert(
+        error?.message ||
+          (editingId !== null
             ? "Failed to update session."
-            : "Failed to save session."
-        );
-      }
-    };
-    
-
-    const deleteSession = async (id: number) => {
-      const confirmed = window.confirm(
-        "Are you sure you want to delete this charging session?\n\nThis action cannot be undone."
+            : "Failed to save session.")
       );
-    
-      if (!confirmed) {
-        return;
-      }
-    
-      try {
-        await deleteChargingSession(id);
-        await loadSessions();
-      
-        alert("Charging session deleted successfully.");
-      } catch (error) {
-        console.error(error);
-        alert("Failed to delete the charging session.");
-      }
+    }
+  }
 
-    };
+  async function deleteSession(id: number) {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this charging session?\n\nThis action cannot be undone."
+    );
 
-    const resetForm = () => {
-      const confirmed = window.confirm(
-        "⚠️ Reset all entered values?\n\nAll unsaved information will be cleared."
-      );
-    
-      if (!confirmed) return;
-      setEditingId(null);
+    if (!confirmed) return;
 
-      setVehicle(`${defaultVehicle.brand} ${defaultVehicle.model}`);
-      setCharger("DC Fast");
-      setEnergy("");
-      setCost("");
-      setStation("");
-      setDate("");
-      
-    };
-    
-    
+    try {
+      await deleteChargingSession(id);
+      await loadSessions();
+
+      alert("Charging session deleted successfully.");
+    } catch (error) {
+      console.error(error);
+      alert("Failed to delete the charging session.");
+    }
+  }
+
+  function resetFormWithoutConfirmation() {
+    setEditingId(null);
+  
+    setVehicle(
+      `${defaultVehicle.brand} ${defaultVehicle.model}`
+    );
+  
+    setCharger("DC Fast");
+    setEnergy("");
+    setCost("");
+    setStation("");
+    setDate("");
+    setInvoice("");
+  
+    // Force the file input to be recreated
+    setInvoiceResetKey((key) => key + 1);
+  }
+
+  function resetForm() {
+    const confirmed = window.confirm(
+      "⚠️ Reset all entered values?\n\nAll unsaved information will be cleared."
+    );
+
+    if (!confirmed) return;
+
+    resetFormWithoutConfirmation();
+  }
 
   return (
     <>
       <div className="welcome">
         <h2>📝 Charge Tracker</h2>
-        <p>Record and manage your EV charging sessions.</p>
+        <p>
+          Record and manage your EV charging sessions.
+        </p>
       </div>
-  
+
       <div className="card">
+        <h3>
+          {editingId !== null
+            ? "✏️ Edit Charging Session"
+            : "➕ New Charging Session"}
+        </h3>
 
-  <h3>
-    {editingId !== null
-      ? "✏️ Edit Charging Session"
-      : "➕ New Charging Session"}
-  </h3>
+        <label>Vehicle</label>
 
-  <label>Vehicle</label>
-  
         <select
-  value={vehicle}
-  disabled={editingId !== null}
-  onChange={(e) => setVehicle(e.target.value)}
->
+          value={vehicle}
+          disabled={editingId !== null}
+          onChange={(e) =>
+            setVehicle(e.target.value)
+          }
+        >
           {vehicles.map((v) => (
             <option
               key={v.id}
@@ -298,173 +324,369 @@ function Tracker() {
             </option>
           ))}
         </select>
-  
+
         {editingId !== null && (
-  <p
-    style={{
-      marginTop: "6px",
-      fontSize: "0.9rem",
-      color: "#666",
-    }}
-  >
-    Vehicle cannot be changed while editing a charging session.
-  </p>
-)}
+          <p
+            style={{
+              marginTop: "6px",
+              fontSize: "0.9rem",
+              color: "#666",
+            }}
+          >
+            Vehicle cannot be changed while editing a
+            charging session.
+          </p>
+        )}
 
         <label>Charging Type</label>
-  
+
         <select
           value={charger}
-          onChange={(e) => setCharger(e.target.value)}
+          onChange={(e) =>
+            setCharger(e.target.value)
+          }
         >
           <option>Home AC</option>
           <option>Public AC</option>
           <option>DC Fast</option>
         </select>
-  
+
         <label>Energy Charged (kWh)</label>
-  
+
         <input
           type="number"
           placeholder="Enter energy charged"
           value={energy}
-          onChange={(e) => setEnergy(e.target.value)}
+          onChange={(e) =>
+            setEnergy(e.target.value)
+          }
         />
-  
+
         <label>Charging Station</label>
-  
-        <select
-          value={station}
-          onChange={(e) => {
-            setStation(e.target.value);
-        }}
+
+        <div
+          style={{
+            display: "flex",
+            gap: "8px",
+            alignItems: "stretch",
+          }}
         >
-          <option value="">
-            Select Charging Station
-          </option>
-  
-          {chargingStations.map((item) => (
-            <option
-              key={item.name}
-              value={item.name}
-            >
-              {item.name}
+          <select
+            value={station}
+            onChange={(e) =>
+              setStation(e.target.value)
+            }
+            style={{ flex: 1 }}
+          >
+            <option value="">
+              Select Charging Station
             </option>
-          ))}
-        </select>
-  
+
+            <optgroup label="Standard Stations">
+              {chargingStations.map((item) => (
+                <option
+                  key={item.name}
+                  value={item.name}
+                >
+                  {item.name}
+                </option>
+              ))}
+            </optgroup>
+
+            {customStations.length > 0 && (
+              <optgroup label="My Stations">
+                {customStations.map((item) => (
+                  <option
+                    key={`custom-${item.id}`}
+                    value={item.name}
+                  >
+                    {item.name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+
+          <button
+            type="button"
+            className="saveButton"
+            onClick={() =>
+              setShowAddStation(true)
+            }
+            style={{
+              whiteSpace: "nowrap",
+              padding: "8px 12px",
+            }}
+          >
+            + Add Station
+          </button>
+        </div>
+
+        {showAddStation && (
+          <div
+            className="card"
+            style={{
+              marginTop: "12px",
+              border: "1px solid #ddd",
+            }}
+          >
+            <h4 style={{ marginTop: 0 }}>
+              Add Charging Station
+            </h4>
+
+            <label>Station Name</label>
+
+            <input
+              type="text"
+              placeholder="e.g. ABC Charging Hub"
+              value={newStationName}
+              onChange={(e) =>
+                setNewStationName(e.target.value)
+              }
+            />
+
+            <label>Category</label>
+
+            <select
+              value={newStationCategory}
+              onChange={(e) =>
+                setNewStationCategory(e.target.value)
+              }
+            >
+              <option>Home</option>
+              <option>Public</option>
+              <option>Office</option>
+              <option>Fleet</option>
+              <option>Highway</option>
+              <option>Commercial</option>
+              <option>OEM</option>
+              <option>Utility</option>
+              <option>Fuel Station</option>
+              <option>Other</option>
+            </select>
+
+            <div
+              className="buttonGroup"
+              style={{ marginTop: "12px" }}
+            >
+              <button
+                type="button"
+                className="primaryButton"
+                onClick={() =>
+                  void handleAddStation()
+                }
+                disabled={savingStation}
+              >
+                {savingStation
+                  ? "Saving..."
+                  : "Save Station"}
+              </button>
+
+              <button
+                type="button"
+                className="dangerButton"
+                onClick={() => {
+                  setShowAddStation(false);
+                  setNewStationName("");
+                  setNewStationCategory("Other");
+                }}
+                disabled={savingStation}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
         <label>Total Cost (₹)</label>
-  
+
         <input
           type="number"
           value={cost}
-          onChange={(e) => setCost(e.target.value)}
+          onChange={(e) =>
+            setCost(e.target.value)
+          }
         />
-  
+
         <label>Date</label>
-  
+
         <input
           type="date"
           value={date}
-          onChange={(e) => setDate(e.target.value)}
+          onChange={(e) =>
+            setDate(e.target.value)
+          }
         />
-  
-  <div className="buttonGroup">
-  <button
-    className="primaryButton"
-    onClick={() => void saveSession()}  >
-{editingId !== null
-  ? "💾 Update Session"
-  : "💾 Save Session"}  </button>
 
-  <button
-    className="dangerButton"
-    onClick={resetForm}
-  >
-    🔄 Reset Form
-  </button>
-</div>
+        <label>Invoice / Receipt</label>
 
+        <ReceiptUploader
+  key={invoiceResetKey}
+  value={invoice}
+  onChange={(value) => setInvoice(value)}
+/>
+
+        <p
+          style={{
+            fontSize: "12px",
+            color: "#6b7280",
+            marginTop: "6px",
+          }}
+        >
+          Upload a PDF, image, or other document.
+          Recommended maximum file size:{" "}
+          <strong>5 MB</strong>.
+        </p>
+
+        <div className="buttonGroup">
+          <button
+            className="primaryButton"
+            onClick={() => void saveSession()}
+          >
+            {editingId !== null
+              ? "💾 Update Session"
+              : "💾 Save Session"}
+          </button>
+
+          <button
+            className="dangerButton"
+            onClick={resetForm}
+          >
+            🔄 Reset Form
+          </button>
+        </div>
       </div>
-  
+
       <div className="card">
         <h3>Recent Sessions</h3>
-  
+
         {sessions.length === 0 ? (
-  <p style={{ marginTop: 15 }}>
-    No charging sessions recorded.
-  </p>
-) : (
-  <div className="tableContainer">
-    <table className="table">
-      <thead>
-        <tr>
-          <th>No.</th>
-          <th>Date</th>
-          <th>Vehicle</th>
-          <th>Station</th>
-          <th>Type</th>
-          <th>Energy</th>
-          <th>Cost</th>
-          <th>Action</th>
-        </tr>
-      </thead>
+          <p style={{ marginTop: 15 }}>
+            No charging sessions recorded.
+          </p>
+        ) : (
+          <div className="tableContainer">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>No.</th>
+                  <th>Date</th>
+                  <th>Vehicle</th>
+                  <th>Station</th>
+                  <th>Type</th>
+                  <th>Energy</th>
+                  <th>Cost</th>
+                  <th>Invoice</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
 
-      <tbody>
-        {sessions.map((session, index) => (
-          <tr key={session.id}>
-            <td>{sessions.length - index}</td>
-            <td>{session.date}</td>
-            <td>{session.vehicle}</td>
-            <td>{session.station || "-"}</td>
-            <td>{session.charger}</td>
-            <td>{session.energy.toFixed(1)} kWh</td>
-            <td>₹{session.cost.toLocaleString()}</td>
-            <td>
-  <div className="actionButtons">
+              <tbody>
+                {sessions.map((session, index) => (
+                  <tr key={session.id}>
+                    <td>
+                      {sessions.length - index}
+                    </td>
 
-    <button
-      className="editButton"
-      onClick={() => {
+                    <td>{session.date}</td>
 
-        setEditingId(session.id);
+                    <td>{session.vehicle}</td>
 
-        setVehicle(session.vehicle);
-        setCharger(session.charger);
-        setEnergy(session.energy.toString());
-        setCost(session.cost.toString());
-        setStation(session.station);
-        setDate(session.date);
+                    <td>
+                      {session.station || "-"}
+                    </td>
 
-        window.scrollTo({
-          top: 0,
-          behavior: "smooth",
-        });
+                    <td>{session.charger}</td>
 
-      }}
-    >
-      Edit
-    </button>
+                    <td>
+                      {session.energy.toFixed(1)} kWh
+                    </td>
 
-    <button
-      className="deleteButton"
-      onClick={() => deleteSession(session.id)}
-    >
-      Delete
-    </button>
+                    <td>
+                      ₹{session.cost.toLocaleString()}
+                    </td>
 
-  </div>
-</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-)}
+                    <td>
+                      {session.invoice ? (
+                        <a
+                          href={session.invoice}
+                          download={`Charging-${session.date}-Invoice`}
+                          className="downloadButton"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          ⬇ Download
+                        </a>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+
+                    <td>
+                      <div className="actionButtons">
+                        <button
+                          className="editButton"
+                          onClick={() => {
+                            setEditingId(
+                              session.id
+                            );
+
+                            setVehicle(
+                              session.vehicle
+                            );
+
+                            setCharger(
+                              session.charger
+                            );
+
+                            setEnergy(
+                              session.energy.toString()
+                            );
+
+                            setCost(
+                              session.cost.toString()
+                            );
+
+                            setStation(
+                              session.station
+                            );
+
+                            setDate(session.date);
+
+                            setInvoice(
+                              session.invoice || ""
+                            );
+
+                            window.scrollTo({
+                              top: 0,
+                              behavior: "smooth",
+                            });
+                          }}
+                        >
+                          Edit
+                        </button>
+
+                        <button
+                          className="deleteButton"
+                          onClick={() =>
+                            void deleteSession(
+                              session.id
+                            )
+                          }
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </>
   );
+}
 
-  }
-  
-  export default Tracker;
+export default Tracker;
