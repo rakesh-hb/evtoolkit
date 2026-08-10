@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { getCurrentUserId } from "../services/authHelper";
 import ReportToolbar from "../components/reports/ReportToolbar";
 
 import {
@@ -45,21 +46,44 @@ function Analytics() {
   }, []);
 
   async function loadSessions() {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    const { data, error } = await supabase
-      .from("charging_sessions")
-      .select("*")
-      .order("date", { ascending: false });
+      const userId = await getCurrentUserId();
 
-    if (error) {
-      console.error("Failed to load charging sessions:", error);
+      const { data, error } = await supabase
+        .from("charging_sessions")
+        .select("*")
+        .eq("user_id", userId)
+        .order("date", { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      const mappedSessions: Session[] = (data ?? []).map(
+        (row) => ({
+          id: row.id,
+          vehicle: row.vehicle ?? "",
+          charger: row.charger ?? "",
+          energy: Number(row.energy ?? 0),
+          cost: Number(row.cost ?? 0),
+          station: row.station ?? "",
+          date: row.date ?? "",
+        })
+      );
+
+      setSessions(mappedSessions);
+    } catch (error) {
+      console.error(
+        "Failed to load charging sessions:",
+        error
+      );
+
+      setSessions([]);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setSessions((data as Session[]) || []);
-    setLoading(false);
   }
 
   if (loading) {
@@ -92,15 +116,44 @@ function Analytics() {
       ? totalCost / totalSessions
       : 0;
 
-  const estimatedRange = totalEnergy * 6;
+  /*
+   * Estimated Distance
+   *
+   * Uses the efficiency defined for each vehicle.
+   *
+   * Formula:
+   *
+   * distance = energy / efficiency × 100
+   *
+   * Example:
+   * 100 kWh / 10.6 kWh/100km × 100
+   * = approximately 943 km
+   *
+   * Each session is calculated using its own vehicle's
+   * efficiency, so this remains correct if multiple
+   * vehicles are added later.
+   */
 
-  const vehicleStats: Record<string, SummaryStats> = {};
 
-  const stationStats: Record<string, SummaryStats> = {};
+  const vehicleStats: Record<
+    string,
+    SummaryStats
+  > = {};
 
-  const monthlyStats: Record<string, SummaryStats> = {};
+  const stationStats: Record<
+    string,
+    SummaryStats
+  > = {};
 
-  const yearlyStats: Record<string, SummaryStats> = {};
+  const monthlyStats: Record<
+    string,
+    SummaryStats
+  > = {};
+
+  const yearlyStats: Record<
+    string,
+    SummaryStats
+  > = {};
 
   const chargerStats: Record<string, number> = {};
 
@@ -115,7 +168,9 @@ function Analytics() {
   };
 
   sessions.forEach((session) => {
+    // --------------------------------------------------
     // Vehicle
+    // --------------------------------------------------
 
     if (!vehicleStats[session.vehicle]) {
       vehicleStats[session.vehicle] = {
@@ -126,12 +181,17 @@ function Analytics() {
     }
 
     vehicleStats[session.vehicle].sessions++;
-    vehicleStats[session.vehicle].energy += session.energy;
-    vehicleStats[session.vehicle].cost += session.cost;
+    vehicleStats[session.vehicle].energy +=
+      session.energy;
+    vehicleStats[session.vehicle].cost +=
+      session.cost;
 
+    // --------------------------------------------------
     // Station
+    // --------------------------------------------------
 
-    const station = session.station || "Home";
+    const station =
+      session.station || "Home";
 
     if (!stationStats[station]) {
       stationStats[station] = {
@@ -142,29 +202,42 @@ function Analytics() {
     }
 
     stationStats[station].sessions++;
-    stationStats[station].energy += session.energy;
-    stationStats[station].cost += session.cost;
+    stationStats[station].energy +=
+      session.energy;
+    stationStats[station].cost +=
+      session.cost;
 
+    // --------------------------------------------------
     // Charger
+    // --------------------------------------------------
 
     chargerStats[session.charger] =
       (chargerStats[session.charger] || 0) + 1;
 
+    // --------------------------------------------------
     // Date
+    // --------------------------------------------------
 
     if (session.date) {
       const date = new Date(session.date);
 
-      const month = date.toLocaleString("default", {
-        month: "long",
-        year: "numeric",
-      });
+      const month = date.toLocaleString(
+        "default",
+        {
+          month: "long",
+          year: "numeric",
+        }
+      );
 
-      const year = date.getFullYear().toString();
+      const year =
+        date.getFullYear().toString();
 
-      const weekday = date.toLocaleString("default", {
-        weekday: "long",
-      });
+      const weekday = date.toLocaleString(
+        "default",
+        {
+          weekday: "long",
+        }
+      );
 
       if (!monthlyStats[month]) {
         monthlyStats[month] = {
@@ -175,8 +248,10 @@ function Analytics() {
       }
 
       monthlyStats[month].sessions++;
-      monthlyStats[month].energy += session.energy;
-      monthlyStats[month].cost += session.cost;
+      monthlyStats[month].energy +=
+        session.energy;
+      monthlyStats[month].cost +=
+        session.cost;
 
       if (!yearlyStats[year]) {
         yearlyStats[year] = {
@@ -187,35 +262,41 @@ function Analytics() {
       }
 
       yearlyStats[year].sessions++;
-      yearlyStats[year].energy += session.energy;
-      yearlyStats[year].cost += session.cost;
+      yearlyStats[year].energy +=
+        session.energy;
+      yearlyStats[year].cost +=
+        session.cost;
 
       weeklyStats[weekday]++;
     }
   });
 
-  const monthlyChartData = Object.entries(monthlyStats).map(
-    ([month, stats]) => ({
-      month,
-      sessions: stats.sessions,
-      energy: stats.energy,
-      cost: stats.cost,
-    })
-  );
+  // --------------------------------------------------
+  // Chart Data
+  // --------------------------------------------------
 
-  const weeklyChartData = Object.entries(weeklyStats).map(
-    ([day, sessions]) => ({
-      day,
-      sessions,
-    })
-  );
+  const monthlyChartData = Object.entries(
+    monthlyStats
+  ).map(([month, stats]) => ({
+    month,
+    sessions: stats.sessions,
+    energy: stats.energy,
+    cost: stats.cost,
+  }));
 
-  const chargingTypeData = Object.entries(chargerStats).map(
-    ([name, value]) => ({
-      name,
-      value,
-    })
-  );
+  const weeklyChartData = Object.entries(
+    weeklyStats
+  ).map(([day, sessions]) => ({
+    day,
+    sessions,
+  }));
+
+  const chargingTypeData = Object.entries(
+    chargerStats
+  ).map(([name, value]) => ({
+    name,
+    value,
+  }));
 
   const COLORS = [
     "#22c55e",
@@ -228,76 +309,114 @@ function Analytics() {
     "#84cc16",
   ];
 
+  // --------------------------------------------------
+  // Report Data
+  // --------------------------------------------------
+
   const reportData = {
     totalSessions,
     totalEnergy,
     totalCost,
     averageEnergy,
     averageCost,
-    estimatedRange,
-  
+
     vehicleStats,
     stationStats,
     monthlyStats,
     yearlyStats,
     weeklyStats,
-  
+
     sessions,
   };
 
   return (
     <>
       <div className="welcome">
-  <h2>📊 Analytics Dashboard</h2>
-  <p>Detailed insights into your EV charging history.</p>
+        <h2>📊 Analytics Dashboard</h2>
 
-  <div style={{ marginTop: "16px" }}>
-  <ReportToolbar reportData={reportData} />
-  
+        <p>
+          Detailed insights into your EV charging
+          history.
+        </p>
+
+        <div style={{ marginTop: "16px" }}>
+          <ReportToolbar
+            reportData={reportData}
+          />
+        </div>
       </div>
-</div>
+
+      {/* ==================================================
+          KPI CARDS
+          ================================================== */}
 
       <div className="statsGrid">
         <div className="statCard">
           <h3>Total Sessions</h3>
+
           <h1>{totalSessions}</h1>
         </div>
 
         <div className="statCard">
           <h3>Total Energy</h3>
-          <h1>{totalEnergy.toFixed(1)} kWh</h1>
+
+          <h1>
+            {totalEnergy.toFixed(1)} kWh
+          </h1>
         </div>
 
         <div className="statCard">
           <h3>Total Spend</h3>
-          <h1>₹{totalCost.toLocaleString()}</h1>
+
+          <h1>
+            ₹{totalCost.toLocaleString()}
+          </h1>
         </div>
 
         <div className="statCard">
           <h3>Avg. Cost / Session</h3>
-          <h1>₹{averageCost.toFixed(2)}</h1>
+
+          <h1>
+            ₹{averageCost.toFixed(2)}
+          </h1>
         </div>
 
         <div className="statCard">
           <h3>Avg. Energy / Session</h3>
-          <h1>{averageEnergy.toFixed(1)} kWh</h1>
+
+          <h1>
+            {averageEnergy.toFixed(1)} kWh
+          </h1>
         </div>
 
-        <div className="statCard">
-          <h3>Estimated Range</h3>
-          <h1>{estimatedRange.toFixed(0)} km</h1>
-        </div>
+
       </div>
 
-      <div id="monthlySpendChart" className="card">
-  <h3>💰 Monthly Spend Trend</h3>
+      {/* ==================================================
+          MONTHLY SPEND
+          ================================================== */}
 
-        <ResponsiveContainer width="100%" height={320}>
-          <AreaChart data={monthlyChartData}>
+      <div
+        id="monthlySpendChart"
+        className="card"
+      >
+        <h3>💰 Monthly Spend Trend</h3>
+
+        <ResponsiveContainer
+          width="100%"
+          height={320}
+        >
+          <AreaChart
+            data={monthlyChartData}
+          >
             <CartesianGrid strokeDasharray="3 3" />
+
             <XAxis dataKey="month" />
+
             <YAxis />
+
             <Tooltip />
+
             <Legend />
 
             <Area
@@ -310,15 +429,31 @@ function Analytics() {
         </ResponsiveContainer>
       </div>
 
-      <div id="monthlyEnergyChart" className="card">
-  <h3>⚡ Monthly Energy Trend</h3>
+      {/* ==================================================
+          MONTHLY ENERGY
+          ================================================== */}
 
-        <ResponsiveContainer width="100%" height={320}>
-          <LineChart data={monthlyChartData}>
+      <div
+        id="monthlyEnergyChart"
+        className="card"
+      >
+        <h3>⚡ Monthly Energy Trend</h3>
+
+        <ResponsiveContainer
+          width="100%"
+          height={320}
+        >
+          <LineChart
+            data={monthlyChartData}
+          >
             <CartesianGrid strokeDasharray="3 3" />
+
             <XAxis dataKey="month" />
+
             <YAxis />
+
             <Tooltip />
+
             <Legend />
 
             <Line
@@ -331,6 +466,10 @@ function Analytics() {
         </ResponsiveContainer>
       </div>
 
+      {/* ==================================================
+          CHARGING OVERVIEW
+          ================================================== */}
+
       <div className="card">
         <h3>Charging Overview</h3>
 
@@ -339,43 +478,69 @@ function Analytics() {
             <tbody>
               <tr>
                 <td>Total Sessions</td>
+
                 <td>{totalSessions}</td>
               </tr>
 
               <tr>
                 <td>Total Energy</td>
-                <td>{totalEnergy.toFixed(1)} kWh</td>
+
+                <td>
+                  {totalEnergy.toFixed(1)} kWh
+                </td>
               </tr>
 
               <tr>
                 <td>Total Spend</td>
-                <td>₹{totalCost.toLocaleString()}</td>
+
+                <td>
+                  ₹{totalCost.toLocaleString()}
+                </td>
               </tr>
 
               <tr>
-                <td>Average Cost / Session</td>
-                <td>₹{averageCost.toFixed(2)}</td>
+                <td>
+                  Average Cost / Session
+                </td>
+
+                <td>
+                  ₹{averageCost.toFixed(2)}
+                </td>
               </tr>
 
               <tr>
-                <td>Average Energy / Session</td>
-                <td>{averageEnergy.toFixed(1)} kWh</td>
+                <td>
+                  Average Energy / Session
+                </td>
+
+                <td>
+                  {averageEnergy.toFixed(1)} kWh
+                </td>
               </tr>
 
-              <tr>
-                <td>Estimated Range Added</td>
-                <td>{estimatedRange.toFixed(0)} km</td>
-              </tr>
+            
             </tbody>
           </table>
         </div>
       </div>
 
-      <div id="weeklyChart" className="card">
-  <h3>📅 Weekly Sessions</h3>
+      {/* ==================================================
+          WEEKLY CHART
+          ================================================== */}
 
-        <ResponsiveContainer width="100%" height={320}>
-          <BarChart data={weeklyChartData}>
+      <div
+        id="weeklyChart"
+        className="card"
+      >
+        <h3>📅 Weekly Sessions</h3>
+
+        <ResponsiveContainer
+          width="100%"
+          height={320}
+        >
+          <BarChart
+            data={weeklyChartData}
+          >
             <CartesianGrid strokeDasharray="3 3" />
 
             <XAxis dataKey="day" />
@@ -394,6 +559,10 @@ function Analytics() {
         </ResponsiveContainer>
       </div>
 
+      {/* ==================================================
+          WEEKLY SUMMARY
+          ================================================== */}
+
       <div className="card">
         <h3>Weekly Summary</h3>
 
@@ -407,9 +576,12 @@ function Analytics() {
             </thead>
 
             <tbody>
-              {Object.entries(weeklyStats).map(([day, count]) => (
+              {Object.entries(
+                weeklyStats
+              ).map(([day, count]) => (
                 <tr key={day}>
                   <td>{day}</td>
+
                   <td>{count}</td>
                 </tr>
               ))}
@@ -417,6 +589,10 @@ function Analytics() {
           </table>
         </div>
       </div>
+
+      {/* ==================================================
+          MONTHLY SUMMARY
+          ================================================== */}
 
       <div className="card">
         <h3>Monthly Summary</h3>
@@ -433,12 +609,21 @@ function Analytics() {
             </thead>
 
             <tbody>
-              {Object.entries(monthlyStats).map(([month, stats]) => (
+              {Object.entries(
+                monthlyStats
+              ).map(([month, stats]) => (
                 <tr key={month}>
                   <td>{month}</td>
+
                   <td>{stats.sessions}</td>
-                  <td>{stats.energy.toFixed(1)} kWh</td>
-                  <td>₹{stats.cost.toLocaleString()}</td>
+
+                  <td>
+                    {stats.energy.toFixed(1)} kWh
+                  </td>
+
+                  <td>
+                    ₹{stats.cost.toLocaleString()}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -446,11 +631,18 @@ function Analytics() {
         </div>
       </div>
 
+      {/* ==================================================
+          VEHICLE STATISTICS
+          ================================================== */}
+
       <div className="card">
         <h3>🚗 Vehicle Statistics</h3>
 
-        {Object.keys(vehicleStats).length === 0 ? (
-          <p>No charging data available.</p>
+        {Object.keys(vehicleStats).length ===
+        0 ? (
+          <p>
+            No charging data available.
+          </p>
         ) : (
           <div className="tableContainer">
             <table className="table">
@@ -464,25 +656,52 @@ function Analytics() {
               </thead>
 
               <tbody>
-                {Object.entries(vehicleStats).map(([vehicle, stats]) => (
-                  <tr key={vehicle}>
-                    <td>{vehicle}</td>
-                    <td>{stats.sessions}</td>
-                    <td>{stats.energy.toFixed(1)} kWh</td>
-                    <td>₹{stats.cost.toLocaleString()}</td>
-                  </tr>
-                ))}
+                {Object.entries(
+                  vehicleStats
+                ).map(
+                  ([vehicle, stats]) => (
+                    <tr key={vehicle}>
+                      <td>{vehicle}</td>
+
+                      <td>
+                        {stats.sessions}
+                      </td>
+
+                      <td>
+                        {stats.energy.toFixed(
+                          1
+                        )}{" "}
+                        kWh
+                      </td>
+
+                      <td>
+                        ₹
+                        {stats.cost.toLocaleString()}
+                      </td>
+                    </tr>
+                  )
+                )}
               </tbody>
             </table>
           </div>
         )}
       </div>
 
-      <div className="card">
-        <h3>🏢 Charging Station Statistics</h3>
+      {/* ==================================================
+          STATION STATISTICS
+          ================================================== */}
 
-        {Object.keys(stationStats).length === 0 ? (
-          <p>No charging station data available.</p>
+      <div className="card">
+        <h3>
+          🏢 Charging Station Statistics
+        </h3>
+
+        {Object.keys(stationStats).length ===
+        0 ? (
+          <p>
+            No charging station data
+            available.
+          </p>
         ) : (
           <div className="tableContainer">
             <table className="table">
@@ -496,24 +715,53 @@ function Analytics() {
               </thead>
 
               <tbody>
-                {Object.entries(stationStats).map(([station, stats]) => (
-                  <tr key={station}>
-                    <td>{station}</td>
-                    <td>{stats.sessions}</td>
-                    <td>{stats.energy.toFixed(1)} kWh</td>
-                    <td>₹{stats.cost.toLocaleString()}</td>
-                  </tr>
-                ))}
+                {Object.entries(
+                  stationStats
+                ).map(
+                  ([station, stats]) => (
+                    <tr key={station}>
+                      <td>{station}</td>
+
+                      <td>
+                        {stats.sessions}
+                      </td>
+
+                      <td>
+                        {stats.energy.toFixed(
+                          1
+                        )}{" "}
+                        kWh
+                      </td>
+
+                      <td>
+                        ₹
+                        {stats.cost.toLocaleString()}
+                      </td>
+                    </tr>
+                  )
+                )}
               </tbody>
             </table>
           </div>
         )}
       </div>
 
-      <div id="chargingTypeChart" className="card">
-  <h3>🔌 Charging Type Distribution</h3>
+      {/* ==================================================
+          CHARGING TYPE
+          ================================================== */}
 
-        <ResponsiveContainer width="100%" height={350}>
+      <div
+        id="chargingTypeChart"
+        className="card"
+      >
+        <h3>
+          🔌 Charging Type Distribution
+        </h3>
+
+        <ResponsiveContainer
+          width="100%"
+          height={350}
+        >
           <PieChart>
             <Pie
               data={chargingTypeData}
@@ -522,12 +770,19 @@ function Analytics() {
               outerRadius={120}
               label
             >
-              {chargingTypeData.map((_, index) => (
-                <Cell
-                  key={index}
-                  fill={COLORS[index % COLORS.length]}
-                />
-              ))}
+              {chargingTypeData.map(
+                (_, index) => (
+                  <Cell
+                    key={index}
+                    fill={
+                      COLORS[
+                        index %
+                          COLORS.length
+                      ]
+                    }
+                  />
+                )
+              )}
             </Pie>
 
             <Tooltip />
@@ -536,6 +791,10 @@ function Analytics() {
           </PieChart>
         </ResponsiveContainer>
       </div>
+
+      {/* ==================================================
+          YEARLY SUMMARY
+          ================================================== */}
 
       <div className="card">
         <h3>📅 Yearly Summary</h3>
@@ -552,12 +811,25 @@ function Analytics() {
             </thead>
 
             <tbody>
-              {Object.entries(yearlyStats).map(([year, stats]) => (
+              {Object.entries(
+                yearlyStats
+              ).map(([year, stats]) => (
                 <tr key={year}>
                   <td>{year}</td>
+
                   <td>{stats.sessions}</td>
-                  <td>{stats.energy.toFixed(1)} kWh</td>
-                  <td>₹{stats.cost.toLocaleString()}</td>
+
+                  <td>
+                    {stats.energy.toFixed(
+                      1
+                    )}{" "}
+                    kWh
+                  </td>
+
+                  <td>
+                    ₹
+                    {stats.cost.toLocaleString()}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -565,11 +837,19 @@ function Analytics() {
         </div>
       </div>
 
+      {/* ==================================================
+          RECENT SESSIONS
+          ================================================== */}
+
       <div className="card">
-        <h3>📝 Recent Charging Sessions</h3>
+        <h3>
+          📝 Recent Charging Sessions
+        </h3>
 
         {sessions.length === 0 ? (
-          <p>No charging sessions found.</p>
+          <p>
+            No charging sessions found.
+          </p>
         ) : (
           <div className="tableContainer">
             <table className="table">
@@ -586,17 +866,45 @@ function Analytics() {
               </thead>
 
               <tbody>
-                {sessions.map((session, index) => (
-                  <tr key={session.id}>
-                    <td>{sessions.length - index}</td>
-                    <td>{session.date}</td>
-                    <td>{session.vehicle}</td>
-                    <td>{session.station || "-"}</td>
-                    <td>{session.charger}</td>
-                    <td>{session.energy.toFixed(1)} kWh</td>
-                    <td>₹{session.cost.toLocaleString()}</td>
-                  </tr>
-                ))}
+                {sessions.map(
+                  (session, index) => (
+                    <tr key={session.id}>
+                      <td>
+                        {sessions.length -
+                          index}
+                      </td>
+
+                      <td>
+                        {session.date}
+                      </td>
+
+                      <td>
+                        {session.vehicle}
+                      </td>
+
+                      <td>
+                        {session.station ||
+                          "-"}
+                      </td>
+
+                      <td>
+                        {session.charger}
+                      </td>
+
+                      <td>
+                        {session.energy.toFixed(
+                          1
+                        )}{" "}
+                        kWh
+                      </td>
+
+                      <td>
+                        ₹
+                        {session.cost.toLocaleString()}
+                      </td>
+                    </tr>
+                  )
+                )}
               </tbody>
             </table>
           </div>
@@ -607,4 +915,3 @@ function Analytics() {
 }
 
 export default Analytics;
-

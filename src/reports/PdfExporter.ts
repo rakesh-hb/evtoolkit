@@ -51,10 +51,6 @@ function buildSummaryTable(
       currency(report.summary.averageCost),
     ],
     [
-      "Estimated Range",
-      `${formatNumber(report.summary.estimatedRange)} km`,
-    ],
-    [
       "Petrol Saved",
       `${formatNumber(report.summary.petrolSaved)} L`,
     ],
@@ -169,12 +165,7 @@ function addCoverPage(
           "Total Spend",
           currency(report.summary.totalCost),
         ],
-        [
-          "Estimated Range",
-          `${formatNumber(
-            report.summary.estimatedRange
-          )} km`,
-        ],
+        
         [
           "Petrol Saved",
           `${formatNumber(

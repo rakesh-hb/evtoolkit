@@ -83,10 +83,6 @@ function Dashboard() {
           <h1>{totalSessions}</h1>
         </div>
 
-        <div className="statCard">
-          <h3>Range Added</h3>
-          <h1>{rangeAdded.toFixed(0)} km</h1>
-        </div>
 
       </div>
 
@@ -116,11 +112,6 @@ function Dashboard() {
             <tr>
               <td>Average Cost / Session</td>
               <td>₹{averageCost.toFixed(2)}</td>
-            </tr>
-
-            <tr>
-              <td>Estimated Range Added</td>
-              <td>{rangeAdded.toFixed(0)} km</td>
             </tr>
 
           </tbody>

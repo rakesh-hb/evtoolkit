@@ -10,7 +10,6 @@ import type {
     totalCost: number;
     averageEnergy: number;
     averageCost: number;
-    estimatedRange: number;
   
     vehicleStats: Record<string, SummaryStats>;
     stationStats: Record<string, SummaryStats>;
@@ -33,7 +32,6 @@ import type {
         totalCost: data.totalCost,
         averageEnergy: data.averageEnergy,
         averageCost: data.averageCost,
-        estimatedRange: data.estimatedRange,
   
         petrolSaved: data.totalEnergy / 14,
         carbonSaved: data.totalEnergy * 0.82,
