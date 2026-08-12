@@ -245,7 +245,7 @@ export async function sendPasswordResetEmail(
   email: string
 ) {
   const redirectTo =
-    `${window.location.origin}/reset-password`;
+  "https://evtoolkit.rockytales.workers.dev/reset-password";
 
   const {
     data,
