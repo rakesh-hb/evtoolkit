@@ -110,7 +110,7 @@ export default function ForgotPassword({
             <br />
 
             <button
-              className="saveButton"
+              className="restoreButton"
               style={{
                 width: "100%",
               }}
@@ -123,7 +123,7 @@ export default function ForgotPassword({
             </button>
 
             <button
-              type="button"
+              className="saveButton"
               disabled={loading}
               onClick={onBack}
               style={{
