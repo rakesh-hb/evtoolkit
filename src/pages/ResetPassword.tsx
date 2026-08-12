@@ -292,7 +292,6 @@ export default function ResetPassword({
             </button>
           </>
         )}
-
         {error && (
           <button
             type="button"
