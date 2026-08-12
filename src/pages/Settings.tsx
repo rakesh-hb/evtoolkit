@@ -135,49 +135,7 @@ function Settings() {
   </p>
 </div>
 
-      <div className="card">
-        <h3>About</h3>
-
-        <table className="table">
-          <tbody>
-            <tr>
-              <td>Application</td>
-              <td>EV Toolkit</td>
-            </tr>
-
-            <tr>
-              <td>Version</td>
-              <td>3.0</td>
-            </tr>
-
-            <tr>
-              <td>Platform</td>
-              <td>React + Vite + TypeScript</td>
-            </tr>
-
-            <tr>
-              <td>Database</td>
-              <td>Supabase PostgreSQL</td>
-            </tr>
-
-            <tr>
-              <td>Hosting</td>
-              <td>Cloudflare Workers</td>
-            </tr>
-
-            <tr>
-              <td>Storage</td>
-              <td>Cloud Database</td>
-            </tr>
-
-            <tr>
-              <td>Owner and Developer</td>
-              <td>Rakesh HB</td>
-            </tr>
-
-          </tbody>
-        </table>
-      </div>
+      
     </>
   );
 }
