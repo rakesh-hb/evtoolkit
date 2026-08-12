@@ -1,622 +1,917 @@
 import { useEffect, useMemo, useState } from "react";
 import { vehicles } from "../data/vehicles";
 import { chargers } from "../data/chargers";
+import { STATES } from "../data/states";
 
-import {
-  STATE_TARIFFS,
-  STATES,
-} from "../data/states";
+/*
+ * These are representative estimated domestic electricity
+ * rates used as DEFAULTS for the Planner.
+ *
+ * They are not intended to reproduce a user's actual
+ * electricity bill. Actual rates can vary by DISCOM,
+ * consumption, subsidies, fixed charges, duties and
+ * surcharges.
+ *
+ * Data basis: FY 2026-27 representative domestic rates.
+ */
+
+const DEFAULT_HOME_RATES: Record<string, number> = {
+  "Andhra Pradesh": 5.3,
+  "Arunachal Pradesh": 4.2,
+  "Assam": 5.8,
+  "Bihar": 4.9,
+  "Chhattisgarh": 4.3,
+  "Goa": 3.6,
+  "Gujarat": 5.2,
+  "Haryana": 5.9,
+  "Himachal Pradesh": 3.8,
+  "Jharkhand": 5.1,
+  "Karnataka": 6.1,
+  "Kerala": 5.9,
+  "Madhya Pradesh": 5.6,
+  "Maharashtra": 8.2,
+  "Manipur": 4.6,
+  "Meghalaya": 4.8,
+  "Mizoram": 4.3,
+  "Nagaland": 4.5,
+  "Odisha": 4.8,
+  "Punjab": 5.5,
+  "Rajasthan": 5.7,
+  "Sikkim": 3.4,
+  "Tamil Nadu": 3.8,
+  "Telangana": 4.3,
+  "Tripura": 4.9,
+  "Uttar Pradesh": 5.7,
+  "Uttarakhand": 4.5,
+  "West Bengal": 7.4,
+
+  "Andaman and Nicobar Islands": 3.6,
+  "Chandigarh": 4.9,
+  "Dadra and Nagar Haveli and Daman and Diu": 3.4,
+  "Delhi": 0,
+  "Jammu and Kashmir": 3.9,
+  "Ladakh": 3.6,
+  "Lakshadweep": 3.0,
+  "Puducherry": 3.6,
+};
+
+interface CustomVehicle {
+  id: number;
+  brand: string;
+  model: string;
+  year: number;
+  country: string;
+
+  battery: number;
+  range: number;
+  efficiency: number;
+
+  batteryChemistry: string;
+  architecture: number;
+
+  acPower: number;
+  dcPower: number;
+
+  connectorAC: string;
+  connectorDC: string;
+
+  chargingPortLocation: string;
+  fastCharge10to80: number;
+
+  motorType: string;
+  drivetrain: string;
+
+  maxPower: number;
+  maxTorque: number;
+
+  acceleration0to100: number;
+  topSpeed: number;
+
+  bodyType: string;
+
+  seats: number;
+  bootSpace: number;
+  kerbWeight: number;
+  wheelbase: number;
+
+  adasLevel: string;
+
+  warrantyBattery: string;
+  warrantyVehicle: string;
+}
+
+type PlannerVehicle =
+  | (typeof vehicles)[number]
+  | CustomVehicle;
+
+interface CustomCharger {
+  id: string;
+  name: string;
+  type: "AC" | "DC";
+  power: number;
+}
+
+const CUSTOM_VEHICLES_KEY =
+  "evtoolkit_custom_vehicles";
+
+const CUSTOM_CHARGERS_KEY =
+  "evtoolkit_custom_chargers";
+
+const emptyVehicleForm = {
+  brand: "",
+  model: "",
+  battery: "",
+  range: "",
+  efficiency: "",
+  acPower: "",
+  dcPower: "",
+  fastCharge10to80: "",
+};
+
+const emptyChargerForm = {
+  name: "",
+  type: "AC" as "AC" | "DC",
+  power: "",
+};
 
 function Planner() {
-  const brands = [...new Set(vehicles.map((v) => v.brand))].sort();
+  /*
+   * =========================================================
+   * CUSTOM VEHICLES
+   * =========================================================
+   */
 
-  const [selectedBrand, setSelectedBrand] = useState("Tata");
+  const [customVehicles, setCustomVehicles] =
+    useState<CustomVehicle[]>(() => {
+      try {
+        const saved = localStorage.getItem(
+          CUSTOM_VEHICLES_KEY
+        );
+
+        return saved ? JSON.parse(saved) : [];
+      } catch {
+        return [];
+      }
+    });
+
+  /*
+   * =========================================================
+   * CUSTOM CHARGERS
+   * =========================================================
+   */
+
+  const [customChargers, setCustomChargers] =
+    useState<CustomCharger[]>(() => {
+      try {
+        const saved = localStorage.getItem(
+          CUSTOM_CHARGERS_KEY
+        );
+
+        return saved ? JSON.parse(saved) : [];
+      } catch {
+        return [];
+      }
+    });
+
+  useEffect(() => {
+    localStorage.setItem(
+      CUSTOM_VEHICLES_KEY,
+      JSON.stringify(customVehicles)
+    );
+  }, [customVehicles]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      CUSTOM_CHARGERS_KEY,
+      JSON.stringify(customChargers)
+    );
+  }, [customChargers]);
+
+  /*
+   * =========================================================
+   * DATA
+   * =========================================================
+   */
+
+  const allVehicles = useMemo<PlannerVehicle[]>(
+    () => [...vehicles, ...customVehicles],
+    [customVehicles]
+  );
+
+  const allChargers = useMemo(
+    () => [...chargers, ...customChargers],
+    [customChargers]
+  );
+
+  const brands = useMemo(
+    () =>
+      [...new Set(allVehicles.map((v) => v.brand))].sort(
+        (a, b) => a.localeCompare(b)
+      ),
+    [allVehicles]
+  );
+
+  /*
+   * =========================================================
+   * VEHICLE
+   * =========================================================
+   */
+
+  const [selectedBrand, setSelectedBrand] =
+    useState("Tata");
 
   const brandVehicles = useMemo(
-    () => vehicles.filter((v) => v.brand === selectedBrand),
-    [selectedBrand]
+    () =>
+      allVehicles.filter(
+        (v) => v.brand === selectedBrand
+      ),
+    [allVehicles, selectedBrand]
   );
 
   const defaultVehicle =
-    vehicles.find(
+    allVehicles.find(
       (v) =>
         v.brand === "Tata" &&
-        v.model.toLowerCase().includes("curvv")
-    ) ?? vehicles[0];
+        v.model.toLowerCase().includes("curvv ev 55")
+    ) ??
+    allVehicles.find(
+      (v) => v.brand === "Tata"
+    ) ??
+    allVehicles[0];
 
-  const [vehicleId, setVehicleId] = useState(defaultVehicle.id);
+  const [vehicleId, setVehicleId] =
+    useState<number>(
+      defaultVehicle?.id ?? 0
+    );
 
   useEffect(() => {
     if (
       brandVehicles.length > 0 &&
-      !brandVehicles.some((v) => v.id === vehicleId)
+      !brandVehicles.some(
+        (v) => v.id === vehicleId
+      )
     ) {
       setVehicleId(brandVehicles[0].id);
     }
   }, [brandVehicles, vehicleId]);
 
+  const vehicle = useMemo(
+    () =>
+      allVehicles.find(
+        (v) => v.id === vehicleId
+      ) ?? defaultVehicle,
+    [allVehicles, vehicleId, defaultVehicle]
+  );
+
+  /*
+   * =========================================================
+   * CHARGER
+   * =========================================================
+   */
+
   const defaultCharger =
-    chargers.find(
+    allChargers.find(
       (c) =>
+        c.type === "AC" &&
         c.power === 3.3 &&
         c.name.toLowerCase().includes("home")
-    ) ?? chargers[0];
+    ) ?? allChargers[0];
 
-  const [chargerId, setChargerId] = useState(defaultCharger.id);
-
-  const [state, setState] = useState("Karnataka");
-
-  const [currentSOC, setCurrentSOC] = useState(20);
-
-  const [targetSOC, setTargetSOC] = useState(80);
-
-  const vehicle = useMemo(
-    () => vehicles.find((v) => v.id === vehicleId)!,
-    [vehicleId]
-  );
+  const [chargerId, setChargerId] =
+    useState<string>(
+      defaultCharger?.id ?? ""
+    );
 
   const charger = useMemo(
-    () => chargers.find((c) => c.id === chargerId)!,
-    [chargerId]
+    () =>
+      allChargers.find(
+        (c) => c.id === chargerId
+      ) ?? defaultCharger,
+    [allChargers, chargerId, defaultCharger]
   );
 
   /*
-   * ---------------------------------------------------------
-   * BASIC VALIDATION
-   * ---------------------------------------------------------
+   * =========================================================
+   * CHARGING LOCATION
+   * =========================================================
    */
 
-  const validSOC = targetSOC > currentSOC;
+  const [chargingLocation, setChargingLocation] =
+    useState<"Home" | "Public">("Home");
 
   /*
-   * ---------------------------------------------------------
-   * ENERGY REQUIRED
-   * ---------------------------------------------------------
+   * =========================================================
+   * STATE
+   * =========================================================
    */
 
-  const energyRequired = validSOC
-    ? vehicle.battery *
-      ((targetSOC - currentSOC) / 100)
-    : 0;
+  const [state, setState] =
+    useState("Karnataka");
 
   /*
-   * ---------------------------------------------------------
-   * EFFECTIVE CHARGER POWER
-   * ---------------------------------------------------------
-   *
-   * AC:
-   *   Limited by the vehicle's onboard AC charger.
-   *
-   * DC:
-   *   Limited by the vehicle's maximum DC charging power.
+   * =========================================================
+   * ELECTRICITY / PUBLIC RATE
+   * =========================================================
    */
 
-  const chargerPower = Math.min(
-    charger.power,
-    charger.type === "DC"
-      ? vehicle.dcPower
-      : vehicle.acPower
+  const defaultHomeRate =
+    DEFAULT_HOME_RATES[state] ?? 5;
+
+  const [homeRate, setHomeRate] =
+    useState(
+      DEFAULT_HOME_RATES["Karnataka"] ?? 5
+    );
+
+  const [publicRate, setPublicRate] =
+    useState(15);
+
+  useEffect(() => {
+    setHomeRate(defaultHomeRate);
+  }, [state, defaultHomeRate]);
+
+  const activeRate =
+    chargingLocation === "Home"
+      ? homeRate
+      : publicRate;
+
+  /*
+   * =========================================================
+   * SOC
+   * =========================================================
+   */
+
+  const [currentSOC, setCurrentSOC] =
+    useState(20);
+
+  const [targetSOC, setTargetSOC] =
+    useState(80);
+
+  useEffect(() => {
+    if (targetSOC < currentSOC) {
+      setTargetSOC(currentSOC);
+    }
+  }, [currentSOC, targetSOC]);
+
+  /*
+   * =========================================================
+   * CHARGER POWER
+   * =========================================================
+   */
+
+  const chargerPower = useMemo(() => {
+    if (!vehicle || !charger) {
+      return 0;
+    }
+
+    if (charger.type === "AC") {
+      if (vehicle.acPower <= 0) {
+        return 0;
+      }
+
+      return Math.min(
+        charger.power,
+        vehicle.acPower
+      );
+    }
+
+    if (vehicle.dcPower <= 0) {
+      return 0;
+    }
+
+    return Math.min(
+      charger.power,
+      vehicle.dcPower
+    );
+  }, [vehicle, charger]);
+
+  /*
+   * =========================================================
+   * ENERGY
+   * =========================================================
+   */
+
+  const socDifference = Math.max(
+    0,
+    targetSOC - currentSOC
   );
 
+  const hasBatteryInformation =
+    !!vehicle &&
+    vehicle.battery > 0;
+
+  const energyRequired =
+    hasBatteryInformation
+      ? vehicle.battery *
+        (socDifference / 100)
+      : 0;
+
   /*
-   * ---------------------------------------------------------
+   * =========================================================
    * CHARGING EFFICIENCY
-   * ---------------------------------------------------------
-   *
-   * These are used for estimating energy drawn from the grid.
-   *
-   * AC charging generally has higher conversion losses than
-   * the battery-side energy calculation suggests.
-   *
-   * DC charging generally has lower conversion losses because
-   * AC -> DC conversion happens at the charging station.
+   * =========================================================
    */
 
   const chargingEfficiency =
-    charger.type === "DC"
+    charger?.type === "DC"
       ? 0.95
       : 0.92;
 
   const energyFromGrid =
-    validSOC
-      ? energyRequired / chargingEfficiency
+    energyRequired > 0
+      ? energyRequired /
+        chargingEfficiency
       : 0;
 
   /*
-   * ---------------------------------------------------------
-   * VEHICLE-SPECIFIC CHARGING PROFILES
-   * ---------------------------------------------------------
-   *
-   * Manufacturer charging times are used where known.
-   *
-   * These values are based on the published charging figures
-   * for the Tata Curvv EV.
-   *
-   * Curvv EV 55:
-   *
-   * 3.3 kW:
-   * 10 -> 100 = 21 hours
-   *
-   * 7.2 kW:
-   * 10 -> 100 = 7.6 hours
-   *
-   * 70 kW DC:
-   * 10 -> 80 = 40 minutes
-   *
-   * Curvv EV 45:
-   *
-   * 3.3 kW:
-   * 10 -> 100 = 17.5 hours
-   *
-   * 7.2 kW:
-   * 10 -> 100 = approximately 6.5-7.25 hours
-   *
-   * 60 kW DC:
-   * 10 -> 80 = approximately 40 minutes
+   * =========================================================
+   * CHARGING TIME
+   * =========================================================
    */
 
-  interface ChargingProfile {
-    acPortableFullHours?: number;
-    acWallboxFullHours?: number;
-    dc10To80Minutes?: number;
-    dcPower?: number;
-  }
-
-  function getVehicleChargingProfile(): ChargingProfile | null {
-    const model = vehicle.model.toLowerCase();
-
-    /*
-     * Tata Curvv EV 55
-     */
+  const chargingTimeHours = useMemo(() => {
     if (
-      vehicle.brand.toLowerCase() === "tata" &&
-      model.includes("curvv") &&
-      vehicle.battery >= 50
+      !vehicle ||
+      !charger ||
+      energyRequired <= 0 ||
+      chargerPower <= 0
     ) {
-      return {
-        acPortableFullHours: 21 / 0.9,
-        acWallboxFullHours: 7.6 / 0.9,
-        dc10To80Minutes: 40,
-        dcPower: 70,
-      };
-    }
-
-    /*
-     * Tata Curvv EV 45
-     */
-    if (
-      vehicle.brand.toLowerCase() === "tata" &&
-      model.includes("curvv") &&
-      vehicle.battery < 50
-    ) {
-      return {
-        acPortableFullHours: 17.5 / 0.9,
-        acWallboxFullHours: 7.25 / 0.9,
-        dc10To80Minutes: 40,
-        dcPower: 60,
-      };
-    }
-
-    return null;
-  }
-
-  const chargingProfile = getVehicleChargingProfile();
-
-  /*
-   * ---------------------------------------------------------
-   * AC CHARGING TIME
-   * ---------------------------------------------------------
-   *
-   * AC charging is approximated using the vehicle-specific
-   * full-cycle charging time where available.
-   *
-   * We normalize manufacturer figures to 0-100%.
-   *
-   * For example Curvv 55:
-   *
-   * 10-100 = 21 hours
-   *
-   * Estimated 0-100:
-   *
-   * 21 / 0.90 = 23.33 hours
-   *
-   * This produces a much more realistic estimate than:
-   *
-   * 55 / 3.3 = 16.67 hours
-   */
-
-  function calculateACTimeHours(): number {
-    if (!validSOC) {
       return 0;
     }
 
     /*
-     * Manufacturer-specific profile
+     * AC
      */
-    if (chargingProfile) {
-      let fullChargeHours: number | undefined;
+
+    if (charger.type === "AC") {
+      return (
+        energyFromGrid /
+        chargerPower
+      );
+    }
+
+    /*
+     * DC
+     *
+     * Use manufacturer 10–80% charging
+     * time where available.
+     */
+
+    if (
+      vehicle.fastCharge10to80 > 0
+    ) {
+      const referenceMinutes =
+        vehicle.fastCharge10to80;
+
+      const referencePower =
+        (vehicle.battery * 0.7) /
+        (referenceMinutes / 60);
+
+      const powerAdjustment =
+        referencePower > chargerPower
+          ? referencePower / chargerPower
+          : 1;
+
+      const tenToEightyMinutes =
+        referenceMinutes *
+        powerAdjustment;
 
       /*
-       * Portable / low-power AC
+       * Approximate tapering:
+       *
+       * 0–10   = 15% of 10–80 time
+       * 10–80  = manufacturer's time
+       * 80–100 = 40% of 10–80 time
        */
-      if (
-        charger.power <= 3.5 ||
-        charger.name.toLowerCase().includes("portable") ||
-        charger.name.toLowerCase().includes("15a")
-      ) {
-        fullChargeHours =
-          chargingProfile.acPortableFullHours;
-      }
 
-      /*
-       * AC wallbox
-       */
-      else {
-        fullChargeHours =
-          chargingProfile.acWallboxFullHours;
-      }
+      const zeroToTenMinutes =
+        tenToEightyMinutes * 0.15;
 
-      if (fullChargeHours) {
+      const eightyToHundredMinutes =
+        tenToEightyMinutes * 0.40;
+
+      if (targetSOC <= 10) {
         return (
-          fullChargeHours *
-          ((targetSOC - currentSOC) / 100)
+          ((targetSOC - currentSOC) *
+            (zeroToTenMinutes / 10)) /
+          60
+        );
+      }
+
+      if (
+        currentSOC < 10 &&
+        targetSOC <= 80
+      ) {
+        const first =
+          (10 - currentSOC) *
+          (zeroToTenMinutes / 10);
+
+        const second =
+          (targetSOC - 10) *
+          (tenToEightyMinutes / 70);
+
+        return (first + second) / 60;
+      }
+
+      if (
+        currentSOC >= 10 &&
+        targetSOC <= 80
+      ) {
+        return (
+          ((targetSOC - currentSOC) *
+            (tenToEightyMinutes / 70)) /
+          60
+        );
+      }
+
+      if (
+        currentSOC >= 10 &&
+        currentSOC < 80 &&
+        targetSOC > 80
+      ) {
+        const first =
+          (80 - currentSOC) *
+          (tenToEightyMinutes / 70);
+
+        const second =
+          (targetSOC - 80) *
+          (eightyToHundredMinutes / 20);
+
+        return (first + second) / 60;
+      }
+
+      if (
+        currentSOC < 10 &&
+        targetSOC > 80
+      ) {
+        const first =
+          (10 - currentSOC) *
+          (zeroToTenMinutes / 10);
+
+        const second =
+          tenToEightyMinutes;
+
+        const third =
+          (targetSOC - 80) *
+          (eightyToHundredMinutes / 20);
+
+        return (
+          (first + second + third) /
+          60
         );
       }
     }
 
     /*
-     * Generic fallback for vehicles without
-     * manufacturer-specific charging data.
-     *
-     * Use grid energy rather than battery energy.
+     * Generic DC fallback
      */
-
-    if (chargerPower <= 0) {
-      return 0;
-    }
-
-    /*
-     * Add a modest high-SOC charging overhead.
-     *
-     * Charging becomes less efficient as SOC approaches 100%.
-     */
-
-    let taperFactor = 1.05;
-
-    if (targetSOC > 90) {
-      taperFactor = 1.15;
-    } else if (targetSOC > 80) {
-      taperFactor = 1.10;
-    }
 
     return (
-      (energyFromGrid / chargerPower) *
-      taperFactor
+      energyFromGrid /
+      chargerPower
     );
-  }
+  }, [
+    vehicle,
+    charger,
+    energyRequired,
+    energyFromGrid,
+    chargerPower,
+    currentSOC,
+    targetSOC,
+  ]);
+
+  const chargingTimeMinutes =
+    Math.round(
+      chargingTimeHours * 60
+    );
 
   /*
-   * ---------------------------------------------------------
-   * DC CHARGING TIME
-   * ---------------------------------------------------------
-   *
-   * DC charging cannot simply be calculated as:
-   *
-   * battery / chargerPower
-   *
-   * because the vehicle reduces charging power as SOC rises.
-   *
-   * We therefore use the manufacturer's 10-80 figure where
-   * available and use a conservative estimate outside that
-   * range.
-   */
-
-  function calculateDCTimeHours(): number {
-    if (!validSOC) {
-      return 0;
-    }
-
-    /*
-     * Manufacturer-specific DC curve
-     */
-    if (
-      chargingProfile?.dc10To80Minutes &&
-      chargingProfile.dcPower
-    ) {
-      const start = currentSOC;
-      const end = targetSOC;
-
-      let minutes = 0;
-
-      /*
-       * 0-10%
-       *
-       * Charging is generally power-limited and therefore
-       * relatively quick.
-       */
-      if (start < 10) {
-        const segmentEnd = Math.min(end, 10);
-
-        const percentage =
-          segmentEnd - start;
-
-        const batteryEnergy =
-          vehicle.battery *
-          (percentage / 100);
-
-        /*
-         * Conservative DC estimate.
-         */
-        minutes +=
-          (batteryEnergy /
-            chargerPower) *
-          60 *
-          1.05;
-      }
-
-      /*
-       * 10-80%
-       *
-       * Use the manufacturer's published 10-80
-       * charging time.
-       */
-      if (end > 10 && start < 80) {
-        const segmentStart =
-          Math.max(start, 10);
-
-        const segmentEnd =
-          Math.min(end, 80);
-
-        const percentage =
-          segmentEnd - segmentStart;
-
-        const totalPercentage = 70;
-
-        minutes +=
-          chargingProfile.dc10To80Minutes *
-          (percentage / totalPercentage);
-
-        /*
-         * If the selected DC charger is weaker than
-         * the manufacturer's reference charger,
-         * scale the time accordingly.
-         */
-        if (
-          chargerPower <
-          chargingProfile.dcPower
-        ) {
-          minutes *=
-            chargingProfile.dcPower /
-            chargerPower;
-        }
-      }
-
-      /*
-       * 80-100%
-       *
-       * Charging tapers considerably in this region.
-       *
-       * We intentionally use a slower estimate rather
-       * than pretending the car continues at peak DC power.
-       */
-      if (end > 80 && start < 100) {
-        const segmentStart =
-          Math.max(start, 80);
-
-        const segmentEnd = end;
-
-        const percentage =
-          segmentEnd - segmentStart;
-
-        /*
-         * Approximate 80-100 charging speed at
-         * roughly 35% of peak charging power.
-         */
-        const taperPower =
-          Math.max(
-            chargerPower * 0.35,
-            10
-          );
-
-        const batteryEnergy =
-          vehicle.battery *
-          (percentage / 100);
-
-        minutes +=
-          (batteryEnergy /
-            taperPower) *
-          60;
-      }
-
-      return minutes / 60;
-    }
-
-    /*
-     * ---------------------------------------------------------
-     * GENERIC DC FALLBACK
-     * ---------------------------------------------------------
-     */
-
-    if (chargerPower <= 0) {
-      return 0;
-    }
-
-    let totalMinutes = 0;
-
-    /*
-     * 0-50%
-     */
-    if (currentSOC < 50 && targetSOC > 0) {
-      const start = currentSOC;
-      const end = Math.min(targetSOC, 50);
-
-      if (end > start) {
-        const energy =
-          vehicle.battery *
-          ((end - start) / 100);
-
-        totalMinutes +=
-          (energy / chargerPower) *
-          60 *
-          1.05;
-      }
-    }
-
-    /*
-     * 50-80%
-     *
-     * Moderate taper.
-     */
-    if (targetSOC > 50 && currentSOC < 80) {
-      const start =
-        Math.max(currentSOC, 50);
-
-      const end =
-        Math.min(targetSOC, 80);
-
-      if (end > start) {
-        const energy =
-          vehicle.battery *
-          ((end - start) / 100);
-
-        totalMinutes +=
-          (energy / (chargerPower * 0.85)) *
-          60;
-      }
-    }
-
-    /*
-     * 80-100%
-     *
-     * Strong taper.
-     */
-    if (targetSOC > 80) {
-      const start =
-        Math.max(currentSOC, 80);
-
-      const end = targetSOC;
-
-      if (end > start) {
-        const energy =
-          vehicle.battery *
-          ((end - start) / 100);
-
-        totalMinutes +=
-          (energy / (chargerPower * 0.35)) *
-          60;
-      }
-    }
-
-    return totalMinutes / 60;
-  }
-
-  /*
-   * ---------------------------------------------------------
-   * FINAL CHARGING TIME
-   * ---------------------------------------------------------
-   */
-
-  const chargingTime =
-    charger.type === "DC"
-      ? calculateDCTimeHours()
-      : calculateACTimeHours();
-
-  /*
-   * ---------------------------------------------------------
-   * TIME DISPLAY
-   * ---------------------------------------------------------
-   */
-
-  function formatChargingTime(hours: number) {
-    if (!validSOC) {
-      return "Select a higher target";
-    }
-
-    if (hours <= 0) {
-      return "0 min";
-    }
-
-    const totalMinutes =
-      Math.round(hours * 60);
-
-    const displayHours =
-      Math.floor(totalMinutes / 60);
-
-    const displayMinutes =
-      totalMinutes % 60;
-
-    if (displayHours === 0) {
-      return `${displayMinutes} min`;
-    }
-
-    if (displayMinutes === 0) {
-      return `${displayHours} hr`;
-    }
-
-    return `${displayHours} hr ${displayMinutes} min`;
-  }
-
-  /*
-   * ---------------------------------------------------------
+   * =========================================================
    * COST
-   * ---------------------------------------------------------
+   * =========================================================
    */
-
-  const tariff = STATE_TARIFFS[state];
-
-  const baseCost =
-    energyFromGrid * tariff;
-
-  /*
-   * NOTE:
-   *
-   * The existing application logic applies GST only
-   * to DC charging. This is retained here so the rest
-   * of the Planner behaves as before.
-   */
-
-  const gst =
-    charger.type === "DC"
-      ? baseCost * 0.18
-      : 0;
 
   const totalCost =
-    baseCost + gst;
-
-  /*
-   * ---------------------------------------------------------
-   * RANGE
-   * ---------------------------------------------------------
-   *
-   * This remains the vehicle's efficiency-based estimate.
-   */
-
-  const rangeAdded =
-    energyRequired *
-    vehicle.efficiency;
+    energyFromGrid *
+    Math.max(0, activeRate);
 
   const costPerKm =
-    rangeAdded > 0
-      ? totalCost / rangeAdded
+    vehicle &&
+    vehicle.efficiency > 0 &&
+    energyRequired > 0
+      ? totalCost /
+        (energyRequired *
+          vehicle.efficiency)
       : 0;
+
+  const rangeAdded =
+    vehicle &&
+    vehicle.efficiency > 0
+      ? energyRequired *
+        vehicle.efficiency
+      : 0;
+
+  /*
+   * =========================================================
+   * FORMAT TIME
+   * =========================================================
+   */
+
+  function formatChargingTime(
+    minutes: number
+  ) {
+    if (minutes <= 0) {
+      return "Unavailable";
+    }
+
+    const hours =
+      Math.floor(minutes / 60);
+
+    const mins =
+      minutes % 60;
+
+    if (hours === 0) {
+      return `${mins} min`;
+    }
+
+    if (mins === 0) {
+      return `${hours} hr`;
+    }
+
+    return `${hours} hr ${mins} min`;
+  }
+
+  /*
+   * =========================================================
+   * ADD VEHICLE
+   * =========================================================
+   */
+
+  const [showVehicleForm, setShowVehicleForm] =
+    useState(false);
+
+  const [newVehicle, setNewVehicle] =
+    useState(emptyVehicleForm);
+
+  function addVehicle() {
+    const brand =
+      newVehicle.brand.trim();
+
+    const model =
+      newVehicle.model.trim();
+
+    if (!brand || !model) {
+      alert(
+        "Please enter the vehicle brand and model."
+      );
+      return;
+    }
+
+    const numberOrZero = (
+      value: string
+    ) => {
+      if (!value.trim()) {
+        return 0;
+      }
+
+      const n = Number(value);
+
+      return Number.isFinite(n) && n >= 0
+        ? n
+        : -1;
+    };
+
+    const battery =
+      numberOrZero(newVehicle.battery);
+
+    const range =
+      numberOrZero(newVehicle.range);
+
+    const efficiency =
+      numberOrZero(
+        newVehicle.efficiency
+      );
+
+    const acPower =
+      numberOrZero(
+        newVehicle.acPower
+      );
+
+    const dcPower =
+      numberOrZero(
+        newVehicle.dcPower
+      );
+
+    const fastCharge10to80 =
+      numberOrZero(
+        newVehicle.fastCharge10to80
+      );
+
+    if (
+      [
+        battery,
+        range,
+        efficiency,
+        acPower,
+        dcPower,
+        fastCharge10to80,
+      ].some((n) => n < 0)
+    ) {
+      alert(
+        "Please enter valid numbers."
+      );
+      return;
+    }
+
+    const duplicate =
+      allVehicles.some(
+        (v) =>
+          v.brand.toLowerCase() ===
+            brand.toLowerCase() &&
+          v.model.toLowerCase() ===
+            model.toLowerCase()
+      );
+
+    if (duplicate) {
+      alert(
+        "This vehicle already exists."
+      );
+      return;
+    }
+
+    const customVehicle: CustomVehicle =
+      {
+        id: Date.now(),
+        brand,
+        model,
+        year: new Date().getFullYear(),
+        country: "Custom",
+
+        battery,
+        range,
+        efficiency,
+
+        batteryChemistry: "Unknown",
+        architecture: 0,
+
+        acPower,
+        dcPower,
+
+        connectorAC: "Unknown",
+        connectorDC: "Unknown",
+
+        chargingPortLocation:
+          "Unknown",
+
+        fastCharge10to80,
+
+        motorType: "Unknown",
+        drivetrain: "Unknown",
+
+        maxPower: 0,
+        maxTorque: 0,
+
+        acceleration0to100: 0,
+        topSpeed: 0,
+
+        bodyType: "Unknown",
+
+        seats: 0,
+        bootSpace: 0,
+        kerbWeight: 0,
+        wheelbase: 0,
+
+        adasLevel: "Unknown",
+
+        warrantyBattery:
+          "Unknown",
+
+        warrantyVehicle:
+          "Unknown",
+      };
+
+    setCustomVehicles((prev) => [
+      ...prev,
+      customVehicle,
+    ]);
+
+    setSelectedBrand(brand);
+    setVehicleId(customVehicle.id);
+
+    setNewVehicle(
+      emptyVehicleForm
+    );
+
+    setShowVehicleForm(false);
+  }
+
+  /*
+   * =========================================================
+   * ADD CHARGER
+   * =========================================================
+   */
+
+  const [showChargerForm, setShowChargerForm] =
+    useState(false);
+
+  const [newCharger, setNewCharger] =
+    useState(emptyChargerForm);
+
+  function addCharger() {
+    const name =
+      newCharger.name.trim();
+
+    const power =
+      Number(newCharger.power);
+
+    if (
+      !name ||
+      !Number.isFinite(power) ||
+      power <= 0
+    ) {
+      alert(
+        "Please enter a valid charger name and power."
+      );
+      return;
+    }
+
+    const duplicate =
+      allChargers.some(
+        (c) =>
+          c.name.toLowerCase() ===
+          name.toLowerCase()
+      );
+
+    if (duplicate) {
+      alert(
+        "This charger already exists."
+      );
+      return;
+    }
+
+    const customCharger: CustomCharger =
+      {
+        id:
+          `custom-${Date.now()}`,
+        name,
+        type: newCharger.type,
+        power,
+      };
+
+    setCustomChargers((prev) => [
+      ...prev,
+      customCharger,
+    ]);
+
+    setChargerId(
+      customCharger.id
+    );
+
+    setNewCharger(
+      emptyChargerForm
+    );
+
+    setShowChargerForm(false);
+  }
+
+  /*
+   * =========================================================
+   * RENDER
+   * =========================================================
+   */
 
   return (
     <>
       <div className="welcome">
-        <h2>⚡ Charge Planner</h2>
+        <h2>
+          ⚡ Charge Planner
+        </h2>
 
         <p>
-          Estimate charging time and charging cost.
+          Estimate charging time
+          and charging cost.
         </p>
       </div>
 
+      {/* =====================================================
+          MAIN SETUP CARD
+          ===================================================== */}
+
       <div className="card">
-        <label>Brand</label>
+
+        <h3>
+          Vehicle & Charging Setup
+        </h3>
+
+        <label>
+          Brand
+        </label>
 
         <select
           value={selectedBrand}
           onChange={(e) =>
-            setSelectedBrand(e.target.value)
+            setSelectedBrand(
+              e.target.value
+            )
           }
         >
           {brands.map((brand) => (
@@ -629,88 +924,231 @@ function Planner() {
           ))}
         </select>
 
-        <label>Model</label>
+        <label>
+          Model
+        </label>
 
         <select
           value={vehicleId}
           onChange={(e) =>
-            setVehicleId(Number(e.target.value))
+            setVehicleId(
+              Number(e.target.value)
+            )
           }
         >
-          {brandVehicles.map((item) => (
-            <option
-              key={item.id}
-              value={item.id}
-            >
-              {item.model}
-            </option>
-          ))}
+          {brandVehicles.map(
+            (v) => (
+              <option
+                key={v.id}
+                value={v.id}
+              >
+                {v.model}
+              </option>
+            )
+          )}
         </select>
 
-        <label>Charging Type</label>
+        <button
+          type="button"
+          className="saveButton"
+          onClick={() => {
+            setShowVehicleForm(
+              !showVehicleForm
+            );
+            setShowChargerForm(false);
+          }}
+          style={{
+            marginTop: 8,
+            marginBottom: 16,
+          }}
+        >
+          ➕ Add Vehicle
+        </button>
+
+        <label>
+          Charging Location
+        </label>
+
+        <select
+          value={chargingLocation}
+          onChange={(e) =>
+            setChargingLocation(
+              e.target.value as
+                | "Home"
+                | "Public"
+            )
+          }
+        >
+          <option value="Home">
+            🏠 Home
+          </option>
+
+          <option value="Public">
+            ⚡ Public Charging
+          </option>
+        </select>
+
+        <label>
+          Charging Type
+        </label>
 
         <select
           value={chargerId}
           onChange={(e) =>
-            setChargerId(Number(e.target.value))
+            setChargerId(
+              e.target.value
+            )
           }
         >
-          {chargers.map((item) => (
-            <option
-              key={item.id}
-              value={item.id}
-            >
-              {item.name}
-            </option>
-          ))}
+          {allChargers.map(
+            (c) => (
+              <option
+                key={c.id}
+                value={c.id}
+              >
+                {c.name}
+              </option>
+            )
+          )}
         </select>
 
-        <label>State Tariff</label>
-
-        <select
-          value={state}
-          onChange={(e) =>
-            setState(e.target.value)
-          }
+        <button
+          type="button"
+          className="saveButton"
+          onClick={() => {
+            setShowChargerForm(
+              !showChargerForm
+            );
+            setShowVehicleForm(false);
+          }}
+          style={{
+            marginTop: 8,
+            marginBottom: 16,
+          }}
         >
-          {STATES.map((item) => (
-            <option
-              key={item}
-              value={item}
-            >
-              {item}
-            </option>
-          ))}
-        </select>
+          ➕ Add Charger
+        </button>
 
-        <label>Current Battery (%)</label>
+        {chargingLocation === "Home" && (
+          <>
+            <label>
+              State
+            </label>
+
+            <select
+              value={state}
+              onChange={(e) =>
+                setState(
+                  e.target.value
+                )
+              }
+            >
+              {STATES.map(
+                (item) => (
+                  <option
+                    key={item}
+                    value={item}
+                  >
+                    {item}
+                  </option>
+                )
+              )}
+            </select>
+
+            <label>
+              Electricity Rate
+              (₹/kWh)
+            </label>
+
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={homeRate}
+              onChange={(e) =>
+                setHomeRate(
+                  Number(e.target.value)
+                )
+              }
+            />
+
+            <p
+              style={{
+                color: "#94a3b8",
+                fontSize: 12,
+              }}
+            >
+              Default estimate for{" "}
+              {state}: ₹
+              {defaultHomeRate.toFixed(
+                2
+              )}
+              /kWh. You can change
+              this to match your
+              electricity bill.
+            </p>
+          </>
+        )}
+
+        {chargingLocation === "Public" && (
+          <>
+            <label>
+              Charging Station Rate
+              (₹/kWh)
+            </label>
+
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={publicRate}
+              onChange={(e) =>
+                setPublicRate(
+                  Number(e.target.value)
+                )
+              }
+            />
+
+            <p
+              style={{
+                color: "#94a3b8",
+                fontSize: 12,
+              }}
+            >
+              Enter the rate shown by
+              the charging station or
+              charging network.
+            </p>
+          </>
+        )}
+
+        <label>
+          Current Battery (%)
+        </label>
 
         <input
           type="range"
           min="0"
           max="100"
           value={currentSOC}
-          onChange={(e) => {
-            const value =
-              Number(e.target.value);
-
-            setCurrentSOC(value);
-
-            if (value >= targetSOC) {
-              setTargetSOC(
-                Math.min(value + 10, 100)
-              );
-            }
-          }}
+          onChange={(e) =>
+            setCurrentSOC(
+              Number(e.target.value)
+            )
+          }
         />
 
-        <p>{currentSOC}%</p>
+        <p>
+          {currentSOC}%
+        </p>
 
-        <label>Target Battery (%)</label>
+        <label>
+          Target Battery (%)
+        </label>
 
         <input
           type="range"
-          min="0"
+          min={currentSOC}
           max="100"
           value={targetSOC}
           onChange={(e) =>
@@ -720,63 +1158,459 @@ function Planner() {
           }
         />
 
-        <p>{targetSOC}%</p>
+        <p>
+          {targetSOC}%
+        </p>
 
-        {!validSOC && (
-          <p
-            style={{
-              color: "#dc2626",
-              fontWeight: 600,
-            }}
-          >
-            Target battery level must be higher
-            than the current battery level.
-          </p>
-        )}
       </div>
 
+      {/* =====================================================
+          ADD VEHICLE CARD
+          ===================================================== */}
+
+      {showVehicleForm && (
+        <div className="card">
+
+          <h3>
+            🚗 Add Vehicle
+          </h3>
+
+          <p
+            style={{
+              color: "#94a3b8",
+              fontSize: 13,
+            }}
+          >
+            Enter the information
+            you know. Optional
+            specifications can be
+            left blank.
+          </p>
+
+          <label>
+            Brand *
+          </label>
+
+          <input
+            value={newVehicle.brand}
+            onChange={(e) =>
+              setNewVehicle({
+                ...newVehicle,
+                brand:
+                  e.target.value,
+              })
+            }
+            placeholder="e.g. Tata"
+          />
+
+          <label>
+            Model *
+          </label>
+
+          <input
+            value={newVehicle.model}
+            onChange={(e) =>
+              setNewVehicle({
+                ...newVehicle,
+                model:
+                  e.target.value,
+              })
+            }
+            placeholder="e.g. Curvv EV 55"
+          />
+
+          <label>
+            Battery Capacity (kWh)
+          </label>
+
+          <input
+            type="number"
+            min="0"
+            step="0.1"
+            value={
+              newVehicle.battery
+            }
+            onChange={(e) =>
+              setNewVehicle({
+                ...newVehicle,
+                battery:
+                  e.target.value,
+              })
+            }
+            placeholder="Optional"
+          />
+
+          <div
+            style={{
+              marginTop: 16,
+              padding: 12,
+              borderRadius: 8,
+              background:
+                "rgba(255,255,255,.04)",
+            }}
+          >
+            <strong>
+              Optional specifications
+            </strong>
+
+            <p
+              style={{
+                color: "#94a3b8",
+                fontSize: 12,
+                marginBottom: 0,
+              }}
+            >
+              Leave these blank if
+              you don't know them.
+            </p>
+          </div>
+
+          <label>
+            Claimed Range (km)
+          </label>
+
+          <input
+            type="number"
+            min="0"
+            value={
+              newVehicle.range
+            }
+            onChange={(e) =>
+              setNewVehicle({
+                ...newVehicle,
+                range:
+                  e.target.value,
+              })
+            }
+            placeholder="Optional"
+          />
+
+          <label>
+            Efficiency (km/kWh)
+          </label>
+
+          <input
+            type="number"
+            min="0"
+            step="0.1"
+            value={
+              newVehicle.efficiency
+            }
+            onChange={(e) =>
+              setNewVehicle({
+                ...newVehicle,
+                efficiency:
+                  e.target.value,
+              })
+            }
+            placeholder="Optional"
+          />
+
+          <label>
+            AC Charging Limit (kW)
+          </label>
+
+          <input
+            type="number"
+            min="0"
+            step="0.1"
+            value={
+              newVehicle.acPower
+            }
+            onChange={(e) =>
+              setNewVehicle({
+                ...newVehicle,
+                acPower:
+                  e.target.value,
+              })
+            }
+            placeholder="Optional"
+          />
+
+          <label>
+            DC Charging Limit (kW)
+          </label>
+
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={
+              newVehicle.dcPower
+            }
+            onChange={(e) =>
+              setNewVehicle({
+                ...newVehicle,
+                dcPower:
+                  e.target.value,
+              })
+            }
+            placeholder="Optional"
+          />
+
+          <label>
+            DC 10–80% Charging Time
+            (minutes)
+          </label>
+
+          <input
+            type="number"
+            min="0"
+            value={
+              newVehicle
+                .fastCharge10to80
+            }
+            onChange={(e) =>
+              setNewVehicle({
+                ...newVehicle,
+                fastCharge10to80:
+                  e.target.value,
+              })
+            }
+            placeholder="Optional"
+          />
+
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              marginTop: 18,
+            }}
+          >
+            <button
+              type="button"
+              className="saveButton"
+              onClick={addVehicle}
+            >
+              Add Vehicle
+            </button>
+
+            <button
+              type="button"
+              className="deleteButton"
+              onClick={() => {
+                setShowVehicleForm(false);
+                setNewVehicle(
+                  emptyVehicleForm
+                );
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+
+        </div>
+      )}
+
+      {/* =====================================================
+          ADD CHARGER CARD
+          ===================================================== */}
+
+      {showChargerForm && (
+        <div className="card">
+
+          <h3>
+            ⚡ Add Charger
+          </h3>
+
+          <p
+            style={{
+              color: "#94a3b8",
+              fontSize: 13,
+            }}
+          >
+            Add a charging setup
+            that isn't available
+            in the list.
+          </p>
+
+          <label>
+            Charger Name
+          </label>
+
+          <input
+            value={
+              newCharger.name
+            }
+            onChange={(e) =>
+              setNewCharger({
+                ...newCharger,
+                name:
+                  e.target.value,
+              })
+            }
+            placeholder="e.g. Home Wallbox"
+          />
+
+          <label>
+            Charging Type
+          </label>
+
+          <select
+            value={
+              newCharger.type
+            }
+            onChange={(e) =>
+              setNewCharger({
+                ...newCharger,
+                type:
+                  e.target.value as
+                    | "AC"
+                    | "DC",
+              })
+            }
+          >
+            <option value="AC">
+              AC
+            </option>
+
+            <option value="DC">
+              DC
+            </option>
+          </select>
+
+          <label>
+            Charging Power (kW)
+          </label>
+
+          <input
+            type="number"
+            min="0"
+            step="0.1"
+            value={
+              newCharger.power
+            }
+            onChange={(e) =>
+              setNewCharger({
+                ...newCharger,
+                power:
+                  e.target.value,
+              })
+            }
+            placeholder="e.g. 7.2"
+          />
+
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              marginTop: 18,
+            }}
+          >
+            <button
+              type="button"
+              className="saveButton"
+              onClick={addCharger}
+            >
+              Add Charger
+            </button>
+
+            <button
+              type="button"
+              className="deleteButton"
+              onClick={() => {
+                setShowChargerForm(false);
+                setNewCharger(
+                  emptyChargerForm
+                );
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+
+        </div>
+      )}
+
+      {/* =====================================================
+          KPIs
+          ===================================================== */}
+
       <div className="kpiGrid">
+
         <div className="kpiCard">
-          <h3>Energy Required</h3>
+          <h3>
+            Energy Required
+          </h3>
+
           <h2>
-            {energyRequired.toFixed(1)} kWh
+            {hasBatteryInformation
+              ? `${energyRequired.toFixed(
+                  1
+                )} kWh`
+              : "Unavailable"}
           </h2>
         </div>
 
         <div className="kpiCard">
-          <h3>Grid Energy</h3>
+          <h3>
+            Grid Energy
+          </h3>
+
           <h2>
-            {energyFromGrid.toFixed(1)} kWh
+            {hasBatteryInformation &&
+            chargerPower > 0
+              ? `${energyFromGrid.toFixed(
+                  1
+                )} kWh`
+              : "Unavailable"}
           </h2>
         </div>
 
         <div className="kpiCard">
-          <h3>Charging Efficiency</h3>
+          <h3>
+            Charging Efficiency
+          </h3>
+
           <h2>
-            {(chargingEfficiency * 100).toFixed(0)}%
+            {hasBatteryInformation
+              ? `${(
+                  chargingEfficiency *
+                  100
+                ).toFixed(0)}%`
+              : "—"}
           </h2>
         </div>
 
         <div className="kpiCard">
-          <h3>Charging Time</h3>
+          <h3>
+            Estimated Charging Time
+          </h3>
+
           <h2>
-            {formatChargingTime(chargingTime)}
+            {formatChargingTime(
+              chargingTimeMinutes
+            )}
           </h2>
         </div>
 
         <div className="kpiCard">
-          <h3>Tariff</h3>
+          <h3>
+            Rate
+          </h3>
+
           <h2>
-            ₹{tariff.toFixed(2)}/kWh
+            ₹
+            {activeRate.toFixed(2)}
+            /kWh
           </h2>
         </div>
 
         <div className="kpiCard">
-          <h3>Range Added</h3>
+          <h3>
+            Range Added
+          </h3>
+
           <h2>
-            {rangeAdded.toFixed(0)} km
+            {vehicle &&
+            vehicle.efficiency > 0
+              ? `${rangeAdded.toFixed(
+                  0
+                )} km`
+              : "Unavailable"}
           </h2>
         </div>
+
       </div>
 
       <div
@@ -795,206 +1629,408 @@ function Planner() {
         taper at higher battery levels.
       </div>
 
+      {/* =====================================================
+          COST
+          ===================================================== */}
+
       <div className="card">
-        <h3>Charging Cost</h3>
+
+        <h3>
+          Charging Cost
+        </h3>
 
         <table className="table">
+
           <tbody>
+
             <tr>
-              <td>Base Cost</td>
               <td>
-                ₹{baseCost.toFixed(2)}
+                Charging Location
+              </td>
+
+              <td>
+                {chargingLocation ===
+                "Home"
+                  ? "🏠 Home"
+                  : "⚡ Public"}
               </td>
             </tr>
 
             <tr>
-              <td>Grid Energy Used</td>
               <td>
-                {energyFromGrid.toFixed(1)} kWh
+                Rate Used
+              </td>
+
+              <td>
+                ₹
+                {activeRate.toFixed(
+                  2
+                )}
+                /kWh
               </td>
             </tr>
 
             <tr>
-              <td>GST</td>
               <td>
-                {charger.type === "DC"
-                  ? `₹${gst.toFixed(2)} (18%)`
-                  : "₹0.00"}
+                Grid Energy Used
+              </td>
+
+              <td>
+                {hasBatteryInformation
+                  ? `${energyFromGrid.toFixed(
+                      1
+                    )} kWh`
+                  : "Unavailable"}
               </td>
             </tr>
 
             <tr>
-              <td>Total Payable</td>
               <td>
-                <strong>
-                  ₹{totalCost.toFixed(2)}
-                </strong>
+                Energy Cost
+              </td>
+
+              <td>
+                {hasBatteryInformation
+                  ? `₹${totalCost.toFixed(
+                      2
+                    )}`
+                  : "Unavailable"}
               </td>
             </tr>
 
             <tr>
-              <td>Cost / km</td>
               <td>
-                ₹{costPerKm.toFixed(2)}
+                Total Payable
+              </td>
+
+              <td>
+                {hasBatteryInformation ? (
+                  <strong>
+                    ₹
+                    {totalCost.toFixed(
+                      2
+                    )}
+                  </strong>
+                ) : (
+                  "Unavailable"
+                )}
               </td>
             </tr>
+
+            <tr>
+              <td>
+                Cost / km
+              </td>
+
+              <td>
+                {costPerKm > 0
+                  ? `₹${costPerKm.toFixed(
+                      2
+                    )}`
+                  : "Unavailable"}
+              </td>
+            </tr>
+
           </tbody>
+
         </table>
+
+        <p
+          style={{
+            color: "#64748b",
+            fontSize: 12,
+            marginTop: 12,
+          }}
+        >
+          {chargingLocation ===
+          "Home"
+            ? "Home charging uses the selected state's representative default rate. Your actual electricity bill may differ."
+            : "Public charging uses the station rate entered above. Check the station/network for the actual applicable price."}
+        </p>
+
       </div>
 
+      {/* =====================================================
+          CHARGING SUMMARY
+          ===================================================== */}
+
       <div className="card">
-        <h3>Charging Summary</h3>
+
+        <h3>
+          Charging Summary
+        </h3>
 
         <table className="table">
+
           <tbody>
+
             <tr>
-              <td>Vehicle</td>
               <td>
-                {vehicle.brand} {vehicle.model}
+                Vehicle
+              </td>
+
+              <td>
+                {vehicle?.brand}{" "}
+                {vehicle?.model}
               </td>
             </tr>
 
             <tr>
-              <td>Battery Charge</td>
               <td>
-                {currentSOC}% → {targetSOC}%
+                Battery Charge
+              </td>
+
+              <td>
+                {currentSOC}% →{" "}
+                {targetSOC}%
               </td>
             </tr>
 
             <tr>
-              <td>Selected Charger</td>
               <td>
-                {charger.name}
+                Charging Location
+              </td>
+
+              <td>
+                {chargingLocation}
               </td>
             </tr>
 
             <tr>
-              <td>Effective Charging Speed</td>
               <td>
-                {chargerPower.toFixed(1)} kW
+                Selected Charger
+              </td>
+
+              <td>
+                {charger?.name}
               </td>
             </tr>
 
             <tr>
-              <td>Energy Required</td>
               <td>
-                {energyRequired.toFixed(1)} kWh
+                Effective Charging Speed
+              </td>
+
+              <td>
+                {chargerPower > 0
+                  ? `${chargerPower.toFixed(
+                      1
+                    )} kW`
+                  : "Unavailable"}
               </td>
             </tr>
 
             <tr>
-              <td>Energy From Grid</td>
               <td>
-                {energyFromGrid.toFixed(1)} kWh
+                Energy Required
+              </td>
+
+              <td>
+                {hasBatteryInformation
+                  ? `${energyRequired.toFixed(
+                      1
+                    )} kWh`
+                  : "Unavailable"}
               </td>
             </tr>
 
             <tr>
-              <td>Charging Efficiency</td>
               <td>
-                {(chargingEfficiency * 100).toFixed(0)}%
+                Energy From Grid
+              </td>
+
+              <td>
+                {hasBatteryInformation
+                  ? `${energyFromGrid.toFixed(
+                      1
+                    )} kWh`
+                  : "Unavailable"}
               </td>
             </tr>
 
             <tr>
-              <td>Charging Time</td>
               <td>
-                <strong>
-                  {formatChargingTime(
-                    chargingTime
-                  )}
-                </strong>
+                Charging Time
+              </td>
+
+              <td>
+                {formatChargingTime(
+                  chargingTimeMinutes
+                )}
               </td>
             </tr>
 
             <tr>
-              <td>Estimated Range Added</td>
               <td>
-                {rangeAdded.toFixed(0)} km
+                Estimated Range Added
+              </td>
+
+              <td>
+                {vehicle &&
+                vehicle.efficiency > 0
+                  ? `${rangeAdded.toFixed(
+                      0
+                    )} km`
+                  : "Unavailable"}
               </td>
             </tr>
 
             <tr>
-              <td>Total Cost</td>
               <td>
-                ₹{totalCost.toFixed(2)}
+                Total Cost
+              </td>
+
+              <td>
+                {hasBatteryInformation
+                  ? `₹${totalCost.toFixed(
+                      2
+                    )}`
+                  : "Unavailable"}
               </td>
             </tr>
+
           </tbody>
+
         </table>
+
       </div>
 
+      {/* =====================================================
+          VEHICLE SPECIFICATIONS
+          ===================================================== */}
+
       <div className="card">
+
         <h3>
           Selected Vehicle Specifications
         </h3>
 
         <table className="table">
+
           <tbody>
+
             <tr>
-              <td>Vehicle</td>
               <td>
-                {vehicle.brand} {vehicle.model}
+                Vehicle
+              </td>
+
+              <td>
+                {vehicle?.brand}{" "}
+                {vehicle?.model}
               </td>
             </tr>
 
             <tr>
-              <td>Battery Capacity</td>
               <td>
-                {vehicle.battery} kWh
+                Battery Capacity
+              </td>
+
+              <td>
+                {vehicle?.battery > 0
+                  ? `${vehicle.battery} kWh`
+                  : "Not available"}
               </td>
             </tr>
 
             <tr>
-              <td>Efficiency</td>
               <td>
-                {vehicle.efficiency} km/kWh
+                Efficiency
+              </td>
+
+              <td>
+                {vehicle?.efficiency > 0
+                  ? `${vehicle.efficiency} km/kWh`
+                  : "Not available"}
               </td>
             </tr>
 
             <tr>
-              <td>Claimed Range</td>
               <td>
-                {vehicle.range} km
+                Claimed Range
+              </td>
+
+              <td>
+                {vehicle?.range > 0
+                  ? `${vehicle.range} km`
+                  : "Not available"}
               </td>
             </tr>
 
             <tr>
-              <td>Vehicle AC Charging Limit</td>
               <td>
-                {vehicle.acPower} kW
+                AC Charging Limit
+              </td>
+
+              <td>
+                {vehicle?.acPower > 0
+                  ? `${vehicle.acPower} kW`
+                  : "Not available"}
               </td>
             </tr>
 
             <tr>
-              <td>Vehicle DC Charging Limit</td>
               <td>
-                {vehicle.dcPower} kW
+                DC Charging Limit
+              </td>
+
+              <td>
+                {vehicle?.dcPower > 0
+                  ? `${vehicle.dcPower} kW`
+                  : "Not available"}
               </td>
             </tr>
 
             <tr>
-              <td>Selected Charger</td>
               <td>
-                {charger.name}
+                DC 10–80% Charging Time
+              </td>
+
+              <td>
+                {vehicle?.fastCharge10to80 >
+                0
+                  ? `${vehicle.fastCharge10to80} min`
+                  : "Not available"}
               </td>
             </tr>
 
             <tr>
-              <td>Charger Power</td>
               <td>
-                {charger.power} kW
+                Selected Charger
+              </td>
+
+              <td>
+                {charger?.name}
               </td>
             </tr>
 
             <tr>
-              <td>Effective Charging Speed</td>
               <td>
-                {chargerPower.toFixed(1)} kW
+                Charger Power
+              </td>
+
+              <td>
+                {charger?.power} kW
               </td>
             </tr>
+
+            <tr>
+              <td>
+                Effective Charging Speed
+              </td>
+
+              <td>
+                {chargerPower > 0
+                  ? `${chargerPower.toFixed(
+                      1
+                    )} kW`
+                  : "Not available"}
+              </td>
+            </tr>
+
           </tbody>
+
         </table>
+
       </div>
 
     </>

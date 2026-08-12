@@ -106,13 +106,15 @@ function Tracker() {
   const [station, setStation] = useState("");
   const [date, setDate] = useState("");
   const [invoice, setInvoice] = useState("");
-const [invoiceResetKey, setInvoiceResetKey] = useState(0);
 
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [invoiceResetKey, setInvoiceResetKey] =
+    useState(0);
 
-  const [customStations, setCustomStations] = useState<
-    ChargingStation[]
-  >([]);
+  const [editingId, setEditingId] =
+    useState<number | null>(null);
+
+  const [customStations, setCustomStations] =
+    useState<ChargingStation[]>([]);
 
   const [showAddStation, setShowAddStation] =
     useState(false);
@@ -136,8 +138,14 @@ const [invoiceResetKey, setInvoiceResetKey] = useState(0);
       const data = await getChargingSessions();
       setSessions(data);
     } catch (error) {
-      console.error("Failed to load charging sessions:", error);
-      alert("Failed to load charging sessions.");
+      console.error(
+        "Failed to load charging sessions:",
+        error
+      );
+
+      alert(
+        "Failed to load charging sessions."
+      );
     }
   }
 
@@ -146,7 +154,10 @@ const [invoiceResetKey, setInvoiceResetKey] = useState(0);
       const data = await getChargingStations();
       setCustomStations(data);
     } catch (error) {
-      console.error("Failed to load charging stations:", error);
+      console.error(
+        "Failed to load charging stations:",
+        error
+      );
     }
   }
 
@@ -154,17 +165,20 @@ const [invoiceResetKey, setInvoiceResetKey] = useState(0);
     const name = newStationName.trim();
 
     if (!name) {
-      alert("Please enter a charging station name.");
+      alert(
+        "Please enter a charging station name."
+      );
       return;
     }
 
     try {
       setSavingStation(true);
 
-      const newStation = await addChargingStation(
-        name,
-        newStationCategory
-      );
+      const newStation =
+        await addChargingStation(
+          name,
+          newStationCategory
+        );
 
       setCustomStations((current) => [
         ...current,
@@ -177,7 +191,9 @@ const [invoiceResetKey, setInvoiceResetKey] = useState(0);
       setNewStationCategory("Other");
       setShowAddStation(false);
 
-      alert("Charging station added successfully.");
+      alert(
+        "Charging station added successfully."
+      );
     } catch (error: any) {
       console.error(error);
 
@@ -185,7 +201,9 @@ const [invoiceResetKey, setInvoiceResetKey] = useState(0);
         error?.code === "23505" ||
         error?.message?.includes("duplicate")
       ) {
-        alert("This charging station already exists.");
+        alert(
+          "This charging station already exists."
+        );
       } else {
         alert(
           error?.message ||
@@ -198,8 +216,15 @@ const [invoiceResetKey, setInvoiceResetKey] = useState(0);
   }
 
   async function saveSession() {
-    if (!vehicle || !energy || !cost || !date) {
-      alert("Please fill all required fields.");
+    if (
+      !vehicle ||
+      !energy ||
+      !cost ||
+      !date
+    ) {
+      alert(
+        "Please fill all required fields."
+      );
       return;
     }
 
@@ -255,29 +280,35 @@ const [invoiceResetKey, setInvoiceResetKey] = useState(0);
       await deleteChargingSession(id);
       await loadSessions();
 
-      alert("Charging session deleted successfully.");
+      alert(
+        "Charging session deleted successfully."
+      );
     } catch (error) {
       console.error(error);
-      alert("Failed to delete the charging session.");
+
+      alert(
+        "Failed to delete the charging session."
+      );
     }
   }
 
   function resetFormWithoutConfirmation() {
     setEditingId(null);
-  
+
     setVehicle(
       `${defaultVehicle.brand} ${defaultVehicle.model}`
     );
-  
+
     setCharger("DC Fast");
     setEnergy("");
     setCost("");
     setStation("");
     setDate("");
     setInvoice("");
-  
-    // Force the file input to be recreated
-    setInvoiceResetKey((key) => key + 1);
+
+    setInvoiceResetKey(
+      (key) => key + 1
+    );
   }
 
   function resetForm() {
@@ -294,8 +325,10 @@ const [invoiceResetKey, setInvoiceResetKey] = useState(0);
     <>
       <div className="welcome">
         <h2>📝 Charge Tracker</h2>
+
         <p>
-          Record and manage your EV charging sessions.
+          Record and manage your EV charging
+          sessions.
         </p>
       </div>
 
@@ -333,8 +366,8 @@ const [invoiceResetKey, setInvoiceResetKey] = useState(0);
               color: "#666",
             }}
           >
-            Vehicle cannot be changed while editing a
-            charging session.
+            Vehicle cannot be changed while
+            editing a charging session.
           </p>
         )}
 
@@ -368,7 +401,7 @@ const [invoiceResetKey, setInvoiceResetKey] = useState(0);
           style={{
             display: "flex",
             gap: "8px",
-            alignItems: "stretch",
+            alignItems: "center",
           }}
         >
           <select
@@ -376,7 +409,10 @@ const [invoiceResetKey, setInvoiceResetKey] = useState(0);
             onChange={(e) =>
               setStation(e.target.value)
             }
-            style={{ flex: 1 }}
+            style={{
+              flex: 1,
+              minWidth: 0,
+            }}
           >
             <option value="">
               Select Charging Station
@@ -408,29 +444,37 @@ const [invoiceResetKey, setInvoiceResetKey] = useState(0);
           </select>
 
           <button
-            type="button"
-            className="saveButton"
-            onClick={() =>
-              setShowAddStation(true)
-            }
-            style={{
-              whiteSpace: "nowrap",
-              padding: "8px 12px",
-            }}
-          >
-            + Add Station
-          </button>
+  type="button"
+  className="saveButton"
+  onClick={() => setShowAddStation(true)}
+  style={{
+    padding: "0 14px",
+    margin: 0,
+    whiteSpace: "nowrap",
+    flexShrink: 0,
+    fontSize: "14px",
+    height: "46px",
+    position: "relative",
+    top: "-5px",
+  }}
+>
+  + Add Station
+</button>
         </div>
 
         {showAddStation && (
           <div
             className="card"
             style={{
-              marginTop: "12px",
-              border: "1px solid #ddd",
+              marginTop: "16px",
+              marginBottom: "4px",
             }}
           >
-            <h4 style={{ marginTop: 0 }}>
+            <h4
+              style={{
+                marginTop: 0,
+              }}
+            >
               Add Charging Station
             </h4>
 
@@ -441,7 +485,9 @@ const [invoiceResetKey, setInvoiceResetKey] = useState(0);
               placeholder="e.g. ABC Charging Hub"
               value={newStationName}
               onChange={(e) =>
-                setNewStationName(e.target.value)
+                setNewStationName(
+                  e.target.value
+                )
               }
             />
 
@@ -450,7 +496,9 @@ const [invoiceResetKey, setInvoiceResetKey] = useState(0);
             <select
               value={newStationCategory}
               onChange={(e) =>
-                setNewStationCategory(e.target.value)
+                setNewStationCategory(
+                  e.target.value
+                )
               }
             >
               <option>Home</option>
@@ -467,7 +515,9 @@ const [invoiceResetKey, setInvoiceResetKey] = useState(0);
 
             <div
               className="buttonGroup"
-              style={{ marginTop: "12px" }}
+              style={{
+                marginTop: "12px",
+              }}
             >
               <button
                 type="button"
@@ -488,7 +538,9 @@ const [invoiceResetKey, setInvoiceResetKey] = useState(0);
                 onClick={() => {
                   setShowAddStation(false);
                   setNewStationName("");
-                  setNewStationCategory("Other");
+                  setNewStationCategory(
+                    "Other"
+                  );
                 }}
                 disabled={savingStation}
               >
@@ -521,10 +573,12 @@ const [invoiceResetKey, setInvoiceResetKey] = useState(0);
         <label>Invoice / Receipt</label>
 
         <ReceiptUploader
-  key={invoiceResetKey}
-  value={invoice}
-  onChange={(value) => setInvoice(value)}
-/>
+          key={invoiceResetKey}
+          value={invoice}
+          onChange={(value) =>
+            setInvoice(value)
+          }
+        />
 
         <p
           style={{
@@ -533,15 +587,17 @@ const [invoiceResetKey, setInvoiceResetKey] = useState(0);
             marginTop: "6px",
           }}
         >
-          Upload a PDF, image, or other document.
-          Recommended maximum file size:{" "}
-          <strong>5 MB</strong>.
+          Upload a PDF, image, or other
+          document. Recommended maximum
+          file size: <strong>5 MB</strong>.
         </p>
 
         <div className="buttonGroup">
           <button
             className="primaryButton"
-            onClick={() => void saveSession()}
+            onClick={() =>
+              void saveSession()
+            }
           >
             {editingId !== null
               ? "💾 Update Session"
@@ -582,104 +638,124 @@ const [invoiceResetKey, setInvoiceResetKey] = useState(0);
               </thead>
 
               <tbody>
-                {sessions.map((session, index) => (
-                  <tr key={session.id}>
-                    <td>
-                      {sessions.length - index}
-                    </td>
+                {sessions.map(
+                  (session, index) => (
+                    <tr key={session.id}>
+                      <td>
+                        {sessions.length -
+                          index}
+                      </td>
 
-                    <td>{session.date}</td>
+                      <td>
+                        {session.date}
+                      </td>
 
-                    <td>{session.vehicle}</td>
+                      <td>
+                        {session.vehicle}
+                      </td>
 
-                    <td>
-                      {session.station || "-"}
-                    </td>
+                      <td>
+                        {session.station ||
+                          "-"}
+                      </td>
 
-                    <td>{session.charger}</td>
+                      <td>
+                        {session.charger}
+                      </td>
 
-                    <td>
-                      {session.energy.toFixed(1)} kWh
-                    </td>
+                      <td>
+                        {session.energy.toFixed(
+                          1
+                        )}{" "}
+                        kWh
+                      </td>
 
-                    <td>
-                      ₹{session.cost.toLocaleString()}
-                    </td>
+                      <td>
+                        ₹
+                        {session.cost.toLocaleString()}
+                      </td>
 
-                    <td>
-                      {session.invoice ? (
-                        <a
-                          href={session.invoice}
-                          download={`Charging-${session.date}-Invoice`}
-                          className="downloadButton"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          ⬇ Download
-                        </a>
-                      ) : (
-                        "-"
-                      )}
-                    </td>
+                      <td>
+                        {session.invoice ? (
+                          <a
+                            href={
+                              session.invoice
+                            }
+                            download={`Charging-${session.date}-Invoice`}
+                            className="downloadButton"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            ⬇ Download
+                          </a>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
 
-                    <td>
-                      <div className="actionButtons">
-                        <button
-                          className="editButton"
-                          onClick={() => {
-                            setEditingId(
-                              session.id
-                            );
+                      <td>
+                        <div className="actionButtons">
+                          <button
+                            className="editButton"
+                            onClick={() => {
+                              setEditingId(
+                                session.id
+                              );
 
-                            setVehicle(
-                              session.vehicle
-                            );
+                              setVehicle(
+                                session.vehicle
+                              );
 
-                            setCharger(
-                              session.charger
-                            );
+                              setCharger(
+                                session.charger
+                              );
 
-                            setEnergy(
-                              session.energy.toString()
-                            );
+                              setEnergy(
+                                session.energy.toString()
+                              );
 
-                            setCost(
-                              session.cost.toString()
-                            );
+                              setCost(
+                                session.cost.toString()
+                              );
 
-                            setStation(
-                              session.station
-                            );
+                              setStation(
+                                session.station
+                              );
 
-                            setDate(session.date);
+                              setDate(
+                                session.date
+                              );
 
-                            setInvoice(
-                              session.invoice || ""
-                            );
+                              setInvoice(
+                                session.invoice ||
+                                  ""
+                              );
 
-                            window.scrollTo({
-                              top: 0,
-                              behavior: "smooth",
-                            });
-                          }}
-                        >
-                          Edit
-                        </button>
+                              window.scrollTo({
+                                top: 0,
+                                behavior:
+                                  "smooth",
+                              });
+                            }}
+                          >
+                            Edit
+                          </button>
 
-                        <button
-                          className="deleteButton"
-                          onClick={() =>
-                            void deleteSession(
-                              session.id
-                            )
-                          }
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          <button
+                            className="deleteButton"
+                            onClick={() =>
+                              void deleteSession(
+                                session.id
+                              )
+                            }
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                )}
               </tbody>
             </table>
           </div>
