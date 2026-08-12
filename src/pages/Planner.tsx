@@ -456,11 +456,12 @@ function Planner() {
      * time where available.
      */
 
-    if (
-      vehicle.fastCharge10to80 > 0
-    ) {
-      const referenceMinutes =
-        vehicle.fastCharge10to80;
+    const fastChargeTime =
+  vehicle.fastCharge10to80 ?? 0;
+
+if (fastChargeTime > 0) {
+  const referenceMinutes =
+    fastChargeTime;
 
       const referencePower =
         (vehicle.battery * 0.7) /
@@ -1986,10 +1987,9 @@ function Planner() {
               </td>
 
               <td>
-                {vehicle?.fastCharge10to80 >
-                0
-                  ? `${vehicle.fastCharge10to80} min`
-                  : "Not available"}
+              {(vehicle.fastCharge10to80 ?? 0) > 0
+  ? `${vehicle.fastCharge10to80} min`
+  : "Not available"}
               </td>
             </tr>
 
