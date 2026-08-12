@@ -966,209 +966,6 @@ if (fastChargeTime > 0) {
           ➕ Add Vehicle
         </button>
 
-        <label>
-          Charging Location
-        </label>
-
-        <select
-          value={chargingLocation}
-          onChange={(e) =>
-            setChargingLocation(
-              e.target.value as
-                | "Home"
-                | "Public"
-            )
-          }
-        >
-          <option value="Home">
-            🏠 Home
-          </option>
-
-          <option value="Public">
-            ⚡ Public Charging
-          </option>
-        </select>
-
-        <label>
-          Charging Type
-        </label>
-
-        <select
-          value={chargerId}
-          onChange={(e) =>
-            setChargerId(
-              e.target.value
-            )
-          }
-        >
-          {allChargers.map(
-            (c) => (
-              <option
-                key={c.id}
-                value={c.id}
-              >
-                {c.name}
-              </option>
-            )
-          )}
-        </select>
-
-        <button
-          type="button"
-          className="saveButton"
-          onClick={() => {
-            setShowChargerForm(
-              !showChargerForm
-            );
-            setShowVehicleForm(false);
-          }}
-          style={{
-            marginTop: 8,
-            marginBottom: 16,
-          }}
-        >
-          ➕ Add Charger
-        </button>
-
-        {chargingLocation === "Home" && (
-          <>
-            <label>
-              State
-            </label>
-
-            <select
-              value={state}
-              onChange={(e) =>
-                setState(
-                  e.target.value
-                )
-              }
-            >
-              {STATES.map(
-                (item) => (
-                  <option
-                    key={item}
-                    value={item}
-                  >
-                    {item}
-                  </option>
-                )
-              )}
-            </select>
-
-            <label>
-              Electricity Rate
-              (₹/kWh)
-            </label>
-
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={homeRate}
-              onChange={(e) =>
-                setHomeRate(
-                  Number(e.target.value)
-                )
-              }
-            />
-
-            <p
-              style={{
-                color: "#94a3b8",
-                fontSize: 12,
-              }}
-            >
-              Default estimate for{" "}
-              {state}: ₹
-              {defaultHomeRate.toFixed(
-                2
-              )}
-              /kWh. You can change
-              this to match your
-              electricity bill.
-            </p>
-          </>
-        )}
-
-        {chargingLocation === "Public" && (
-          <>
-            <label>
-              Charging Station Rate
-              (₹/kWh)
-            </label>
-
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={publicRate}
-              onChange={(e) =>
-                setPublicRate(
-                  Number(e.target.value)
-                )
-              }
-            />
-
-            <p
-              style={{
-                color: "#94a3b8",
-                fontSize: 12,
-              }}
-            >
-              Enter the rate shown by
-              the charging station or
-              charging network.
-            </p>
-          </>
-        )}
-
-        <label>
-          Current Battery (%)
-        </label>
-
-        <input
-          type="range"
-          min="0"
-          max="100"
-          value={currentSOC}
-          onChange={(e) =>
-            setCurrentSOC(
-              Number(e.target.value)
-            )
-          }
-        />
-
-        <p>
-          {currentSOC}%
-        </p>
-
-        <label>
-          Target Battery (%)
-        </label>
-
-        <input
-          type="range"
-          min={currentSOC}
-          max="100"
-          value={targetSOC}
-          onChange={(e) =>
-            setTargetSOC(
-              Number(e.target.value)
-            )
-          }
-        />
-
-        <p>
-          {targetSOC}%
-        </p>
-
-      </div>
-
-      {/* =====================================================
-          ADD VEHICLE CARD
-          ===================================================== */}
-
       {showVehicleForm && (
         <div className="card">
 
@@ -1403,9 +1200,71 @@ if (fastChargeTime > 0) {
         </div>
       )}
 
-      {/* =====================================================
-          ADD CHARGER CARD
-          ===================================================== */}
+
+
+        <label>
+          Charging Location
+        </label>
+
+        <select
+          value={chargingLocation}
+          onChange={(e) =>
+            setChargingLocation(
+              e.target.value as
+                | "Home"
+                | "Public"
+            )
+          }
+        >
+          <option value="Home">
+            🏠 Home
+          </option>
+
+          <option value="Public">
+            ⚡ Public Charging
+          </option>
+        </select>
+
+        <label>
+          Charging Type
+        </label>
+
+        <select
+          value={chargerId}
+          onChange={(e) =>
+            setChargerId(
+              e.target.value
+            )
+          }
+        >
+          {allChargers.map(
+            (c) => (
+              <option
+                key={c.id}
+                value={c.id}
+              >
+                {c.name}
+              </option>
+            )
+          )}
+        </select>
+
+        <button
+          type="button"
+          className="saveButton"
+          onClick={() => {
+            setShowChargerForm(
+              !showChargerForm
+            );
+            setShowVehicleForm(false);
+          }}
+          style={{
+            marginTop: 8,
+            marginBottom: 16,
+          }}
+        >
+          ➕ Add Charger
+        </button>
 
       {showChargerForm && (
         <div className="card">
@@ -1522,6 +1381,151 @@ if (fastChargeTime > 0) {
 
         </div>
       )}
+
+
+
+        {chargingLocation === "Home" && (
+          <>
+            <label>
+              State
+            </label>
+
+            <select
+              value={state}
+              onChange={(e) =>
+                setState(
+                  e.target.value
+                )
+              }
+            >
+              {STATES.map(
+                (item) => (
+                  <option
+                    key={item}
+                    value={item}
+                  >
+                    {item}
+                  </option>
+                )
+              )}
+            </select>
+
+            <label>
+              Electricity Rate
+              (₹/kWh)
+            </label>
+
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={homeRate}
+              onChange={(e) =>
+                setHomeRate(
+                  Number(e.target.value)
+                )
+              }
+            />
+
+            <p
+              style={{
+                color: "#94a3b8",
+                fontSize: 12,
+              }}
+            >
+              Default estimate for{" "}
+              {state}: ₹
+              {defaultHomeRate.toFixed(
+                2
+              )}
+              /kWh. You can change
+              this to match your
+              electricity bill.
+            </p>
+          </>
+        )}
+
+        {chargingLocation === "Public" && (
+          <>
+            <label>
+              Charging Station Rate
+              (₹/kWh)
+            </label>
+
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={publicRate}
+              onChange={(e) =>
+                setPublicRate(
+                  Number(e.target.value)
+                )
+              }
+            />
+
+            <p
+              style={{
+                color: "#94a3b8",
+                fontSize: 12,
+              }}
+            >
+              Enter the rate shown by
+              the charging station or
+              charging network.
+            </p>
+          </>
+        )}
+
+        <label>
+          Current Battery (%)
+        </label>
+
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value={currentSOC}
+          onChange={(e) =>
+            setCurrentSOC(
+              Number(e.target.value)
+            )
+          }
+        />
+
+        <p>
+          {currentSOC}%
+        </p>
+
+        <label>
+          Target Battery (%)
+        </label>
+
+        <input
+          type="range"
+          min={currentSOC}
+          max="100"
+          value={targetSOC}
+          onChange={(e) =>
+            setTargetSOC(
+              Number(e.target.value)
+            )
+          }
+        />
+
+        <p>
+          {targetSOC}%
+        </p>
+
+      </div>
+
+      {/* =====================================================
+          ADD VEHICLE CARD
+          ===================================================== */}
+
+      {/* =====================================================
+          ADD CHARGER CARD
+          ===================================================== */}
 
       {/* =====================================================
           KPIs
