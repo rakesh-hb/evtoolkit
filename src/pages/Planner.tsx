@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { vehicles } from "../data/vehicles";
 import { chargers } from "../data/chargers";
 import { STATES } from "../data/states";
+import { supabase } from "../lib/supabase";
 
 /*
  * These are representative estimated domestic electricity
@@ -137,55 +138,461 @@ const emptyChargerForm = {
 function Planner() {
   /*
    * =========================================================
-   * CUSTOM VEHICLES
+   * CUSTOM VEHICLES / CHARGERS
    * =========================================================
+   *
+   * Built-in vehicles and chargers continue to come from
+   * src/data/*.ts. User-created records are stored in
+   * Supabase and are therefore available across devices.
+   *
+   * Existing localStorage records are migrated once when
+   * the Planner loads. The local copy is removed only after
+   * the migration has completed successfully.
    */
 
   const [customVehicles, setCustomVehicles] =
-    useState<CustomVehicle[]>(() => {
-      try {
-        const saved = localStorage.getItem(
-          CUSTOM_VEHICLES_KEY
-        );
-
-        return saved ? JSON.parse(saved) : [];
-      } catch {
-        return [];
-      }
-    });
-
-  /*
-   * =========================================================
-   * CUSTOM CHARGERS
-   * =========================================================
-   */
+    useState<CustomVehicle[]>([]);
 
   const [customChargers, setCustomChargers] =
-    useState<CustomCharger[]>(() => {
-      try {
-        const saved = localStorage.getItem(
-          CUSTOM_CHARGERS_KEY
+    useState<CustomCharger[]>([]);
+
+  const [customDataLoading, setCustomDataLoading] =
+    useState(true);
+
+  const [customDataError, setCustomDataError] =
+    useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCustomData() {
+      setCustomDataLoading(true);
+      setCustomDataError("");
+
+      const {
+        data: {
+          user,
+        },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        if (!cancelled) {
+          setCustomDataLoading(false);
+          setCustomDataError(
+            "Unable to identify the signed-in user."
+          );
+        }
+        return;
+      }
+
+      const [
+        vehicleResult,
+        chargerResult,
+      ] = await Promise.all([
+        supabase
+          .from("custom_vehicles")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", {
+            ascending: true,
+          }),
+
+        supabase
+          .from("custom_chargers")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", {
+            ascending: true,
+          }),
+      ]);
+
+      if (
+        vehicleResult.error ||
+        chargerResult.error
+      ) {
+        console.error(
+          "Error loading custom Planner data:",
+          vehicleResult.error ??
+            chargerResult.error
         );
 
-        return saved ? JSON.parse(saved) : [];
-      } catch {
-        return [];
+        if (!cancelled) {
+          setCustomDataLoading(false);
+          setCustomDataError(
+            "Unable to load your custom vehicles or chargers."
+          );
+        }
+
+        return;
       }
-    });
 
-  useEffect(() => {
-    localStorage.setItem(
-      CUSTOM_VEHICLES_KEY,
-      JSON.stringify(customVehicles)
-    );
-  }, [customVehicles]);
+      /*
+       * Convert the compact Supabase custom-vehicle record
+       * into the Planner's vehicle shape.
+       */
+      const mapVehicle = (
+        row: any
+      ): CustomVehicle => ({
+        id: Number(row.id),
+        brand: row.brand,
+        model: row.model,
+        year: new Date(
+          row.created_at ?? Date.now()
+        ).getFullYear(),
+        country: "Custom",
 
-  useEffect(() => {
-    localStorage.setItem(
-      CUSTOM_CHARGERS_KEY,
-      JSON.stringify(customChargers)
-    );
-  }, [customChargers]);
+        battery: Number(
+          row.battery ?? 0
+        ),
+        range: Number(
+          row.range_km ?? 0
+        ),
+        efficiency: Number(
+          row.efficiency ?? 0
+        ),
+
+        batteryChemistry: "Unknown",
+        architecture: 0,
+
+        acPower: Number(
+          row.ac_power ?? 0
+        ),
+        dcPower: Number(
+          row.dc_power ?? 0
+        ),
+
+        connectorAC: "Unknown",
+        connectorDC: "Unknown",
+
+        chargingPortLocation:
+          "Unknown",
+
+        fastCharge10to80: Number(
+          row.fast_charge_10_to_80 ?? 0
+        ),
+
+        motorType: "Unknown",
+        drivetrain: "Unknown",
+
+        maxPower: 0,
+        maxTorque: 0,
+
+        acceleration0to100: 0,
+        topSpeed: 0,
+
+        bodyType: "Unknown",
+
+        seats: 0,
+        bootSpace: 0,
+        kerbWeight: 0,
+        wheelbase: 0,
+
+        adasLevel: "Unknown",
+
+        warrantyBattery: "Unknown",
+        warrantyVehicle: "Unknown",
+      });
+
+      const loadedVehicles =
+        (vehicleResult.data ?? []).map(
+          mapVehicle
+        );
+
+      const loadedChargers =
+        (chargerResult.data ?? []).map(
+          (row): CustomCharger => ({
+            id: String(row.id),
+            name: row.name,
+            type:
+              row.type === "DC"
+                ? "DC"
+                : "AC",
+            power: Number(
+              row.power
+            ),
+          })
+        );
+
+      /*
+       * =====================================================
+       * ONE-TIME LOCALSTORAGE MIGRATION
+       * =====================================================
+       */
+
+      let migratedVehicles =
+        loadedVehicles;
+
+      let migratedChargers =
+        loadedChargers;
+
+      let vehicleMigrationSucceeded =
+        true;
+
+      let chargerMigrationSucceeded =
+        true;
+
+      try {
+        const savedVehiclesRaw =
+          localStorage.getItem(
+            CUSTOM_VEHICLES_KEY
+          );
+
+        if (savedVehiclesRaw) {
+          const savedVehicles =
+            JSON.parse(
+              savedVehiclesRaw
+            ) as CustomVehicle[];
+
+          const existingKeys =
+            new Set(
+              loadedVehicles.map(
+                (v) =>
+                  `${v.brand.trim().toLowerCase()}|${v.model.trim().toLowerCase()}`
+              )
+            );
+
+          const vehiclesToInsert =
+            savedVehicles.filter(
+              (v) => {
+                const key =
+                  `${v.brand.trim().toLowerCase()}|${v.model.trim().toLowerCase()}`;
+
+                if (
+                  existingKeys.has(
+                    key
+                  )
+                ) {
+                  return false;
+                }
+
+                existingKeys.add(key);
+                return true;
+              }
+            );
+
+          if (
+            vehiclesToInsert.length >
+            0
+          ) {
+            const { data, error } =
+              await supabase
+                .from(
+                  "custom_vehicles"
+                )
+                .insert(
+                  vehiclesToInsert.map(
+                    (v) => ({
+                      user_id:
+                        user.id,
+                      brand: v.brand,
+                      model: v.model,
+                      battery:
+                        Number(
+                          v.battery ??
+                            0
+                        ),
+                      range_km:
+                        Number(
+                          v.range ??
+                            0
+                        ),
+                      efficiency:
+                        Number(
+                          v.efficiency ??
+                            0
+                        ),
+                      ac_power:
+                        Number(
+                          v.acPower ??
+                            0
+                        ),
+                      dc_power:
+                        Number(
+                          v.dcPower ??
+                            0
+                        ),
+                      fast_charge_10_to_80:
+                        Number(
+                          v.fastCharge10to80 ??
+                            0
+                        ),
+                    })
+                  )
+                )
+                .select("*");
+
+            if (error) {
+              console.error(
+                "Custom vehicle migration failed:",
+                error
+              );
+              vehicleMigrationSucceeded =
+                false;
+            } else if (data) {
+              migratedVehicles = [
+                ...loadedVehicles,
+                ...data.map(
+                  mapVehicle
+                ),
+              ];
+            }
+          }
+
+          if (
+            vehicleMigrationSucceeded
+          ) {
+            localStorage.removeItem(
+              CUSTOM_VEHICLES_KEY
+            );
+          }
+        }
+      } catch (error) {
+        console.error(
+          "Custom vehicle localStorage migration failed:",
+          error
+        );
+        vehicleMigrationSucceeded =
+          false;
+      }
+
+      try {
+        const savedChargersRaw =
+          localStorage.getItem(
+            CUSTOM_CHARGERS_KEY
+          );
+
+        if (savedChargersRaw) {
+          const savedChargers =
+            JSON.parse(
+              savedChargersRaw
+            ) as CustomCharger[];
+
+          const existingKeys =
+            new Set(
+              loadedChargers.map(
+                (c) =>
+                  `${c.name.trim().toLowerCase()}|${c.type}|${c.power}`
+              )
+            );
+
+          const chargersToInsert =
+            savedChargers.filter(
+              (c) => {
+                const key =
+                  `${c.name.trim().toLowerCase()}|${c.type}|${c.power}`;
+
+                if (
+                  existingKeys.has(
+                    key
+                  )
+                ) {
+                  return false;
+                }
+
+                existingKeys.add(key);
+                return true;
+              }
+            );
+
+          if (
+            chargersToInsert.length >
+            0
+          ) {
+            const { data, error } =
+              await supabase
+                .from(
+                  "custom_chargers"
+                )
+                .insert(
+                  chargersToInsert.map(
+                    (c) => ({
+                      user_id:
+                        user.id,
+                      name: c.name,
+                      type: c.type,
+                      power:
+                        Number(
+                          c.power
+                        ),
+                    })
+                  )
+                )
+                .select("*");
+
+            if (error) {
+              console.error(
+                "Custom charger migration failed:",
+                error
+              );
+              chargerMigrationSucceeded =
+                false;
+            } else if (data) {
+              migratedChargers = [
+                ...loadedChargers,
+                ...data.map(
+                  (row): CustomCharger => ({
+                    id: String(
+                      row.id
+                    ),
+                    name: row.name,
+                    type:
+                      row.type ===
+                      "DC"
+                        ? "DC"
+                        : "AC",
+                    power: Number(
+                      row.power
+                    ),
+                  })
+                ),
+              ];
+            }
+          }
+
+          if (
+            chargerMigrationSucceeded
+          ) {
+            localStorage.removeItem(
+              CUSTOM_CHARGERS_KEY
+            );
+          }
+        }
+      } catch (error) {
+        console.error(
+          "Custom charger localStorage migration failed:",
+          error
+        );
+        chargerMigrationSucceeded =
+          false;
+      }
+
+      if (!cancelled) {
+        setCustomVehicles(
+          migratedVehicles
+        );
+        setCustomChargers(
+          migratedChargers
+        );
+        setCustomDataLoading(false);
+
+        if (
+          !vehicleMigrationSucceeded ||
+          !chargerMigrationSucceeded
+        ) {
+          setCustomDataError(
+            "Some existing custom Planner data could not be migrated. It has been kept locally and will be retried."
+          );
+        }
+      }
+    }
+
+    void loadCustomData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   /*
    * =========================================================
@@ -653,7 +1060,7 @@ if (fastChargeTime > 0) {
   const [newVehicle, setNewVehicle] =
     useState(emptyVehicleForm);
 
-  function addVehicle() {
+  async function addVehicle() {
     const brand =
       newVehicle.brand.trim();
 
@@ -739,23 +1146,80 @@ if (fastChargeTime > 0) {
       return;
     }
 
+    const {
+      data: {
+        user,
+      },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      alert(
+        "Your session could not be verified. Please sign in again."
+      );
+      return;
+    }
+
+    const { data, error } =
+      await supabase
+        .from("custom_vehicles")
+        .insert({
+          user_id: user.id,
+          brand,
+          model,
+          battery,
+          range_km: range,
+          efficiency,
+          ac_power: acPower,
+          dc_power: dcPower,
+          fast_charge_10_to_80:
+            fastCharge10to80,
+        })
+        .select("*")
+        .single();
+
+    if (error || !data) {
+      console.error(
+        "Error adding custom vehicle:",
+        error
+      );
+
+      alert(
+        "Unable to save the vehicle. Please try again."
+      );
+      return;
+    }
+
     const customVehicle: CustomVehicle =
       {
-        id: Date.now(),
-        brand,
-        model,
-        year: new Date().getFullYear(),
+        id: Number(data.id),
+        brand: data.brand,
+        model: data.model,
+        year: new Date(
+          data.created_at ??
+            Date.now()
+        ).getFullYear(),
         country: "Custom",
 
-        battery,
-        range,
-        efficiency,
+        battery: Number(
+          data.battery ?? 0
+        ),
+        range: Number(
+          data.range_km ?? 0
+        ),
+        efficiency: Number(
+          data.efficiency ?? 0
+        ),
 
         batteryChemistry: "Unknown",
         architecture: 0,
 
-        acPower,
-        dcPower,
+        acPower: Number(
+          data.ac_power ?? 0
+        ),
+        dcPower: Number(
+          data.dc_power ?? 0
+        ),
 
         connectorAC: "Unknown",
         connectorDC: "Unknown",
@@ -763,7 +1227,10 @@ if (fastChargeTime > 0) {
         chargingPortLocation:
           "Unknown",
 
-        fastCharge10to80,
+        fastCharge10to80: Number(
+          data.fast_charge_10_to_80 ??
+            0
+        ),
 
         motorType: "Unknown",
         drivetrain: "Unknown",
@@ -817,7 +1284,7 @@ if (fastChargeTime > 0) {
   const [newCharger, setNewCharger] =
     useState(emptyChargerForm);
 
-  function addCharger() {
+  async function addCharger() {
     const name =
       newCharger.name.trim();
 
@@ -849,13 +1316,57 @@ if (fastChargeTime > 0) {
       return;
     }
 
-    const customCharger: CustomCharger =
-      {
-        id:
-          `custom-${Date.now()}`,
+    const {
+      data: {
+        user,
+      },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      alert(
+        "Your session could not be verified. Please sign in again."
+      );
+      return;
+    }
+
+    const {
+      data,
+      error,
+    } = await supabase
+      .from("custom_chargers")
+      .insert({
+        user_id: user.id,
         name,
         type: newCharger.type,
         power,
+      })
+      .select("*")
+      .single();
+
+    if (error || !data) {
+      console.error(
+        "Error adding custom charger:",
+        error
+      );
+
+      alert(
+        "Unable to save the charger. Please try again."
+      );
+      return;
+    }
+
+    const customCharger: CustomCharger =
+      {
+        id: String(data.id),
+        name: data.name,
+        type:
+          data.type === "DC"
+            ? "DC"
+            : "AC",
+        power: Number(
+          data.power
+        ),
       };
 
     setCustomChargers((prev) => [
@@ -892,6 +1403,36 @@ if (fastChargeTime > 0) {
           and charging cost.
         </p>
       </div>
+
+      {/* =====================================================
+          CUSTOM DATA STATUS
+          ===================================================== */}
+
+      {customDataLoading && (
+        <div
+          className="card"
+          style={{
+            marginBottom: 16,
+            color: "#64748b",
+            fontSize: 13,
+          }}
+        >
+          Loading your custom vehicles and chargers...
+        </div>
+      )}
+
+      {customDataError && (
+        <div
+          className="card"
+          style={{
+            marginBottom: 16,
+            color: "#b45309",
+            fontSize: 13,
+          }}
+        >
+          {customDataError}
+        </div>
+      )}
 
       {/* =====================================================
           MAIN SETUP CARD

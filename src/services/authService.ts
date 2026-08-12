@@ -1,29 +1,69 @@
 import { supabase } from "../lib/supabase";
 
 /*
- * Sign in
+ * =========================================================
+ * SIGN IN
+ * =========================================================
  */
+
 export async function signIn(
   email: string,
   password: string
 ) {
-  const { data, error } =
-    await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+  const {
+    data,
+    error,
+  } =
+    await supabase.auth.signInWithPassword(
+      {
+        email,
+        password,
+      }
+    );
 
   if (error) throw error;
+
+  /*
+   * Establish the password-history baseline.
+   *
+   * This is intentionally called only AFTER Supabase
+   * successfully authenticates the user.
+   */
+  if (data.session) {
+    try {
+      await supabase.functions.invoke(
+        "password-history",
+        {
+          body: {
+            action:
+              "record_login",
+            password,
+          },
+        }
+      );
+    } catch (historyError) {
+      /*
+       * Do not prevent a valid user from logging in if
+       * password-history recording temporarily fails.
+       *
+       * The error is logged so it can be diagnosed.
+       */
+      console.error(
+        "Password history initialization error:",
+        historyError
+      );
+    }
+  }
 
   return data;
 }
 
 /*
- * Create account
- *
- * First name, last name and phone are
- * stored in Supabase Auth user metadata.
+ * =========================================================
+ * CREATE ACCOUNT
+ * =========================================================
  */
+
 export async function signUp(
   email: string,
   password: string,
@@ -31,14 +71,19 @@ export async function signUp(
   lastName: string,
   phone: string
 ) {
-  const { data, error } =
+  const {
+    data,
+    error,
+  } =
     await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
-          first_name: firstName,
-          last_name: lastName,
+          first_name:
+            firstName,
+          last_name:
+            lastName,
           phone,
           full_name:
             `${firstName} ${lastName}`.trim(),
@@ -52,49 +97,133 @@ export async function signUp(
 }
 
 /*
- * Sign out
+ * =========================================================
+ * SIGN OUT
+ * =========================================================
  */
+
 export async function signOut() {
-  const { error } =
+  const {
+    error,
+  } =
     await supabase.auth.signOut();
 
   if (error) throw error;
 }
 
 /*
- * Change password for an authenticated user.
- *
- * current_password requires the corresponding
- * Supabase Auth password-security setting.
+ * =========================================================
+ * CHANGE PASSWORD
+ * =========================================================
  */
+
 export async function changePassword(
   currentPassword: string,
   newPassword: string
 ) {
-  const { data, error } =
-    await supabase.auth.updateUser({
-      password: newPassword,
-      current_password: currentPassword,
-    });
+  const {
+    data,
+    error,
+  } =
+    await supabase.functions.invoke(
+      "password-history",
+      {
+        body: {
+          action:
+            "change_password",
+          currentPassword,
+          newPassword,
+        },
+      }
+    );
 
-  if (error) throw error;
+  if (error) {
+    throw error;
+  }
+
+  if (data?.error) {
+    const passwordError =
+      new Error(data.error);
+
+    (
+      passwordError as Error & {
+        code?: string;
+      }
+    ).code =
+      data.code;
+
+    throw passwordError;
+  }
 
   return data;
 }
 
 /*
- * Update profile information
+ * =========================================================
+ * RESET PASSWORD
+ * =========================================================
  */
+
+export async function resetPassword(
+  newPassword: string
+) {
+  const {
+    data,
+    error,
+  } =
+    await supabase.functions.invoke(
+      "password-history",
+      {
+        body: {
+          action:
+            "reset_password",
+          newPassword,
+        },
+      }
+    );
+
+  if (error) {
+    throw error;
+  }
+
+  if (data?.error) {
+    const passwordError =
+      new Error(data.error);
+
+    (
+      passwordError as Error & {
+        code?: string;
+      }
+    ).code =
+      data.code;
+
+    throw passwordError;
+  }
+
+  return data;
+}
+
+/*
+ * =========================================================
+ * UPDATE PROFILE
+ * =========================================================
+ */
+
 export async function updateProfile(
   firstName: string,
   lastName: string,
   phone: string
 ) {
-  const { data, error } =
+  const {
+    data,
+    error,
+  } =
     await supabase.auth.updateUser({
       data: {
-        first_name: firstName,
-        last_name: lastName,
+        first_name:
+          firstName,
+        last_name:
+          lastName,
         phone,
         full_name:
           `${firstName} ${lastName}`.trim(),
@@ -107,15 +236,21 @@ export async function updateProfile(
 }
 
 /*
- * Send forgot-password email
+ * =========================================================
+ * SEND FORGOT-PASSWORD EMAIL
+ * =========================================================
  */
+
 export async function sendPasswordResetEmail(
   email: string
 ) {
   const redirectTo =
     `${window.location.origin}/reset-password`;
 
-  const { data, error } =
+  const {
+    data,
+    error,
+  } =
     await supabase.auth.resetPasswordForEmail(
       email,
       {
