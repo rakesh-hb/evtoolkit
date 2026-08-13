@@ -128,6 +128,31 @@ function Tracker() {
   const [savingStation, setSavingStation] =
     useState(false);
 
+  /*
+   * Return today's date using the user's local timezone.
+   *
+   * We intentionally do not use toISOString() because
+   * that uses UTC and can produce the previous/next date
+   * around midnight.
+   */
+  function getTodayLocalDate() {
+    const today = new Date();
+
+    const year = today.getFullYear();
+
+    const month = String(
+      today.getMonth() + 1
+    ).padStart(2, "0");
+
+    const day = String(
+      today.getDate()
+    ).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+  const today = getTodayLocalDate();
+
   useEffect(() => {
     loadSessions();
     loadStations();
@@ -224,6 +249,19 @@ function Tracker() {
     ) {
       alert(
         "Please fill all required fields."
+      );
+      return;
+    }
+
+    /*
+     * Prevent future charging dates.
+     *
+     * This validation also protects against manually
+     * typing a future date instead of using the picker.
+     */
+    if (date > today) {
+      alert(
+        "Charging date cannot be in the future."
       );
       return;
     }
@@ -444,22 +482,24 @@ function Tracker() {
           </select>
 
           <button
-  type="button"
-  className="saveButton"
-  onClick={() => setShowAddStation(true)}
-  style={{
-    padding: "0 14px",
-    margin: 0,
-    whiteSpace: "nowrap",
-    flexShrink: 0,
-    fontSize: "14px",
-    height: "46px",
-    position: "relative",
-    top: "-4px",
-  }}
->
-  + Add Station
-</button>
+            type="button"
+            className="saveButton"
+            onClick={() =>
+              setShowAddStation(true)
+            }
+            style={{
+              padding: "0 14px",
+              margin: 0,
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+              fontSize: "14px",
+              height: "46px",
+              position: "relative",
+              top: "-4px",
+            }}
+          >
+            + Add Station
+          </button>
         </div>
 
         {showAddStation && (
@@ -565,10 +605,21 @@ function Tracker() {
         <input
           type="date"
           value={date}
+          max={today}
           onChange={(e) =>
             setDate(e.target.value)
           }
         />
+
+        <p
+          style={{
+            fontSize: "12px",
+            color: "#6b7280",
+            marginTop: "6px",
+          }}
+        >
+          Charging date cannot be in the future.
+        </p>
 
         <label>Invoice / Receipt</label>
 

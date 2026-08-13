@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ServiceRecord } from "../types/service";
+
 import {
   getServiceRecords,
   addServiceRecord,
@@ -10,7 +11,6 @@ import {
 import { vehicles } from "../data/vehicles";
 import ReceiptUploader from "../components/ReceiptUploader";
 
-
 const emptyRecord: ServiceRecord = {
   id: 0,
   vehicle: "",
@@ -19,28 +19,57 @@ const emptyRecord: ServiceRecord = {
   serviceType: "",
   serviceCenter: "",
   amount: 0,
-  //nextServiceKm: 0,
-  //nextServiceDate: "",
   notes: "",
   attachment: "",
 };
 
 export default function ServiceHistory() {
-  const [records, setRecords] = useState<ServiceRecord[]>([]);
-  const [form, setForm] = useState<ServiceRecord>(emptyRecord);
-  const [search, setSearch] = useState("");
+  const [records, setRecords] =
+    useState<ServiceRecord[]>([]);
 
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [form, setForm] =
+    useState<ServiceRecord>(emptyRecord);
+
+  const [search, setSearch] =
+    useState("");
+
+  const [editingId, setEditingId] =
+    useState<number | null>(null);
+
+  function getTodayLocalDate() {
+    const today = new Date();
+
+    const year =
+      today.getFullYear();
+
+    const month = String(
+      today.getMonth() + 1
+    ).padStart(2, "0");
+
+    const day = String(
+      today.getDate()
+    ).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+  const today =
+    getTodayLocalDate();
 
   async function loadRecords() {
     try {
-      const data = await getServiceRecords();
+      const data =
+        await getServiceRecords();
+
       setRecords(data);
     } catch (err: any) {
-      console.error("Failed to load service history:", err);
-    
+      console.error(
+        "Failed to load service history:",
+        err
+      );
+
       setRecords([]);
-    
+
       alert(
         JSON.stringify(
           {
@@ -55,368 +84,541 @@ export default function ServiceHistory() {
       );
     }
   }
+
   useEffect(() => {
     loadRecords();
   }, []);
 
   const filtered = useMemo(() => {
-    const text = search.toLowerCase();
+    const text =
+      search.toLowerCase();
 
     return records.filter(
       (r) =>
-        r.serviceType.toLowerCase().includes(text) ||
-        r.serviceCenter.toLowerCase().includes(text) ||
-        (r.notes ?? "").toLowerCase().includes(text)
+        r.serviceType
+          .toLowerCase()
+          .includes(text) ||
+        r.serviceCenter
+          .toLowerCase()
+          .includes(text) ||
+        (r.notes ?? "")
+          .toLowerCase()
+          .includes(text)
     );
   }, [records, search]);
 
-  const totalCost = filtered.reduce(
-    (sum, r) => sum + r.amount,
-    0
-  );
+  const totalCost =
+    filtered.reduce(
+      (sum, r) => sum + r.amount,
+      0
+    );
 
   return (
     <>
       <div className="welcome">
         <h2>🔧 Service History</h2>
-        <p>Track maintenance and servicing of your EV.</p>
+
+        <p>
+          Track maintenance and servicing
+          of your EV.
+        </p>
       </div>
 
       <div className="card">
+        <h3>
+          {editingId !== null
+            ? "Edit Service Record"
+            : "Add Service Record"}
+        </h3>
 
+        <div className="formGrid">
+          <div>
+            <label>Date</label>
 
-<h3>
-  {editingId !== null
-    ? "Edit Service Record"
-    : "Add Service Record"}
-</h3>
+            <input
+              type="date"
+              value={form.date}
+              max={today}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  date: e.target.value,
+                })
+              }
+            />
 
-  <div className="formGrid">
+            <p
+              style={{
+                fontSize: "12px",
+                color: "#6b7280",
+                marginTop: "6px",
+              }}
+            >
+              Service date cannot be in
+              the future.
+            </p>
+          </div>
 
-    <div>
-      <label>Date</label>
-      <input
-        type="date"
-        value={form.date}
-        onChange={(e) =>
-          setForm({ ...form, date: e.target.value })
-        }
-      />
-    </div>
+          <div>
+            <label>Vehicle</label>
 
-    <div>
-  <label>Vehicle</label>
+            <select
+              value={form.vehicle}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  vehicle:
+                    e.target.value,
+                })
+              }
+              disabled={
+                editingId !== null
+              }
+            >
+              <option value="">
+                Select Vehicle
+              </option>
 
-  <select
-    value={form.vehicle}
-    onChange={(e) =>
-      setForm({
-        ...form,
-        vehicle: e.target.value,
-      })
-    }
-    disabled={editingId !== null}
-  >
-    <option value="">Select Vehicle</option>
+              {vehicles.map(
+                (vehicle) => (
+                  <option
+                    key={`${vehicle.country}-${vehicle.id}`}
+                    value={`${vehicle.brand} ${vehicle.model}`}
+                  >
+                    {vehicle.brand}{" "}
+                    {vehicle.model}
+                  </option>
+                )
+              )}
+            </select>
+          </div>
 
-    {vehicles.map((vehicle) => (
-      <option
-        key={`${vehicle.country}-${vehicle.id}`}
-        value={`${vehicle.brand} ${vehicle.model}`}
-      >
-        {vehicle.brand} {vehicle.model}
-      </option>
-    ))}
-  </select>
-</div>
+          <div>
+            <label>
+              Odometer (km)
+            </label>
 
-    <div>
-      <label>Odometer (km)</label>
-      <input
-        type="number"
-        value={form.odometer}
-        onChange={(e) =>
-          setForm({
-            ...form,
-            odometer: Number(e.target.value),
-          })
-        }
-      />
-    </div>
+            <input
+              type="number"
+              value={form.odometer}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  odometer:
+                    Number(
+                      e.target.value
+                    ),
+                })
+              }
+            />
+          </div>
 
-    <div>
-      <label>Service Type</label>
+          <div>
+            <label>
+              Service Type
+            </label>
 
-      <select
-        value={form.serviceType}
-        onChange={(e) =>
-          setForm({
-            ...form,
-            serviceType: e.target.value,
-          })
-        }
-      >
-        <option value="">Select</option>
-        <option>Regular Service</option>
-        <option>Battery Check</option>
-        <option>Brake Service</option>
-        <option>Coolant Change</option>
-        <option>Software Update</option>
-        <option>Tyre Rotation</option>
-        <option>Wheel Alignment</option>
-        <option>General Inspection</option>
-        <option>Other</option>
-      </select>
-    </div>
+            <select
+              value={
+                form.serviceType
+              }
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  serviceType:
+                    e.target.value,
+                })
+              }
+            >
+              <option value="">
+                Select
+              </option>
+              <option>
+                Regular Service
+              </option>
+              <option>
+                Battery Check
+              </option>
+              <option>
+                Brake Service
+              </option>
+              <option>
+                Coolant Change
+              </option>
+              <option>
+                Software Update
+              </option>
+              <option>
+                Tyre Rotation
+              </option>
+              <option>
+                Wheel Alignment
+              </option>
+              <option>
+                General Inspection
+              </option>
+              <option>
+                Other
+              </option>
+            </select>
+          </div>
 
-    <div>
-      <label>Service Centre</label>
-      <input
-        value={form.serviceCenter}
-        onChange={(e) =>
-          setForm({
-            ...form,
-            serviceCenter: e.target.value,
-          })
-        }
-      />
-    </div>
+          <div>
+            <label>
+              Service Centre
+            </label>
 
-    <div>
-      <label>Amount (INR)</label>
-      <input
-        type="number"
-        value={form.amount}
-        onChange={(e) =>
-          setForm({
-            ...form,
-            amount: Number(e.target.value),
-          })
-        }
-      />
-    </div>
+            <input
+              value={
+                form.serviceCenter
+              }
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  serviceCenter:
+                    e.target.value,
+                })
+              }
+            />
+          </div>
 
-  
+          <div>
+            <label>
+              Amount (INR)
+            </label>
 
-  </div>
+            <input
+              type="number"
+              value={form.amount}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  amount:
+                    Number(
+                      e.target.value
+                    ),
+                })
+              }
+            />
+          </div>
+        </div>
 
-  <label>Notes</label>
+        <label>Notes</label>
 
-  <textarea
-    rows={3}
-    value={form.notes}
-    onChange={(e) =>
-      setForm({
-        ...form,
-        notes: e.target.value,
-      })
-    }
-    
-  />
+        <textarea
+          rows={3}
+          value={form.notes}
+          onChange={(e) =>
+            setForm({
+              ...form,
+              notes: e.target.value,
+            })
+          }
+        />
 
-  <br />
-  <label>Invoice / Receipt</label>
+        <br />
 
-<ReceiptUploader
-  value={form.attachment}
-  onChange={(attachment) =>
-    setForm({
-      ...form,
-      attachment,
-    })
-  }
-/>
+        <label>
+          Invoice / Receipt
+        </label>
 
-<p
-  style={{
-    fontSize: "12px",
-    color: "#6b7280",
-    marginTop: "6px",
-  }}
->
-  Supported file types: PDF, images, and other document formats. Recommended
-  maximum file size: <strong>5 MB</strong> per file for optimal performance.
-</p>
+        <ReceiptUploader
+          value={
+            form.attachment
+          }
+          onChange={(
+            attachment
+          ) =>
+            setForm({
+              ...form,
+              attachment,
+            })
+          }
+        />
 
-  <br />
+        <p
+          style={{
+            fontSize: "12px",
+            color: "#6b7280",
+            marginTop: "6px",
+          }}
+        >
+          Supported file types:
+          PDF, images, and other
+          document formats.
+          Recommended maximum
+          file size:{" "}
+          <strong>5 MB</strong>{" "}
+          per file for optimal
+          performance.
+        </p>
 
-  <button
-  className="saveButton"
-  onClick={async () => {
-    if (
-      !form.vehicle ||
-      !form.date ||
-      !form.serviceType ||
-      !form.serviceCenter
-    ) {
-      alert("Please complete all required fields.");
-      return;
-    }
+        <br />
 
-    try {
-      if (editingId !== null) {
-        await updateServiceRecord({
-          ...form,
-          id: editingId,
-        });
+        <button
+          className="saveButton"
+          onClick={async () => {
+            if (
+              !form.vehicle ||
+              !form.date ||
+              !form.serviceType ||
+              !form.serviceCenter
+            ) {
+              alert(
+                "Please complete all required fields."
+              );
+              return;
+            }
 
-        alert("Service updated successfully.");
-      } else {
-        const { id, ...newRecord } = form;
-await addServiceRecord(newRecord);
+            if (
+              form.date > today
+            ) {
+              alert(
+                "Service date cannot be in the future."
+              );
+              return;
+            }
 
-        alert("Service record added successfully.");
-      }
+            try {
+              if (
+                editingId !== null
+              ) {
+                await updateServiceRecord(
+                  {
+                    ...form,
+                    id: editingId,
+                  }
+                );
 
-      await loadRecords();
+                alert(
+                  "Service updated successfully."
+                );
+              } else {
+                const {
+                  id,
+                  ...newRecord
+                } = form;
 
-      setEditingId(null);
-      setForm(emptyRecord);
-    } catch (error: any) {
-      console.error("Supabase error:", error);
-    
-      alert(
-        error?.message ||
-        error?.details ||
-        error?.hint ||
-        JSON.stringify(error)
-      );
-    }
-  }}
->
-  {editingId !== null
-    ? "Update Service"
-    : "Add Service Record"}
-</button>
+                await addServiceRecord(
+                  newRecord
+                );
 
-</div>
+                alert(
+                  "Service record added successfully."
+                );
+              }
+
+              await loadRecords();
+
+              setEditingId(null);
+
+              setForm(
+                emptyRecord
+              );
+            } catch (
+              error: any
+            ) {
+              console.error(
+                "Supabase error:",
+                error
+              );
+
+              alert(
+                error?.message ||
+                  error?.details ||
+                  error?.hint ||
+                  JSON.stringify(
+                    error
+                  )
+              );
+            }
+          }}
+        >
+          {editingId !== null
+            ? "Update Service"
+            : "Add Service Record"}
+        </button>
+      </div>
 
       <div className="kpiGrid">
-
         <div className="kpiCard">
-          <h3>Total Services</h3>
-          <h2>{filtered.length}</h2>
+          <h3>
+            Total Services
+          </h3>
+
+          <h2>
+            {filtered.length}
+          </h2>
         </div>
 
         <div className="kpiCard">
-          <h3>Total Cost</h3>
-          <h2>INR {totalCost.toFixed(2)}</h2>
-        </div>
+          <h3>
+            Total Cost
+          </h3>
 
+          <h2>
+            INR{" "}
+            {totalCost.toFixed(
+              2
+            )}
+          </h2>
+        </div>
       </div>
 
       <div className="card">
-
         <input
           type="text"
           placeholder="Search..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) =>
+            setSearch(
+              e.target.value
+            )
+          }
         />
 
-  
-<div className="tableContainer">
-
-        <table className="table">
-
-        <thead>
-  <tr>
-    <th>Date</th>
-    <th>Type</th>
-    <th>Centre</th>
-    <th>Cost</th>
-    <th>Receipt</th>
-    <th>Actions</th>
-  </tr>
-</thead>
-
-          <tbody>
-
-            {filtered.length === 0 ? (
+        <div className="tableContainer">
+          <table className="table">
+            <thead>
               <tr>
-                <td colSpan={6}>
-                  No service records found.
-                </td>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Centre</th>
+                <th>Cost</th>
+                <th>Receipt</th>
+                <th>Actions</th>
               </tr>
-            ) : (
-              filtered.map((record) => (
-                <tr key={record.id}>
+            </thead>
 
-  <td>{record.date}</td>
+            <tbody>
+              {filtered.length ===
+              0 ? (
+                <tr>
+                  <td colSpan={6}>
+                    No service
+                    records found.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map(
+                  (record) => (
+                    <tr
+                      key={
+                        record.id
+                      }
+                    >
+                      <td>
+                        {
+                          record.date
+                        }
+                      </td>
 
-  <td>{record.serviceType}</td>
+                      <td>
+                        {
+                          record.serviceType
+                        }
+                      </td>
 
-  <td>{record.serviceCenter}</td>
+                      <td>
+                        {
+                          record.serviceCenter
+                        }
+                      </td>
 
-  <td>INR {record.amount.toFixed(2)}</td>
+                      <td>
+                        INR{" "}
+                        {record.amount.toFixed(
+                          2
+                        )}
+                      </td>
 
-  <td>
-  {record.attachment ? (
-    <a
-      href={record.attachment}
-      download={`${record.vehicle}-${record.serviceType}-Receipt`}
-      className="downloadButton"
-    >
-      ⬇ Download
-    </a>
-  ) : (
-    "-"
-  )}
-</td>
+                      <td>
+                        {record.attachment ? (
+                          <a
+                            href={
+                              record.attachment
+                            }
+                            download={`${record.vehicle}-${record.serviceType}-Receipt`}
+                            className="downloadButton"
+                          >
+                            ⬇
+                            Download
+                          </a>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
 
-  <td>
+                      <td>
+                        <div className="actionButtons">
+                          <button
+                            className="editButton"
+                            onClick={() => {
+                              setEditingId(
+                                record.id
+                              );
 
-  <div className="actionButtons">
+                              setForm(
+                                record
+                              );
 
-    <button
-      className="editButton"
-      onClick={() => {
-        setEditingId(record.id);
-        setForm(record);
-      
-        window.scrollTo({
-          top: 0,
-          behavior: "smooth",
-        });
-      }}
-    >
-      Edit
-    </button>
+                              window.scrollTo(
+                                {
+                                  top: 0,
+                                  behavior:
+                                    "smooth",
+                                }
+                              );
+                            }}
+                          >
+                            Edit
+                          </button>
 
-    {" "}
+                          <button
+                            className="deleteButton"
+                            onClick={async () => {
+                              if (
+                                !window.confirm(
+                                  "Delete this service record?"
+                                )
+                              ) {
+                                return;
+                              }
 
-    <button
-  className="deleteButton"
-  onClick={async () => {
-    if (!window.confirm("Delete this service record?")) {
-      return;
-    }
-  
-    try {
-      await deleteServiceRecord(record.id);
-      await loadRecords();
-  
-      alert("Service record deleted successfully.");
-    } catch (error) {
-      console.error(error);
-      alert("Failed to delete service record.");
-    }
-  }}
-    >
-      Delete
-    </button>
-    </div>
-  </td>
+                              try {
+                                await deleteServiceRecord(
+                                  record.id
+                                );
 
-</tr>
-              ))
-            )}
+                                await loadRecords();
 
-          </tbody>
+                                alert(
+                                  "Service record deleted successfully."
+                                );
+                              } catch (
+                                error
+                              ) {
+                                console.error(
+                                  error
+                                );
 
-        </table>
+                                alert(
+                                  "Failed to delete service record."
+                                );
+                              }
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                )
+              )}
+            </tbody>
+          </table>
         </div>
-
       </div>
     </>
   );

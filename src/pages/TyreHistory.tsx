@@ -1,6 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
 import type { TyreRecord } from "../types/tyre";
-//import { supabase } from "../lib/supabase";
+
 import ReceiptUploader from "../components/ReceiptUploader";
 
 import {
@@ -9,7 +14,6 @@ import {
   updateTyre,
   deleteTyre,
 } from "../services/tyreService";
-
 
 const emptyRecord: TyreRecord = {
   id: 0,
@@ -39,7 +43,9 @@ export default function TyreHistory() {
     useState<TyreRecord[]>([]);
 
   const [form, setForm] =
-    useState<TyreRecord>(emptyRecord);
+    useState<TyreRecord>(
+      emptyRecord
+    );
 
   const [search, setSearch] =
     useState("");
@@ -47,46 +53,86 @@ export default function TyreHistory() {
   const [editingId, setEditingId] =
     useState<number | null>(null);
 
-    useEffect(() => {
-      loadTyres();
-    }, []);
-    
-    async function loadTyres() {
-      try {
-        const tyres = await getTyres();
-        setRecords(tyres);
-      } catch (err) {
-        console.error(err);
-        alert("Failed to load tyre records.");
-      }
+  function getTodayLocalDate() {
+    const today = new Date();
+
+    const year =
+      today.getFullYear();
+
+    const month = String(
+      today.getMonth() + 1
+    ).padStart(2, "0");
+
+    const day = String(
+      today.getDate()
+    ).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+  const today =
+    getTodayLocalDate();
+
+  useEffect(() => {
+    loadTyres();
+  }, []);
+
+  async function loadTyres() {
+    try {
+      const tyres =
+        await getTyres();
+
+      setRecords(tyres);
+    } catch (err) {
+      console.error(err);
+
+      alert(
+        "Failed to load tyre records."
+      );
     }
+  }
 
   const filtered = useMemo(() => {
-    const text = search.toLowerCase();
+    const text =
+      search.toLowerCase();
 
     return records.filter(
       (r) =>
-        r.brand.toLowerCase().includes(text) ||
-        r.model.toLowerCase().includes(text) ||
-        r.size.toLowerCase().includes(text) ||
-        r.dealer.toLowerCase().includes(text) ||
+        r.brand
+          .toLowerCase()
+          .includes(text) ||
+        r.model
+          .toLowerCase()
+          .includes(text) ||
+        r.size
+          .toLowerCase()
+          .includes(text) ||
+        r.dealer
+          .toLowerCase()
+          .includes(text) ||
         (r.notes ?? "")
           .toLowerCase()
           .includes(text)
     );
   }, [records, search]);
 
-  const totalInvestment = filtered.reduce(
-    (sum, r) => sum + r.cost,
-    0
-  );
+  const totalInvestment =
+    filtered.reduce(
+      (sum, r) =>
+        sum + r.cost,
+      0
+    );
 
   const currentTyre =
     filtered.length > 0
       ? [...filtered].sort(
           (a, b) =>
-            new Date(b.installDate).getTime() -
-            new Date(a.installDate).getTime()
+            new Date(
+              b.installDate
+            ).getTime() -
+            new Date(
+              a.installDate
+            ).getTime()
         )[0]
       : null;
 
@@ -99,273 +145,403 @@ export default function TyreHistory() {
         currentTyre.installDate
       ).getTime();
 
-    const days = Math.floor(
-      diff / (1000 * 60 * 60 * 24)
-    );
+    const days =
+      Math.floor(
+        diff /
+          (1000 *
+            60 *
+            60 *
+            24)
+      );
 
     tyreAge =
       days < 30
         ? `${days} Days`
-        : `${Math.floor(days / 30)} Months`;
+        : `${Math.floor(
+            days / 30
+          )} Months`;
   }
 
   return (
     <>
       <div className="welcome">
-        <h2>🛞 Tyre History</h2>
+        <h2>
+          🛞 Tyre History
+        </h2>
 
         <p>
-          Track tyre purchases, warranty,
-          dealer details and maintenance.
+          Track tyre purchases,
+          warranty, dealer details
+          and maintenance.
         </p>
       </div>
 
       <div className="card">
-
         <h3>
-          {editingId
+          {editingId !== null
             ? "Edit Tyre Record"
             : "Add Tyre Record"}
         </h3>
+
         <div className="formGrid">
+          <div>
+            <label>Brand</label>
 
-<div>
-  <label>Brand</label>
-  <input
-    type="text"
-    value={form.brand}
-    onChange={(e) =>
-      setForm({
-        ...form,
-        brand: e.target.value,
-      })
-    }
-    placeholder="Michelin"
-  />
-</div>
+            <input
+              type="text"
+              value={form.brand}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  brand:
+                    e.target.value,
+                })
+              }
+              placeholder="Michelin"
+            />
+          </div>
 
-<div>
-  <label>Model</label>
-  <input
-    type="text"
-    value={form.model}
-    onChange={(e) =>
-      setForm({
-        ...form,
-        model: e.target.value,
-      })
-    }
-    placeholder="Primacy 4 ST"
-  />
-</div>
+          <div>
+            <label>Model</label>
 
-<div>
-  <label>Tyre Size</label>
-  <input
-    type="text"
-    value={form.size}
-    onChange={(e) =>
-      setForm({
-        ...form,
-        size: e.target.value,
-      })
-    }
-    placeholder="215/55 R18"
-  />
-</div>
+            <input
+              type="text"
+              value={form.model}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  model:
+                    e.target.value,
+                })
+              }
+              placeholder="Primacy 4 ST"
+            />
+          </div>
 
-<div>
-  <label>Purchase Date</label>
-  <input
-    type="date"
-    value={form.purchaseDate}
-    onChange={(e) =>
-      setForm({
-        ...form,
-        purchaseDate: e.target.value,
-      })
-    }
-  />
-</div>
+          <div>
+            <label>
+              Tyre Size
+            </label>
 
-<div>
-  <label>Install Date</label>
-  <input
-    type="date"
-    value={form.installDate}
-    onChange={(e) =>
-      setForm({
-        ...form,
-        installDate: e.target.value,
-      })
-    }
-  />
-</div>
+            <input
+              type="text"
+              value={form.size}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  size:
+                    e.target.value,
+                })
+              }
+              placeholder="215/55 R18"
+            />
+          </div>
 
-<div>
-  <label>Odometer (km)</label>
-  <input
-    type="number"
-    value={form.odometer}
-    onChange={(e) =>
-      setForm({
-        ...form,
-        odometer: Number(e.target.value),
-      })
-    }
-  />
-</div>
+          <div>
+            <label>
+              Purchase Date
+            </label>
 
-<div>
-  <label>Dealer</label>
-  <input
-    type="text"
-    value={form.dealer}
-    onChange={(e) =>
-      setForm({
-        ...form,
-        dealer: e.target.value,
-      })
-    }
-    placeholder="Tyre Dealer"
-  />
-</div>
+            <input
+              type="date"
+              value={
+                form.purchaseDate
+              }
+              max={today}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  purchaseDate:
+                    e.target.value,
+                })
+              }
+            />
+          </div>
 
-<div>
-  <label>Cost (INR)</label>
-  <input
-    type="number"
-    value={form.cost}
-    onChange={(e) =>
-      setForm({
-        ...form,
-        cost: Number(e.target.value),
-      })
-    }
-  />
-</div>
+          <div>
+            <label>
+              Install Date
+            </label>
 
-<div>
-  <label>Warranty (Months)</label>
-  <input
-    type="number"
-    value={form.warrantyMonths}
-    onChange={(e) =>
-      setForm({
-        ...form,
-        warrantyMonths: Number(e.target.value),
-      })
-    }
-  />
-</div>
+            <input
+              type="date"
+              value={
+                form.installDate
+              }
+              max={today}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  installDate:
+                    e.target.value,
+                })
+              }
+            />
+          </div>
 
-</div>
+          <div>
+            <label>
+              Odometer (km)
+            </label>
 
-<label>Notes</label>
+            <input
+              type="number"
+              value={
+                form.odometer
+              }
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  odometer:
+                    Number(
+                      e.target.value
+                    ),
+                })
+              }
+            />
+          </div>
 
-<textarea
-rows={3}
-value={form.notes}
-onChange={(e) =>
-  setForm({
-    ...form,
-    notes: e.target.value,
-  })
-}
-/>
+          <div>
+            <label>Dealer</label>
 
-<br />
+            <input
+              type="text"
+              value={
+                form.dealer
+              }
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  dealer:
+                    e.target.value,
+                })
+              }
+              placeholder="Tyre Dealer"
+            />
+          </div>
 
-<label>Invoice / Receipt</label>
+          <div>
+            <label>
+              Cost (INR)
+            </label>
 
-<ReceiptUploader
-value={form.receipt}
-onChange={(receipt) =>
-  setForm({
-    ...form,
-    receipt,
-  })
-}
-/>
+            <input
+              type="number"
+              value={form.cost}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  cost:
+                    Number(
+                      e.target.value
+                    ),
+                })
+              }
+            />
+          </div>
 
-<p
-  style={{
-    fontSize: "12px",
-    color: "#6b7280",
-    marginTop: "6px",
-  }}
->
-  Supported file types: PDF, images, and other document formats. Recommended
-  maximum file size: <strong>5 MB</strong> per file for optimal performance.
-</p>
+          <div>
+            <label>
+              Warranty (Months)
+            </label>
 
-<br /> 
-<button
-  className="primaryButton"
-  onClick={async () => {
+            <input
+              type="number"
+              value={
+                form.warrantyMonths
+              }
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  warrantyMonths:
+                    Number(
+                      e.target.value
+                    ),
+                })
+              }
+            />
+          </div>
+        </div>
 
-    if (
-      !form.brand ||
-      !form.model ||
-      !form.size ||
-      !form.installDate
-    ) {
-      alert("Please complete all required fields.");
-      return;
-    }
+        <p
+          style={{
+            fontSize: "12px",
+            color: "#6b7280",
+            marginTop: "8px",
+          }}
+        >
+          Purchase and installation
+          dates cannot be in the future.
+        </p>
 
-    try {
+        <label>Notes</label>
 
-      if (editingId !== null) {
+        <textarea
+          rows={3}
+          value={form.notes}
+          onChange={(e) =>
+            setForm({
+              ...form,
+              notes:
+                e.target.value,
+            })
+          }
+        />
 
-        await updateTyre({
-          ...form,
-          id: editingId,
-        });
+        <br />
 
-      } else {
+        <label>
+          Invoice / Receipt
+        </label>
 
-        await addTyre(form);
+        <ReceiptUploader
+          value={form.receipt}
+          onChange={(receipt) =>
+            setForm({
+              ...form,
+              receipt,
+            })
+          }
+        />
 
-      }
+        <p
+          style={{
+            fontSize: "12px",
+            color: "#6b7280",
+            marginTop: "6px",
+          }}
+        >
+          Supported file types:
+          PDF, images, and other
+          document formats.
+          Recommended maximum
+          file size:{" "}
+          <strong>5 MB</strong>{" "}
+          per file for optimal
+          performance.
+        </p>
 
-      await loadTyres();
+        <br />
 
-      setEditingId(null);
+        <button
+          className="primaryButton"
+          onClick={async () => {
+            if (
+              !form.brand ||
+              !form.model ||
+              !form.size ||
+              !form.installDate
+            ) {
+              alert(
+                "Please complete all required fields."
+              );
+              return;
+            }
 
-      setForm(emptyRecord);
+            if (
+              form.purchaseDate &&
+              form.purchaseDate >
+                today
+            ) {
+              alert(
+                "Purchase date cannot be in the future."
+              );
+              return;
+            }
 
-    } catch (err) {
+            if (
+              form.installDate >
+              today
+            ) {
+              alert(
+                "Install date cannot be in the future."
+              );
+              return;
+            }
 
-      console.error(err);
+            if (
+              form.purchaseDate &&
+              form.installDate &&
+              form.purchaseDate >
+                form.installDate
+            ) {
+              alert(
+                "Purchase date cannot be after the install date."
+              );
+              return;
+            }
 
-      alert("Failed to save tyre.");
+            try {
+              if (
+                editingId !== null
+              ) {
+                await updateTyre({
+                  ...form,
+                  id: editingId,
+                });
+              } else {
+                await addTyre(
+                  form
+                );
+              }
 
-    }
+              await loadTyres();
 
-  }}
->
+              setEditingId(null);
+
+              setForm(
+                emptyRecord
+              );
+
+              alert(
+                editingId !== null
+                  ? "Tyre updated successfully."
+                  : "Tyre added successfully."
+              );
+            } catch (err) {
+              console.error(err);
+
+              alert(
+                "Failed to save tyre."
+              );
+            }
+          }}
+        >
           {editingId !== null
             ? "Update Tyre"
             : "Add Tyre"}
         </button>
-
       </div>
 
       <div className="kpiGrid">
-
         <div className="kpiCard">
-          <h3>Total Tyre Records</h3>
-          <h2>{filtered.length}</h2>
+          <h3>
+            Total Tyre Records
+          </h3>
+
+          <h2>
+            {filtered.length}
+          </h2>
         </div>
 
         <div className="kpiCard">
-          <h3>Total Investment</h3>
-          <h2>₹ {totalInvestment.toFixed(2)}</h2>
+          <h3>
+            Total Investment
+          </h3>
+
+          <h2>
+            ₹{" "}
+            {totalInvestment.toFixed(
+              2
+            )}
+          </h2>
         </div>
 
         <div className="kpiCard">
-          <h3>Current Tyre</h3>
+          <h3>
+            Current Tyre
+          </h3>
+
           <h2>
             {currentTyre
               ? currentTyre.brand
@@ -375,144 +551,191 @@ onChange={(receipt) =>
 
         <div className="kpiCard">
           <h3>Tyre Age</h3>
-          <h2>{tyreAge}</h2>
+
+          <h2>
+            {tyreAge}
+          </h2>
         </div>
-
       </div>
+
       <div className="card">
+        <input
+          type="text"
+          placeholder="Search by brand, model, dealer or size..."
+          value={search}
+          onChange={(e) =>
+            setSearch(
+              e.target.value
+            )
+          }
+        />
 
-<input
-  type="text"
-  placeholder="Search by brand, model, dealer or size..."
-  value={search}
-  onChange={(e) => setSearch(e.target.value)}
-/>
+        <div className="tableContainer">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Brand</th>
+                <th>Model</th>
+                <th>Size</th>
+                <th>Installed</th>
+                <th>Odometer</th>
+                <th>Cost</th>
+                <th>Warranty</th>
+                <th>Receipt</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
 
-<div className="tableContainer">
+            <tbody>
+              {filtered.length ===
+              0 ? (
+                <tr>
+                  <td colSpan={10}>
+                    No tyre records
+                    found.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map(
+                  (
+                    record,
+                    index
+                  ) => (
+                    <tr
+                      key={
+                        record.id
+                      }
+                    >
+                      <td>
+                        {index + 1}
+                      </td>
 
-  <table className="table">
+                      <td>
+                        {
+                          record.brand
+                        }
+                      </td>
 
-    <thead>
+                      <td>
+                        {
+                          record.model
+                        }
+                      </td>
 
-      <tr>
-        <th>#</th>
-        <th>Brand</th>
-        <th>Model</th>
-        <th>Size</th>
-        <th>Installed</th>
-        <th>Odometer</th>
-        <th>Cost</th>
-        <th>Warranty</th>
-        <th>Receipt</th>
-        <th>Actions</th>
-      </tr>
+                      <td>
+                        {
+                          record.size
+                        }
+                      </td>
 
-    </thead>
+                      <td>
+                        {
+                          record.installDate
+                        }
+                      </td>
 
-    <tbody>
+                      <td>
+                        {record.odometer.toLocaleString()}{" "}
+                        km
+                      </td>
 
-      {filtered.length === 0 ? (
+                      <td>
+                        ₹{" "}
+                        {record.cost.toLocaleString()}
+                      </td>
 
-        <tr>
-          <td colSpan={10}>
-            No tyre records found.
-          </td>
-        </tr>
+                      <td>
+                        {
+                          record.warrantyMonths
+                        }{" "}
+                        Months
+                      </td>
 
-      ) : (
+                      <td>
+                        {record.receipt ? (
+                          <a
+                            href={
+                              record.receipt
+                            }
+                            download={`${record.brand}-${record.model}-Receipt`}
+                            className="downloadButton"
+                          >
+                            ⬇
+                            Download
+                          </a>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
 
-        filtered.map((record, index) => (
+                      <td>
+                        <div className="actionButtons">
+                          <button
+                            className="editButton"
+                            onClick={() => {
+                              setEditingId(
+                                record.id
+                              );
 
-          <tr key={record.id}>
+                              setForm(
+                                record
+                              );
 
-            <td>{index + 1}</td>
+                              window.scrollTo(
+                                {
+                                  top: 0,
+                                  behavior:
+                                    "smooth",
+                                }
+                              );
+                            }}
+                          >
+                            Edit
+                          </button>
 
-            <td>{record.brand}</td>
+                          <button
+                            className="deleteButton"
+                            onClick={async () => {
+                              if (
+                                !window.confirm(
+                                  "Delete this tyre record?"
+                                )
+                              ) {
+                                return;
+                              }
 
-            <td>{record.model}</td>
+                              try {
+                                await deleteTyre(
+                                  record.id
+                                );
 
-            <td>{record.size}</td>
+                                await loadTyres();
+                              } catch (
+                                err
+                              ) {
+                                console.error(
+                                  err
+                                );
 
-            <td>{record.installDate}</td>
-
-            <td>{record.odometer.toLocaleString()} km</td>
-
-            <td>₹ {record.cost.toLocaleString()}</td>
-
-            <td>{record.warrantyMonths} Months</td>
-
-            <td>
-  {record.receipt ? (
-    <a
-      href={record.receipt}
-      download={`${record.brand}-${record.model}-Receipt`}
-      className="downloadButton"
-    >
-      ⬇ Download
-    </a>
-  ) : (
-    "-"
-  )}
-</td>
-
-            <td>
-  <div className="actionButtons">
-
-    <button
-      className="editButton"
-      onClick={async () => {
-        setEditingId(record.id);
-        setForm(record);
-      }}
-    >
-      Edit
-    </button>
-
-    <button
-  className="deleteButton"
-  onClick={async () => {
-
-    if (!window.confirm("Delete this tyre record?")) {
-      return;
-    }
-
-    try {
-
-      await deleteTyre(record.id);
-
-      await loadTyres();
-
-    } catch (err) {
-
-      console.error(err);
-
-      alert("Delete failed");
-
-    }
-
-  }}
->
-      Delete
-    </button>
-
-  </div>
-</td>
-
-          </tr>
-
-        ))
-
-      )}
-
-    </tbody>
-
-  </table>
-
-</div>
-
-</div>
-
-</>
-);
-
+                                alert(
+                                  "Delete failed"
+                                );
+                              }
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                )
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  );
 }
