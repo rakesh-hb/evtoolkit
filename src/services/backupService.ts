@@ -55,6 +55,7 @@ export async function createBackup() {
       .split("T")[0];
 
     a.href = url;
+
     a.download =
       `EVToolkit_Backup_${today}.json`;
 
@@ -199,31 +200,19 @@ export async function restoreBackup(
 
     /*
      * ------------------------------------------------------------
-     * Map Charging Sessions
+     * Charging
      * ------------------------------------------------------------
+     *
+     * Keep the charging data in the same
+     * structure used by createBackup().
      */
 
     const mappedCharging =
-      charging.map(
-        (r: any) => ({
-          vehicle:
-            r.vehicle,
-          charger:
-            r.charger,
-          station:
-            r.station,
-          energy:
-            r.energy,
-          cost:
-            r.cost,
-          date:
-            r.date,
-        })
-      );
+      charging;
 
     /*
      * ------------------------------------------------------------
-     * Map Service History
+     * Service History
      * ------------------------------------------------------------
      */
 
@@ -262,7 +251,7 @@ export async function restoreBackup(
 
     /*
      * ------------------------------------------------------------
-     * Map Tyres
+     * Tyres
      * ------------------------------------------------------------
      */
 
@@ -309,7 +298,7 @@ export async function restoreBackup(
 
     /*
      * ------------------------------------------------------------
-     * Map Documents
+     * Documents
      * ------------------------------------------------------------
      */
 
@@ -339,8 +328,15 @@ export async function restoreBackup(
 
     /*
      * ------------------------------------------------------------
-     * Map Insurance
+     * Insurance
      * ------------------------------------------------------------
+     *
+     * IMPORTANT:
+     * Only use columns that are part of the
+     * existing insurance table.
+     *
+     * Do NOT add fields such as ncb unless
+     * the database actually has that column.
      */
 
     const mappedInsurance =
@@ -353,29 +349,22 @@ export async function restoreBackup(
             p.company,
 
           policy_number:
-            p.policy_number ??
-            p.policyNumber,
+            p.policy_number,
 
           policy_type:
-            p.policy_type ??
-            p.policyType,
+            p.policy_type,
 
           start_date:
-            p.start_date ??
-            p.startDate,
+            p.start_date,
 
           expiry_date:
-            p.expiry_date ??
-            p.expiryDate,
+            p.expiry_date,
 
           premium:
             p.premium,
 
           idv:
             p.idv,
-
-          ncb:
-            p.ncb,
 
           addons:
             p.addons,
@@ -384,16 +373,7 @@ export async function restoreBackup(
             p.agent,
 
           contact_number:
-            p.contact_number ??
-            p.contactNumber,
-
-          claim_number:
-            p.claim_number ??
-            p.claimNumber,
-
-          claim_status:
-            p.claim_status ??
-            p.claimStatus,
+            p.contact_number,
 
           notes:
             p.notes ?? "",
@@ -409,8 +389,10 @@ export async function restoreBackup(
      * ------------------------------------------------------------
      *
      * The database function uses auth.uid()
-     * for user_id. We deliberately do NOT send
-     * user_id from the backup file.
+     * for user_id.
+     *
+     * We deliberately do NOT send user_id
+     * from the backup file.
      */
 
     const {
