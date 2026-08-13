@@ -6,8 +6,76 @@ import { getTyres } from "./tyreService";
 import { getDocuments } from "./documentVaultService";
 import { getInsurance } from "./insuranceService";
 
+/*
+ * Create a SHA-256 hash for the exact backup JSON.
+ *
+ * The hash is used to bind the backup file to the
+ * account that created it.
+ */
+async function createBackupHash(
+  json: string
+): Promise<string> {
+  const encoder =
+    new TextEncoder();
+
+  const data =
+    encoder.encode(json);
+
+  const hashBuffer =
+    await crypto.subtle.digest(
+      "SHA-256",
+      data
+    );
+
+  const hashArray =
+    Array.from(
+      new Uint8Array(hashBuffer)
+    );
+
+  return hashArray
+    .map((byte) =>
+      byte
+        .toString(16)
+        .padStart(2, "0")
+    )
+    .join("");
+}
+
+
+/*
+ * ============================================================
+ * CREATE BACKUP
+ * ============================================================
+ */
+
 export async function createBackup() {
   try {
+    /*
+     * Make sure the user is authenticated.
+     */
+
+    const {
+      data: {
+        user,
+      },
+      error: userError,
+    } =
+      await supabase.auth.getUser();
+
+    if (userError) {
+      throw userError;
+    }
+
+    if (!user) {
+      throw new Error(
+        "You must be signed in to create a backup."
+      );
+    }
+
+    /*
+     * Load all application data.
+     */
+
     const [
       charging,
       service,
@@ -22,10 +90,20 @@ export async function createBackup() {
       getInsurance(),
     ]);
 
+    /*
+     * Create the backup object.
+     *
+     * IMPORTANT:
+     * We do NOT put user_id into the JSON.
+     * Ownership is maintained separately by
+     * the backup_registry table.
+     */
+
     const backup = {
       app: "EV Toolkit",
       version: 1,
-      createdAt: new Date().toISOString(),
+      createdAt:
+        new Date().toISOString(),
 
       charging,
       service,
@@ -34,38 +112,102 @@ export async function createBackup() {
       insurance,
     };
 
-    const json = JSON.stringify(
-      backup,
-      null,
-      2
-    );
+    /*
+     * Create deterministic JSON.
+     *
+     * This exact string is what gets hashed.
+     */
 
-    const blob = new Blob([json], {
-      type: "application/json",
-    });
+    const json =
+      JSON.stringify(
+        backup,
+        null,
+        2
+      );
+
+    /*
+     * Calculate backup fingerprint.
+     */
+
+    const backupHash =
+      await createBackupHash(
+        json
+      );
+
+    /*
+     * Register the backup against
+     * the currently authenticated user.
+     */
+
+    const {
+      error: registerError,
+    } =
+      await supabase.rpc(
+        "register_backup",
+        {
+          p_backup_hash:
+            backupHash,
+        }
+      );
+
+    if (registerError) {
+      console.error(
+        "Backup registration error:",
+        registerError
+      );
+
+      throw new Error(
+        registerError.message ||
+          "Unable to register backup."
+      );
+    }
+
+    /*
+     * Create downloadable file.
+     */
+
+    const blob =
+      new Blob(
+        [json],
+        {
+          type:
+            "application/json",
+        }
+      );
 
     const url =
-      URL.createObjectURL(blob);
+      URL.createObjectURL(
+        blob
+      );
 
     const a =
-      document.createElement("a");
+      document.createElement(
+        "a"
+      );
 
-    const today = new Date()
-      .toISOString()
-      .split("T")[0];
+    const today =
+      new Date()
+        .toISOString()
+        .split("T")[0];
 
     a.href = url;
 
     a.download =
       `EVToolkit_Backup_${today}.json`;
 
-    document.body.appendChild(a);
+    document.body.appendChild(
+      a
+    );
 
     a.click();
 
-    document.body.removeChild(a);
+    document.body.removeChild(
+      a
+    );
 
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(
+      url
+    );
 
     alert(
       "Backup created successfully."
@@ -83,14 +225,41 @@ export async function createBackup() {
   }
 }
 
+
+/*
+ * ============================================================
+ * RESTORE BACKUP
+ * ============================================================
+ */
+
 export async function restoreBackup(
   file: File
 ) {
   try {
     /*
-     * ------------------------------------------------------------
-     * Read backup file
-     * ------------------------------------------------------------
+     * Make sure the user is authenticated.
+     */
+
+    const {
+      data: {
+        user,
+      },
+      error: userError,
+    } =
+      await supabase.auth.getUser();
+
+    if (userError) {
+      throw userError;
+    }
+
+    if (!user) {
+      throw new Error(
+        "You must be signed in to restore a backup."
+      );
+    }
+
+    /*
+     * Read the file.
      */
 
     const text =
@@ -108,14 +277,13 @@ export async function restoreBackup(
     }
 
     /*
-     * ------------------------------------------------------------
-     * Validate backup
-     * ------------------------------------------------------------
+     * Validate basic backup structure.
      */
 
     if (
       !backup ||
-      typeof backup !== "object"
+      typeof backup !==
+        "object"
     ) {
       throw new Error(
         "Invalid backup file."
@@ -140,55 +308,126 @@ export async function restoreBackup(
     }
 
     /*
-     * ------------------------------------------------------------
-     * Validate backup sections
-     * ------------------------------------------------------------
+     * Re-create the exact JSON representation
+     * used to generate the backup hash.
+     *
+     * This means any modification to the JSON
+     * produces a different hash.
      */
 
-    const charging =
-      Array.isArray(
-        backup.charging
-      )
-        ? backup.charging
-        : [];
+    const normalizedBackup = {
+      app:
+        backup.app,
 
-    const service =
-      Array.isArray(
-        backup.service
-      )
-        ? backup.service
-        : [];
+      version:
+        backup.version,
 
-    const tyres =
-      Array.isArray(
-        backup.tyres
-      )
-        ? backup.tyres
-        : [];
+      createdAt:
+        backup.createdAt,
 
-    const documents =
-      Array.isArray(
-        backup.documents
-      )
-        ? backup.documents
-        : [];
+      charging:
+        Array.isArray(
+          backup.charging
+        )
+          ? backup.charging
+          : [],
 
-    const insurance =
-      Array.isArray(
-        backup.insurance
-      )
-        ? backup.insurance
-        : [];
+      service:
+        Array.isArray(
+          backup.service
+        )
+          ? backup.service
+          : [],
+
+      tyres:
+        Array.isArray(
+          backup.tyres
+        )
+          ? backup.tyres
+          : [],
+
+      documents:
+        Array.isArray(
+          backup.documents
+        )
+          ? backup.documents
+          : [],
+
+      insurance:
+        Array.isArray(
+          backup.insurance
+        )
+          ? backup.insurance
+          : [],
+    };
+
+    const normalizedJson =
+      JSON.stringify(
+        normalizedBackup,
+        null,
+        2
+      );
 
     /*
-     * ------------------------------------------------------------
-     * Confirm restore
-     * ------------------------------------------------------------
+     * Calculate the hash of the selected file.
+     */
+
+    const backupHash =
+      await createBackupHash(
+        normalizedJson
+      );
+
+    /*
+     * ==========================================================
+     * VERIFY BACKUP OWNERSHIP
+     * ==========================================================
+     *
+     * This happens BEFORE any restore operation.
+     */
+
+    const {
+      data:
+        isOwner,
+      error:
+        verifyError,
+    } =
+      await supabase.rpc(
+        "verify_backup_owner",
+        {
+          p_backup_hash:
+            backupHash,
+        }
+      );
+
+    if (verifyError) {
+      console.error(
+        "Backup ownership verification error:",
+        verifyError
+      );
+
+      throw new Error(
+        verifyError.message ||
+          "Unable to verify backup ownership."
+      );
+    }
+
+    if (
+      isOwner !== true
+    ) {
+      throw new Error(
+        "This backup belongs to another EV Toolkit account and cannot be restored here."
+      );
+    }
+
+    /*
+     * ==========================================================
+     * CONFIRM RESTORE
+     * ==========================================================
      */
 
     const confirmed =
       window.confirm(
-        "Merge this backup with your existing data?\n\n" +
+        "Restore this backup?\n\n" +
           "• Existing records will be kept.\n" +
           "• New records will be imported.\n" +
           "• Duplicate records will be skipped."
@@ -199,21 +438,35 @@ export async function restoreBackup(
     }
 
     /*
-     * ------------------------------------------------------------
+     * ==========================================================
+     * PREPARE BACKUP DATA
+     * ==========================================================
+     */
+
+    const charging =
+      normalizedBackup.charging;
+
+    const service =
+      normalizedBackup.service;
+
+    const tyres =
+      normalizedBackup.tyres;
+
+    const documents =
+      normalizedBackup.documents;
+
+    const insurance =
+      normalizedBackup.insurance;
+
+    /*
      * Charging
-     * ------------------------------------------------------------
-     *
-     * Keep the charging data in the same
-     * structure used by createBackup().
      */
 
     const mappedCharging =
       charging;
 
     /*
-     * ------------------------------------------------------------
      * Service History
-     * ------------------------------------------------------------
      */
 
     const mappedService =
@@ -250,9 +503,7 @@ export async function restoreBackup(
       );
 
     /*
-     * ------------------------------------------------------------
      * Tyres
-     * ------------------------------------------------------------
      */
 
     const mappedTyres =
@@ -297,9 +548,7 @@ export async function restoreBackup(
       );
 
     /*
-     * ------------------------------------------------------------
      * Documents
-     * ------------------------------------------------------------
      */
 
     const mappedDocuments =
@@ -327,16 +576,7 @@ export async function restoreBackup(
       );
 
     /*
-     * ------------------------------------------------------------
      * Insurance
-     * ------------------------------------------------------------
-     *
-     * IMPORTANT:
-     * Only use columns that are part of the
-     * existing insurance table.
-     *
-     * Do NOT add fields such as ncb unless
-     * the database actually has that column.
      */
 
     const mappedInsurance =
@@ -384,19 +624,18 @@ export async function restoreBackup(
       );
 
     /*
-     * ------------------------------------------------------------
-     * Restore through Supabase
-     * ------------------------------------------------------------
+     * ==========================================================
+     * RESTORE INTO CURRENT USER ACCOUNT
+     * ==========================================================
      *
-     * The database function uses auth.uid()
-     * for user_id.
+     * restore_backup() uses auth.uid() internally.
      *
-     * We deliberately do NOT send user_id
-     * from the backup file.
+     * We do NOT pass user_id from the backup.
      */
 
     const {
-      error,
+      error:
+        restoreError,
     } =
       await supabase.rpc(
         "restore_backup",
@@ -418,30 +657,22 @@ export async function restoreBackup(
         }
       );
 
-    /*
-     * ------------------------------------------------------------
-     * Handle Supabase error
-     * ------------------------------------------------------------
-     */
-
-    if (error) {
+    if (restoreError) {
       console.error(
         "restore_backup RPC error:",
-        error
+        restoreError
       );
 
       throw new Error(
         `Restore failed: ${
-          error.message ||
+          restoreError.message ||
           "Supabase could not restore the backup."
         }`
       );
     }
 
     /*
-     * ------------------------------------------------------------
      * Success
-     * ------------------------------------------------------------
      */
 
     alert(
