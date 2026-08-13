@@ -6,76 +6,8 @@ import { getTyres } from "./tyreService";
 import { getDocuments } from "./documentVaultService";
 import { getInsurance } from "./insuranceService";
 
-/*
- * Create a SHA-256 hash for the exact backup JSON.
- *
- * The hash is used to bind the backup file to the
- * account that created it.
- */
-async function createBackupHash(
-  json: string
-): Promise<string> {
-  const encoder =
-    new TextEncoder();
-
-  const data =
-    encoder.encode(json);
-
-  const hashBuffer =
-    await crypto.subtle.digest(
-      "SHA-256",
-      data
-    );
-
-  const hashArray =
-    Array.from(
-      new Uint8Array(hashBuffer)
-    );
-
-  return hashArray
-    .map((byte) =>
-      byte
-        .toString(16)
-        .padStart(2, "0")
-    )
-    .join("");
-}
-
-
-/*
- * ============================================================
- * CREATE BACKUP
- * ============================================================
- */
-
 export async function createBackup() {
   try {
-    /*
-     * Make sure the user is authenticated.
-     */
-
-    const {
-      data: {
-        user,
-      },
-      error: userError,
-    } =
-      await supabase.auth.getUser();
-
-    if (userError) {
-      throw userError;
-    }
-
-    if (!user) {
-      throw new Error(
-        "You must be signed in to create a backup."
-      );
-    }
-
-    /*
-     * Load all application data.
-     */
-
     const [
       charging,
       service,
@@ -90,20 +22,10 @@ export async function createBackup() {
       getInsurance(),
     ]);
 
-    /*
-     * Create the backup object.
-     *
-     * IMPORTANT:
-     * We do NOT put user_id into the JSON.
-     * Ownership is maintained separately by
-     * the backup_registry table.
-     */
-
     const backup = {
       app: "EV Toolkit",
       version: 1,
-      createdAt:
-        new Date().toISOString(),
+      createdAt: new Date().toISOString(),
 
       charging,
       service,
@@ -112,102 +34,38 @@ export async function createBackup() {
       insurance,
     };
 
-    /*
-     * Create deterministic JSON.
-     *
-     * This exact string is what gets hashed.
-     */
+    const json = JSON.stringify(
+      backup,
+      null,
+      2
+    );
 
-    const json =
-      JSON.stringify(
-        backup,
-        null,
-        2
-      );
-
-    /*
-     * Calculate backup fingerprint.
-     */
-
-    const backupHash =
-      await createBackupHash(
-        json
-      );
-
-    /*
-     * Register the backup against
-     * the currently authenticated user.
-     */
-
-    const {
-      error: registerError,
-    } =
-      await supabase.rpc(
-        "register_backup",
-        {
-          p_backup_hash:
-            backupHash,
-        }
-      );
-
-    if (registerError) {
-      console.error(
-        "Backup registration error:",
-        registerError
-      );
-
-      throw new Error(
-        registerError.message ||
-          "Unable to register backup."
-      );
-    }
-
-    /*
-     * Create downloadable file.
-     */
-
-    const blob =
-      new Blob(
-        [json],
-        {
-          type:
-            "application/json",
-        }
-      );
+    const blob = new Blob([json], {
+      type: "application/json",
+    });
 
     const url =
-      URL.createObjectURL(
-        blob
-      );
+      URL.createObjectURL(blob);
 
     const a =
-      document.createElement(
-        "a"
-      );
+      document.createElement("a");
 
-    const today =
-      new Date()
-        .toISOString()
-        .split("T")[0];
+    const today = new Date()
+      .toISOString()
+      .split("T")[0];
 
     a.href = url;
 
     a.download =
       `EVToolkit_Backup_${today}.json`;
 
-    document.body.appendChild(
-      a
-    );
+    document.body.appendChild(a);
 
     a.click();
 
-    document.body.removeChild(
-      a
-    );
+    document.body.removeChild(a);
 
-    URL.revokeObjectURL(
-      url
-    );
+    URL.revokeObjectURL(url);
 
     alert(
       "Backup created successfully."
@@ -225,42 +83,13 @@ export async function createBackup() {
   }
 }
 
-
-/*
- * ============================================================
- * RESTORE BACKUP
- * ============================================================
- */
-
 export async function restoreBackup(
   file: File
 ) {
   try {
-    /*
-     * Make sure the user is authenticated.
-     */
-
-    const {
-      data: {
-        user,
-      },
-      error: userError,
-    } =
-      await supabase.auth.getUser();
-
-    if (userError) {
-      throw userError;
-    }
-
-    if (!user) {
-      throw new Error(
-        "You must be signed in to restore a backup."
-      );
-    }
-
-    /*
-     * Read the file.
-     */
+    // ============================================================
+    // Read backup file
+    // ============================================================
 
     const text =
       await file.text();
@@ -276,14 +105,13 @@ export async function restoreBackup(
       );
     }
 
-    /*
-     * Validate basic backup structure.
-     */
+    // ============================================================
+    // Validate backup
+    // ============================================================
 
     if (
       !backup ||
-      typeof backup !==
-        "object"
+      typeof backup !== "object"
     ) {
       throw new Error(
         "Invalid backup file."
@@ -307,127 +135,52 @@ export async function restoreBackup(
       );
     }
 
-    /*
-     * Re-create the exact JSON representation
-     * used to generate the backup hash.
-     *
-     * This means any modification to the JSON
-     * produces a different hash.
-     */
+    // ============================================================
+    // Validate backup sections
+    // ============================================================
 
-    const normalizedBackup = {
-      app:
-        backup.app,
+    const charging =
+      Array.isArray(
+        backup.charging
+      )
+        ? backup.charging
+        : [];
 
-      version:
-        backup.version,
+    const service =
+      Array.isArray(
+        backup.service
+      )
+        ? backup.service
+        : [];
 
-      createdAt:
-        backup.createdAt,
+    const tyres =
+      Array.isArray(
+        backup.tyres
+      )
+        ? backup.tyres
+        : [];
 
-      charging:
-        Array.isArray(
-          backup.charging
-        )
-          ? backup.charging
-          : [],
+    const documents =
+      Array.isArray(
+        backup.documents
+      )
+        ? backup.documents
+        : [];
 
-      service:
-        Array.isArray(
-          backup.service
-        )
-          ? backup.service
-          : [],
+    const insurance =
+      Array.isArray(
+        backup.insurance
+      )
+        ? backup.insurance
+        : [];
 
-      tyres:
-        Array.isArray(
-          backup.tyres
-        )
-          ? backup.tyres
-          : [],
-
-      documents:
-        Array.isArray(
-          backup.documents
-        )
-          ? backup.documents
-          : [],
-
-      insurance:
-        Array.isArray(
-          backup.insurance
-        )
-          ? backup.insurance
-          : [],
-    };
-
-    const normalizedJson =
-      JSON.stringify(
-        normalizedBackup,
-        null,
-        2
-      );
-
-    /*
-     * Calculate the hash of the selected file.
-     */
-
-    const backupHash =
-      await createBackupHash(
-        normalizedJson
-      );
-
-    /*
-     * ==========================================================
-     * VERIFY BACKUP OWNERSHIP
-     * ==========================================================
-     *
-     * This happens BEFORE any restore operation.
-     */
-
-    const {
-      data:
-        isOwner,
-      error:
-        verifyError,
-    } =
-      await supabase.rpc(
-        "verify_backup_owner",
-        {
-          p_backup_hash:
-            backupHash,
-        }
-      );
-
-    if (verifyError) {
-      console.error(
-        "Backup ownership verification error:",
-        verifyError
-      );
-
-      throw new Error(
-        verifyError.message ||
-          "Unable to verify backup ownership."
-      );
-    }
-
-    if (
-      isOwner !== true
-    ) {
-      throw new Error(
-        "This backup belongs to another EV Toolkit account and cannot be restored here."
-      );
-    }
-
-    /*
-     * ==========================================================
-     * CONFIRM RESTORE
-     * ==========================================================
-     */
+    // ============================================================
+    // Confirm restore
+    // ============================================================
 
     const confirmed =
       window.confirm(
-        "Restore this backup?\n\n" +
+        "Merge this backup with your existing data?\n\n" +
           "• Existing records will be kept.\n" +
           "• New records will be imported.\n" +
           "• Duplicate records will be skipped."
@@ -437,37 +190,39 @@ export async function restoreBackup(
       return;
     }
 
-    /*
-     * ==========================================================
-     * PREPARE BACKUP DATA
-     * ==========================================================
-     */
-
-    const charging =
-      normalizedBackup.charging;
-
-    const service =
-      normalizedBackup.service;
-
-    const tyres =
-      normalizedBackup.tyres;
-
-    const documents =
-      normalizedBackup.documents;
-
-    const insurance =
-      normalizedBackup.insurance;
-
-    /*
-     * Charging
-     */
+    // ============================================================
+    // Charging
+    // ============================================================
 
     const mappedCharging =
-      charging;
+      charging.map(
+        (r: any) => ({
+          vehicle:
+            r.vehicle,
 
-    /*
-     * Service History
-     */
+          charger:
+            r.charger,
+
+          station:
+            r.station,
+
+          energy:
+            r.energy,
+
+          cost:
+            r.cost,
+
+          date:
+            r.date,
+
+          invoice:
+            r.invoice ?? "",
+        })
+      );
+
+    // ============================================================
+    // Service History
+    // ============================================================
 
     const mappedService =
       service.map(
@@ -502,9 +257,9 @@ export async function restoreBackup(
         })
       );
 
-    /*
-     * Tyres
-     */
+    // ============================================================
+    // Tyres
+    // ============================================================
 
     const mappedTyres =
       tyres.map(
@@ -547,9 +302,9 @@ export async function restoreBackup(
         })
       );
 
-    /*
-     * Documents
-     */
+    // ============================================================
+    // Documents
+    // ============================================================
 
     const mappedDocuments =
       documents.map(
@@ -575,9 +330,9 @@ export async function restoreBackup(
         })
       );
 
-    /*
-     * Insurance
-     */
+    // ============================================================
+    // Insurance
+    // ============================================================
 
     const mappedInsurance =
       insurance.map(
@@ -623,19 +378,13 @@ export async function restoreBackup(
         })
       );
 
-    /*
-     * ==========================================================
-     * RESTORE INTO CURRENT USER ACCOUNT
-     * ==========================================================
-     *
-     * restore_backup() uses auth.uid() internally.
-     *
-     * We do NOT pass user_id from the backup.
-     */
+    // ============================================================
+    // Restore through Supabase
+    // ============================================================
 
     const {
-      error:
-        restoreError,
+      data,
+      error,
     } =
       await supabase.rpc(
         "restore_backup",
@@ -657,27 +406,144 @@ export async function restoreBackup(
         }
       );
 
-    if (restoreError) {
+    // ============================================================
+    // Handle Supabase error
+    // ============================================================
+
+    if (error) {
       console.error(
         "restore_backup RPC error:",
-        restoreError
+        error
       );
 
       throw new Error(
         `Restore failed: ${
-          restoreError.message ||
+          error.message ||
           "Supabase could not restore the backup."
         }`
       );
     }
 
-    /*
-     * Success
-     */
+    // ============================================================
+    // Validate RPC response
+    // ============================================================
 
-    alert(
-      "Backup restored successfully."
-    );
+    if (
+      !data ||
+      typeof data !== "object"
+    ) {
+      throw new Error(
+        "Restore completed but the server returned an invalid restore summary."
+      );
+    }
+
+    // ============================================================
+    // Extract statistics
+    // ============================================================
+
+    const result = data as {
+      charging?: {
+        total?: number;
+        inserted?: number;
+        skipped?: number;
+      };
+
+      service?: {
+        total?: number;
+        inserted?: number;
+        skipped?: number;
+      };
+
+      tyres?: {
+        total?: number;
+        inserted?: number;
+        skipped?: number;
+      };
+
+      documents?: {
+        total?: number;
+        inserted?: number;
+        skipped?: number;
+      };
+
+      insurance?: {
+        total?: number;
+        inserted?: number;
+        skipped?: number;
+      };
+
+      summary?: {
+        total?: number;
+        inserted?: number;
+        skipped?: number;
+      };
+    };
+
+    const chargingInserted =
+      result.charging?.inserted ?? 0;
+
+    const chargingSkipped =
+      result.charging?.skipped ?? 0;
+
+    const serviceInserted =
+      result.service?.inserted ?? 0;
+
+    const serviceSkipped =
+      result.service?.skipped ?? 0;
+
+    const tyresInserted =
+      result.tyres?.inserted ?? 0;
+
+    const tyresSkipped =
+      result.tyres?.skipped ?? 0;
+
+    const documentsInserted =
+      result.documents?.inserted ?? 0;
+
+    const documentsSkipped =
+      result.documents?.skipped ?? 0;
+
+    const insuranceInserted =
+      result.insurance?.inserted ?? 0;
+
+    const insuranceSkipped =
+      result.insurance?.skipped ?? 0;
+
+    const totalInserted =
+      result.summary?.inserted ??
+      chargingInserted +
+        serviceInserted +
+        tyresInserted +
+        documentsInserted +
+        insuranceInserted;
+
+    const totalSkipped =
+      result.summary?.skipped ??
+      chargingSkipped +
+        serviceSkipped +
+        tyresSkipped +
+        documentsSkipped +
+        insuranceSkipped;
+
+    // ============================================================
+    // Build restore summary
+    // ============================================================
+
+    const summary =
+      [
+        "Backup restore completed.",
+        "",
+        `Charging: ${chargingInserted} imported, ${chargingSkipped} skipped`,
+        `Service: ${serviceInserted} imported, ${serviceSkipped} skipped`,
+        `Tyres: ${tyresInserted} imported, ${tyresSkipped} skipped`,
+        `Documents: ${documentsInserted} imported, ${documentsSkipped} skipped`,
+        `Insurance: ${insuranceInserted} imported, ${insuranceSkipped} skipped`,
+        "",
+        `Total imported: ${totalInserted}`,
+        `Total skipped: ${totalSkipped}`,
+      ].join("\n");
+
+    alert(summary);
 
     window.location.reload();
   } catch (err: any) {
