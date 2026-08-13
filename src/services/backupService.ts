@@ -34,22 +34,29 @@ export async function createBackup() {
       insurance,
     };
 
-    const json = JSON.stringify(backup, null, 2);
+    const json = JSON.stringify(
+      backup,
+      null,
+      2
+    );
 
     const blob = new Blob([json], {
       type: "application/json",
     });
 
-    const url = URL.createObjectURL(blob);
+    const url =
+      URL.createObjectURL(blob);
 
-    const a = document.createElement("a");
+    const a =
+      document.createElement("a");
 
     const today = new Date()
       .toISOString()
       .split("T")[0];
 
     a.href = url;
-    a.download = `EVToolkit_Backup_${today}.json`;
+    a.download =
+      `EVToolkit_Backup_${today}.json`;
 
     document.body.appendChild(a);
 
@@ -59,100 +66,413 @@ export async function createBackup() {
 
     URL.revokeObjectURL(url);
 
-    alert("Backup created successfully.");
-  } catch (err) {
-    console.error(err);
-    alert("Failed to create backup.");
+    alert(
+      "Backup created successfully."
+    );
+  } catch (err: any) {
+    console.error(
+      "Backup creation error:",
+      err
+    );
+
+    alert(
+      err?.message ||
+        "Failed to create backup."
+    );
   }
 }
 
-export async function restoreBackup(file: File) {
-  const text = await file.text();
+export async function restoreBackup(
+  file: File
+) {
+  try {
+    /*
+     * ------------------------------------------------------------
+     * Read backup file
+     * ------------------------------------------------------------
+     */
 
-  const backup = JSON.parse(text);
+    const text =
+      await file.text();
 
-  if (backup.app !== "EV Toolkit") {
-    throw new Error("Invalid backup file.");
+    let backup: any;
+
+    try {
+      backup =
+        JSON.parse(text);
+    } catch {
+      throw new Error(
+        "The selected file is not valid JSON."
+      );
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * Validate backup
+     * ------------------------------------------------------------
+     */
+
+    if (
+      !backup ||
+      typeof backup !== "object"
+    ) {
+      throw new Error(
+        "Invalid backup file."
+      );
+    }
+
+    if (
+      backup.app !==
+      "EV Toolkit"
+    ) {
+      throw new Error(
+        "Invalid backup file. This file was not created by EV Toolkit."
+      );
+    }
+
+    if (
+      backup.version !== 1
+    ) {
+      throw new Error(
+        "Unsupported backup version."
+      );
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * Validate backup sections
+     * ------------------------------------------------------------
+     */
+
+    const charging =
+      Array.isArray(
+        backup.charging
+      )
+        ? backup.charging
+        : [];
+
+    const service =
+      Array.isArray(
+        backup.service
+      )
+        ? backup.service
+        : [];
+
+    const tyres =
+      Array.isArray(
+        backup.tyres
+      )
+        ? backup.tyres
+        : [];
+
+    const documents =
+      Array.isArray(
+        backup.documents
+      )
+        ? backup.documents
+        : [];
+
+    const insurance =
+      Array.isArray(
+        backup.insurance
+      )
+        ? backup.insurance
+        : [];
+
+    /*
+     * ------------------------------------------------------------
+     * Confirm restore
+     * ------------------------------------------------------------
+     */
+
+    const confirmed =
+      window.confirm(
+        "Merge this backup with your existing data?\n\n" +
+          "• Existing records will be kept.\n" +
+          "• New records will be imported.\n" +
+          "• Duplicate records will be skipped."
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * Map Charging Sessions
+     * ------------------------------------------------------------
+     */
+
+    const mappedCharging =
+      charging.map(
+        (r: any) => ({
+          vehicle:
+            r.vehicle,
+          charger:
+            r.charger,
+          station:
+            r.station,
+          energy:
+            r.energy,
+          cost:
+            r.cost,
+          date:
+            r.date,
+        })
+      );
+
+    /*
+     * ------------------------------------------------------------
+     * Map Service History
+     * ------------------------------------------------------------
+     */
+
+    const mappedService =
+      service.map(
+        (r: any) => ({
+          vehicle:
+            r.vehicle,
+
+          service_date:
+            r.service_date ??
+            r.date,
+
+          odometer:
+            r.odometer,
+
+          service_type:
+            r.service_type ??
+            r.serviceType,
+
+          workshop:
+            r.workshop ??
+            r.serviceCenter,
+
+          cost:
+            r.cost ??
+            r.amount,
+
+          notes:
+            r.notes ?? "",
+
+          attachment:
+            r.attachment ?? "",
+        })
+      );
+
+    /*
+     * ------------------------------------------------------------
+     * Map Tyres
+     * ------------------------------------------------------------
+     */
+
+    const mappedTyres =
+      tyres.map(
+        (r: any) => ({
+          brand:
+            r.brand,
+
+          model:
+            r.model,
+
+          size:
+            r.size,
+
+          purchase_date:
+            r.purchase_date ??
+            r.purchaseDate,
+
+          install_date:
+            r.install_date ??
+            r.installDate,
+
+          odometer:
+            r.odometer,
+
+          cost:
+            r.cost,
+
+          dealer:
+            r.dealer,
+
+          warranty_months:
+            r.warranty_months ??
+            r.warrantyMonths,
+
+          receipt:
+            r.receipt ?? "",
+
+          notes:
+            r.notes ?? "",
+        })
+      );
+
+    /*
+     * ------------------------------------------------------------
+     * Map Documents
+     * ------------------------------------------------------------
+     */
+
+    const mappedDocuments =
+      documents.map(
+        (r: any) => ({
+          title:
+            r.title,
+
+          category:
+            r.category,
+
+          vehicle:
+            r.vehicle,
+
+          document_date:
+            r.document_date ??
+            r.documentDate,
+
+          file:
+            r.file,
+
+          notes:
+            r.notes ?? "",
+        })
+      );
+
+    /*
+     * ------------------------------------------------------------
+     * Map Insurance
+     * ------------------------------------------------------------
+     */
+
+    const mappedInsurance =
+      insurance.map(
+        (p: any) => ({
+          vehicle:
+            p.vehicle,
+
+          company:
+            p.company,
+
+          policy_number:
+            p.policy_number ??
+            p.policyNumber,
+
+          policy_type:
+            p.policy_type ??
+            p.policyType,
+
+          start_date:
+            p.start_date ??
+            p.startDate,
+
+          expiry_date:
+            p.expiry_date ??
+            p.expiryDate,
+
+          premium:
+            p.premium,
+
+          idv:
+            p.idv,
+
+          ncb:
+            p.ncb,
+
+          addons:
+            p.addons,
+
+          agent:
+            p.agent,
+
+          contact_number:
+            p.contact_number ??
+            p.contactNumber,
+
+          claim_number:
+            p.claim_number ??
+            p.claimNumber,
+
+          claim_status:
+            p.claim_status ??
+            p.claimStatus,
+
+          notes:
+            p.notes ?? "",
+
+          attachment:
+            p.attachment ?? "",
+        })
+      );
+
+    /*
+     * ------------------------------------------------------------
+     * Restore through Supabase
+     * ------------------------------------------------------------
+     *
+     * The database function uses auth.uid()
+     * for user_id. We deliberately do NOT send
+     * user_id from the backup file.
+     */
+
+    const {
+      error,
+    } =
+      await supabase.rpc(
+        "restore_backup",
+        {
+          charging:
+            mappedCharging,
+
+          service:
+            mappedService,
+
+          tyres:
+            mappedTyres,
+
+          documents:
+            mappedDocuments,
+
+          insurance:
+            mappedInsurance,
+        }
+      );
+
+    /*
+     * ------------------------------------------------------------
+     * Handle Supabase error
+     * ------------------------------------------------------------
+     */
+
+    if (error) {
+      console.error(
+        "restore_backup RPC error:",
+        error
+      );
+
+      throw new Error(
+        `Restore failed: ${
+          error.message ||
+          "Supabase could not restore the backup."
+        }`
+      );
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * Success
+     * ------------------------------------------------------------
+     */
+
+    alert(
+      "Backup restored successfully."
+    );
+
+    window.location.reload();
+  } catch (err: any) {
+    console.error(
+      "Backup restore error:",
+      err
+    );
+
+    throw err;
   }
-
-  if (backup.version !== 1) {
-    throw new Error("Unsupported backup version.");
-  }
-
-  const confirmed = window.confirm(
-    "Merge this backup with your existing data?\n\n" +
-      "• Existing records will be kept.\n" +
-      "• New records will be imported.\n" +
-      "• Duplicate records will be skipped."
-  );
-
-  if (!confirmed) return;
-
-  const mappedCharging = backup.charging ?? [];
-
-  const mappedService = (backup.service ?? []).map((r: any) => ({
-    vehicle: r.vehicle,
-    service_date: r.date,
-    odometer: r.odometer,
-    service_type: r.serviceType,
-    workshop: r.serviceCenter,
-    cost: r.amount,
-    notes: r.notes ?? "",
-    attachment: r.attachment ?? "",
-  }));
-
-  const mappedTyres = (backup.tyres ?? []).map((r: any) => ({
-    brand: r.brand,
-    model: r.model,
-    size: r.size,
-    purchase_date: r.purchaseDate,
-    install_date: r.installDate,
-    odometer: r.odometer,
-    cost: r.cost,
-    dealer: r.dealer,
-    warranty_months: r.warrantyMonths,
-    receipt: r.receipt ?? "",
-    notes: r.notes ?? "",
-  }));
-
-  const mappedDocuments = (backup.documents ?? []).map((r: any) => ({
-    title: r.title,
-    category: r.category,
-    vehicle: r.vehicle,
-    document_date: r.documentDate,
-    file: r.file,
-    notes: r.notes ?? "",
-  }));
-
-  const mappedInsurance = (backup.insurance ?? []).map((p: any) => ({
-    vehicle: p.vehicle,
-    company: p.company,
-    policy_number: p.policy_number,
-    policy_type: p.policy_type,
-    start_date: p.start_date,
-    expiry_date: p.expiry_date,
-    premium: p.premium,
-    idv: p.idv,
-    addons: p.addons,
-    agent: p.agent,
-    contact_number: p.contact_number,
-    notes: p.notes ?? "",
-    attachment: p.attachment ?? "",
-  }));
-
-  const { error } = await supabase.rpc("restore_backup", {
-    charging: mappedCharging,
-    service: mappedService,
-    tyres: mappedTyres,
-    documents: mappedDocuments,
-    insurance: mappedInsurance,
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  alert("Backup restored successfully.");
-
-  window.location.reload();
 }
