@@ -234,7 +234,6 @@ function Planner() {
         row: any
       ): CustomVehicle => ({
         id: Number(row.id),
-        user_id: row.user_id,
         brand: row.brand,
         model: row.model,
         year: new Date(

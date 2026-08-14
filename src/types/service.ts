@@ -1,5 +1,6 @@
 export interface ServiceRecord {
   id: number;
+  user_id: string;
   vehicle: string;
   date: string;
   odometer: number;
@@ -9,5 +10,6 @@ export interface ServiceRecord {
   notes: string;
   attachment: string;
 }
+
 
 export const serviceHistory: ServiceRecord[] = [];
