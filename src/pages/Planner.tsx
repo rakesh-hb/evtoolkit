@@ -58,6 +58,7 @@ const DEFAULT_HOME_RATES: Record<string, number> = {
 
 interface CustomVehicle {
   id: number;
+  user_id: string;
   brand: string;
   model: string;
   year: number;
@@ -191,12 +192,11 @@ function Planner() {
         chargerResult,
       ] = await Promise.all([
         supabase
-          .from("custom_vehicles")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", {
-            ascending: true,
-          }),
+  .from("custom_vehicles")
+  .select("*")
+  .order("created_at", {
+    ascending: true,
+  }),
 
         supabase
           .from("custom_chargers")
@@ -235,6 +235,7 @@ function Planner() {
         row: any
       ): CustomVehicle => ({
         id: Number(row.id),
+        user_id: row.user_id,
         brand: row.brand,
         model: row.model,
         year: new Date(

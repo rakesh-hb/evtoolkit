@@ -1,6 +1,7 @@
 export interface TyreRecord {
   id: number;
-
+  user_id: string;
+  
   // Tyre details
   brand: string;
   model: string;

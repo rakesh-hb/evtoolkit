@@ -15,11 +15,17 @@ import {
   deleteInsurance,
 } from "../services/insuranceService";
 
+import { getCurrentUserId } from "../services/authHelper";
+
 import { vehicles } from "../data/vehicles";
+
 import ReceiptUploader from "../components/ReceiptUploader";
+
 
 const emptyPolicy: InsuranceRecord = {
   id: 0,
+
+  user_id: "",
 
   vehicle: "",
 
@@ -27,7 +33,8 @@ const emptyPolicy: InsuranceRecord = {
 
   policy_number: "",
 
-  policy_type: "Comprehensive",
+  policy_type:
+    "Comprehensive",
 
   start_date: "",
 
@@ -48,61 +55,119 @@ const emptyPolicy: InsuranceRecord = {
   attachment: "",
 };
 
+
 export default function Insurance() {
   const [records, setRecords] =
     useState<InsuranceRecord[]>(
       []
     );
 
+
+  const [
+    currentUserId,
+    setCurrentUserId,
+  ] = useState<string | null>(
+    null
+  );
+
+
   const [form, setForm] =
     useState<InsuranceRecord>(
       emptyPolicy
     );
 
-  const [editingId, setEditingId] =
-    useState<number | null>(
-      null
-    );
+
+  const [
+    editingId,
+    setEditingId,
+  ] = useState<number | null>(
+    null
+  );
+
 
   const [search, setSearch] =
     useState("");
 
+
   /*
-   * Return today's date using the
-   * user's local timezone.
+   * =========================================================
+   * DATE
+   * =========================================================
    */
+
   function getTodayLocalDate() {
-    const today = new Date();
+    const today =
+      new Date();
 
     const year =
       today.getFullYear();
 
-    const month = String(
-      today.getMonth() + 1
-    ).padStart(2, "0");
+    const month =
+      String(
+        today.getMonth() + 1
+      ).padStart(2, "0");
 
-    const day = String(
-      today.getDate()
-    ).padStart(2, "0");
+    const day =
+      String(
+        today.getDate()
+      ).padStart(2, "0");
 
     return `${year}-${month}-${day}`;
   }
 
+
   const today =
     getTodayLocalDate();
 
+
+  /*
+   * =========================================================
+   * LOAD USER + POLICIES
+   * =========================================================
+   */
+
   useEffect(() => {
-    loadPolicies();
+    async function initialize() {
+      try {
+        const userId =
+          await getCurrentUserId();
+
+        setCurrentUserId(
+          userId
+        );
+
+        await loadPolicies();
+
+      } catch (err) {
+        console.error(
+          "Failed to initialize insurance:",
+          err
+        );
+
+        alert(
+          "Failed to initialize insurance."
+        );
+      }
+    }
+
+
+    void initialize();
   }, []);
+
 
   async function loadPolicies() {
     try {
       const data =
         await getInsurance();
 
-      setRecords(data);
+      setRecords(
+        data
+      );
+
     } catch (err) {
-      console.error(err);
+      console.error(
+        err
+      );
 
       alert(
         "Failed to load insurance policies."
@@ -110,36 +175,61 @@ export default function Insurance() {
     }
   }
 
-  const filtered = useMemo(() => {
-    const text =
-      search.toLowerCase();
 
-    return records.filter(
-      (r) =>
-        r.vehicle
-          .toLowerCase()
-          .includes(text) ||
-        r.company
-          .toLowerCase()
-          .includes(text) ||
-        r.policy_number
-          .toLowerCase()
-          .includes(text) ||
-        r.policy_type
-          .toLowerCase()
-          .includes(text) ||
-        (r.notes ?? "")
-          .toLowerCase()
-          .includes(text)
-    );
-  }, [records, search]);
+  /*
+   * =========================================================
+   * SEARCH
+   * =========================================================
+   */
+
+  const filtered =
+    useMemo(() => {
+      const text =
+        search.toLowerCase();
+
+      return records.filter(
+        (r) =>
+          r.vehicle
+            .toLowerCase()
+            .includes(text) ||
+
+          r.company
+            .toLowerCase()
+            .includes(text) ||
+
+          r.policy_number
+            .toLowerCase()
+            .includes(text) ||
+
+          r.policy_type
+            .toLowerCase()
+            .includes(text) ||
+
+          (r.notes ?? "")
+            .toLowerCase()
+            .includes(text)
+      );
+    }, [
+      records,
+      search,
+    ]);
+
+
+  /*
+   * =========================================================
+   * KPI
+   * =========================================================
+   */
 
   const totalPremium =
     filtered.reduce(
       (sum, r) =>
-        sum + r.premium,
+        sum + Number(
+          r.premium ?? 0
+        ),
       0
     );
+
 
   const activePolicies =
     filtered.filter(
@@ -148,6 +238,13 @@ export default function Insurance() {
           r.expiry_date
         ) >= new Date()
     ).length;
+
+
+  /*
+   * =========================================================
+   * STATUS
+   * =========================================================
+   */
 
   function getStatus(
     expiry: string
@@ -160,13 +257,18 @@ export default function Insurance() {
 
     const diff =
       Math.ceil(
-        (expiryDate.getTime() -
-          todayDate.getTime()) /
-          (1000 *
+        (
+          expiryDate.getTime() -
+          todayDate.getTime()
+        ) /
+          (
+            1000 *
             60 *
             60 *
-            24)
+            24
+          )
       );
+
 
     if (diff < 0) {
       return {
@@ -175,6 +277,7 @@ export default function Insurance() {
       };
     }
 
+
     if (diff <= 30) {
       return {
         text: "Expiring Soon",
@@ -182,15 +285,270 @@ export default function Insurance() {
       };
     }
 
+
     return {
       text: "Active",
       color: "#16a34a",
     };
   }
 
+
+  /*
+   * =========================================================
+   * EDIT
+   * =========================================================
+   */
+
+  function handleEdit(
+    record: InsuranceRecord
+  ) {
+    /*
+     * Family members can view another
+     * user's policy but cannot edit it.
+     */
+
+    if (
+      record.user_id !==
+      currentUserId
+    ) {
+      alert(
+        "You can only edit your own insurance policies."
+      );
+
+      return;
+    }
+
+
+    setEditingId(
+      record.id
+    );
+
+
+    setForm(
+      record
+    );
+
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
+
+  /*
+   * =========================================================
+   * DELETE
+   * =========================================================
+   */
+
+  async function handleDelete(
+    record: InsuranceRecord
+  ) {
+    /*
+     * UI-side ownership check.
+     *
+     * Database RLS remains the final
+     * security boundary.
+     */
+
+    if (
+      record.user_id !==
+      currentUserId
+    ) {
+      alert(
+        "You can only delete your own insurance policies."
+      );
+
+      return;
+    }
+
+
+    if (
+      !window.confirm(
+        "Delete this insurance policy?"
+      )
+    ) {
+      return;
+    }
+
+
+    try {
+      await deleteInsurance(
+        record.id
+      );
+
+
+      await loadPolicies();
+
+
+      alert(
+        "Insurance policy deleted successfully."
+      );
+
+    } catch (err) {
+      console.error(
+        err
+      );
+
+      alert(
+        "Failed to delete insurance policy."
+      );
+    }
+  }
+
+
+  /*
+   * =========================================================
+   * SAVE / UPDATE
+   * =========================================================
+   */
+
+  async function handleSave() {
+    if (
+      !form.vehicle ||
+      !form.company ||
+      !form.policy_number ||
+      !form.start_date ||
+      !form.expiry_date
+    ) {
+      alert(
+        "Please complete all required fields."
+      );
+
+      return;
+    }
+
+
+    /*
+     * Policy start date cannot be
+     * future-dated.
+     */
+
+    if (
+      form.start_date >
+      today
+    ) {
+      alert(
+        "Policy start date cannot be in the future."
+      );
+
+      return;
+    }
+
+
+    /*
+     * Expiry can be in the future,
+     * but cannot precede start date.
+     */
+
+    if (
+      form.expiry_date <
+      form.start_date
+    ) {
+      alert(
+        "Policy expiry date cannot be before the policy start date."
+      );
+
+      return;
+    }
+
+
+    try {
+      if (
+        editingId !== null
+      ) {
+        /*
+         * Extra application-side ownership
+         * check.
+         *
+         * RLS independently enforces
+         * owner-only UPDATE.
+         */
+
+        if (
+          form.user_id !==
+          currentUserId
+        ) {
+          alert(
+            "You can only update your own insurance policies."
+          );
+
+          return;
+        }
+
+
+        await updateInsurance(
+          editingId,
+          form
+        );
+
+
+        alert(
+          "Insurance policy updated successfully."
+        );
+
+      } else {
+        /*
+         * addInsurance() assigns the
+         * authenticated user's user_id.
+         */
+
+        const {
+          id,
+          user_id,
+          ...newPolicy
+        } = form;
+
+
+        await addInsurance(
+          newPolicy as Omit<
+            InsuranceRecord,
+            "id" | "user_id"
+          >
+        );
+
+
+        alert(
+          "Insurance policy added successfully."
+        );
+      }
+
+
+      await loadPolicies();
+
+
+      setEditingId(
+        null
+      );
+
+
+      setForm(
+        emptyPolicy
+      );
+
+    } catch (err) {
+      console.error(
+        err
+      );
+
+      alert(
+        "Failed to save insurance policy."
+      );
+    }
+  }
+
+
+  /*
+   * =========================================================
+   * RENDER
+   * =========================================================
+   */
+
   return (
     <>
       <div className="welcome">
+
         <h2>
           🛡 Insurance
         </h2>
@@ -200,16 +558,25 @@ export default function Insurance() {
           renewals and policy
           documents.
         </p>
+
       </div>
 
+
+      {/* =====================================================
+          FORM
+          ===================================================== */}
+
       <div className="card">
+
         <h3>
           {editingId !== null
             ? "Edit Insurance Policy"
             : "Add Insurance Policy"}
         </h3>
 
+
         <div className="formGrid">
+
           <div>
             <label>
               Vehicle
@@ -230,6 +597,7 @@ export default function Insurance() {
                 editingId !== null
               }
             >
+
               <option value="">
                 Select Vehicle
               </option>
@@ -245,8 +613,10 @@ export default function Insurance() {
                   </option>
                 )
               )}
+
             </select>
           </div>
+
 
           <div>
             <label>
@@ -269,6 +639,7 @@ export default function Insurance() {
             />
           </div>
 
+
           <div>
             <label>
               Policy Number
@@ -290,6 +661,7 @@ export default function Insurance() {
             />
           </div>
 
+
           <div>
             <label>
               Policy Type
@@ -307,6 +679,7 @@ export default function Insurance() {
                 })
               }
             >
+
               <option>
                 Comprehensive
               </option>
@@ -322,8 +695,10 @@ export default function Insurance() {
               <option>
                 Zero Depreciation
               </option>
+
             </select>
           </div>
+
 
           <div>
             <label>
@@ -347,9 +722,12 @@ export default function Insurance() {
 
             <p
               style={{
-                fontSize: "12px",
-                color: "#6b7280",
-                marginTop: "6px",
+                fontSize:
+                  "12px",
+                color:
+                  "#6b7280",
+                marginTop:
+                  "6px",
               }}
             >
               Policy start date
@@ -357,6 +735,7 @@ export default function Insurance() {
               future.
             </p>
           </div>
+
 
           <div>
             <label>
@@ -379,15 +758,19 @@ export default function Insurance() {
 
             <p
               style={{
-                fontSize: "12px",
-                color: "#6b7280",
-                marginTop: "6px",
+                fontSize:
+                  "12px",
+                color:
+                  "#6b7280",
+                marginTop:
+                  "6px",
               }}
             >
               Future expiry dates
               are allowed.
             </p>
           </div>
+
 
           <div>
             <label>
@@ -411,6 +794,7 @@ export default function Insurance() {
             />
           </div>
 
+
           <div>
             <label>
               IDV (₹)
@@ -418,7 +802,9 @@ export default function Insurance() {
 
             <input
               type="number"
-              value={form.idv}
+              value={
+                form.idv
+              }
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -430,6 +816,7 @@ export default function Insurance() {
               }
             />
           </div>
+
 
           <div>
             <label>
@@ -452,6 +839,7 @@ export default function Insurance() {
             />
           </div>
 
+
           <div>
             <label>
               Agent / Broker
@@ -473,6 +861,7 @@ export default function Insurance() {
             />
           </div>
 
+
           <div>
             <label>
               Contact Number
@@ -493,13 +882,20 @@ export default function Insurance() {
               placeholder="9876543210"
             />
           </div>
+
         </div>
 
-        <label>Notes</label>
+
+        <label>
+          Notes
+        </label>
+
 
         <textarea
           rows={3}
-          value={form.notes}
+          value={
+            form.notes
+          }
           onChange={(e) =>
             setForm({
               ...form,
@@ -509,11 +905,14 @@ export default function Insurance() {
           }
         />
 
+
         <br />
+
 
         <label>
           Policy Document
         </label>
+
 
         <ReceiptUploader
           value={
@@ -529,11 +928,15 @@ export default function Insurance() {
           }
         />
 
+
         <p
           style={{
-            fontSize: "12px",
-            color: "#6b7280",
-            marginTop: "6px",
+            fontSize:
+              "12px",
+            color:
+              "#6b7280",
+            marginTop:
+              "6px",
           }}
         >
           Upload your insurance
@@ -547,116 +950,42 @@ export default function Insurance() {
           .
         </p>
 
+
         <br />
+
 
         <button
           className="saveButton"
-          onClick={async () => {
-            if (
-              !form.vehicle ||
-              !form.company ||
-              !form.policy_number ||
-              !form.start_date ||
-              !form.expiry_date
-            ) {
-              alert(
-                "Please complete all required fields."
-              );
-              return;
-            }
-
-            /*
-             * Policy start date cannot
-             * be future-dated.
-             */
-            if (
-              form.start_date >
-              today
-            ) {
-              alert(
-                "Policy start date cannot be in the future."
-              );
-              return;
-            }
-
-            /*
-             * Expiry date may be future,
-             * but it cannot be before
-             * the start date.
-             */
-            if (
-              form.expiry_date <
-              form.start_date
-            ) {
-              alert(
-                "Policy expiry date cannot be before the policy start date."
-              );
-              return;
-            }
-
-            try {
-              if (
-                editingId !== null
-              ) {
-                await updateInsurance(
-                  editingId,
-                  form
-                );
-
-                alert(
-                  "Insurance policy updated successfully."
-                );
-              } else {
-                const {
-                  id,
-                  ...newPolicy
-                } = form;
-
-                await addInsurance(
-                  newPolicy as InsuranceRecord
-                );
-
-                alert(
-                  "Insurance policy added successfully."
-                );
-              }
-
-              await loadPolicies();
-
-              setEditingId(null);
-
-              setForm(
-                emptyPolicy
-              );
-            } catch (
-              err
-            ) {
-              console.error(
-                err
-              );
-
-              alert(
-                "Failed to save insurance policy."
-              );
-            }
-          }}
+          onClick={() =>
+            void handleSave()
+          }
         >
           {editingId !== null
             ? "Update Policy"
             : "Add Insurance Policy"}
         </button>
+
       </div>
 
+
+      {/* =====================================================
+          KPIs
+          ===================================================== */}
+
       <div className="kpiGrid">
+
         <div className="kpiCard">
           <h3>
             Total Policies
           </h3>
 
           <h2>
-            {filtered.length}
+            {
+              filtered.length
+            }
           </h2>
         </div>
+
 
         <div className="kpiCard">
           <h3>
@@ -664,9 +993,12 @@ export default function Insurance() {
           </h3>
 
           <h2>
-            {activePolicies}
+            {
+              activePolicies
+            }
           </h2>
         </div>
+
 
         <div className="kpiCard">
           <h3>
@@ -680,13 +1012,22 @@ export default function Insurance() {
             )}
           </h2>
         </div>
+
       </div>
 
+
+      {/* =====================================================
+          POLICY TABLE
+          ===================================================== */}
+
       <div className="card">
+
         <input
           type="text"
           placeholder="Search by company, vehicle or policy number..."
-          value={search}
+          value={
+            search
+          }
           onChange={(e) =>
             setSearch(
               e.target.value
@@ -694,57 +1035,92 @@ export default function Insurance() {
           }
         />
 
+
         <div className="tableContainer">
+
           <table className="table">
+
             <thead>
               <tr>
-                <th>#</th>
+                <th>
+                  #
+                </th>
+
                 <th>
                   Vehicle
                 </th>
+
                 <th>
                   Company
                 </th>
+
                 <th>
                   Policy No.
                 </th>
+
                 <th>
                   Expiry
                 </th>
+
                 <th>
                   Status
                 </th>
+
                 <th>
                   Premium
                 </th>
+
                 <th>
                   Document
                 </th>
+
                 <th>
                   Actions
                 </th>
               </tr>
             </thead>
 
+
             <tbody>
+
               {filtered.length ===
               0 ? (
+
                 <tr>
                   <td colSpan={9}>
                     No insurance
                     policies found.
                   </td>
                 </tr>
+
               ) : (
+
                 filtered.map(
                   (
                     record,
                     index
                   ) => {
+
                     const status =
                       getStatus(
                         record.expiry_date
                       );
+
+
+                    /*
+                     * Ownership check.
+                     *
+                     * Family records are visible,
+                     * but only their creator can
+                     * edit/delete them.
+                     */
+
+                    const isOwner =
+                      currentUserId !==
+                        null &&
+                      record.user_id ===
+                        currentUserId;
+
 
                     return (
                       <tr
@@ -752,10 +1128,13 @@ export default function Insurance() {
                           record.id
                         }
                       >
+
                         <td>
-                          {index +
-                            1}
+                          {
+                            index + 1
+                          }
                         </td>
+
 
                         <td>
                           {
@@ -763,11 +1142,13 @@ export default function Insurance() {
                           }
                         </td>
 
+
                         <td>
                           {
                             record.company
                           }
                         </td>
+
 
                         <td>
                           {
@@ -775,35 +1156,47 @@ export default function Insurance() {
                           }
                         </td>
 
+
                         <td>
                           {
                             record.expiry_date
                           }
                         </td>
 
+
                         <td>
+
                           <span
                             style={{
                               color:
                                 status.color,
-                              fontWeight: 600,
+                              fontWeight:
+                                600,
                             }}
                           >
                             {
                               status.text
                             }
                           </span>
+
                         </td>
+
 
                         <td>
                           ₹{" "}
-                          {record.premium.toLocaleString(
+                          {Number(
+                            record.premium ??
+                              0
+                          ).toLocaleString(
                             "en-IN"
                           )}
                         </td>
 
+
                         <td>
+
                           {record.attachment ? (
+
                             <a
                               href={
                                 record.attachment
@@ -814,82 +1207,75 @@ export default function Insurance() {
                               ⬇
                               Download
                             </a>
+
                           ) : (
                             "-"
                           )}
+
                         </td>
+
 
                         <td>
-                          <div className="actionButtons">
-                            <button
-                              className="editButton"
-                              onClick={() => {
-                                setEditingId(
-                                  record.id
-                                );
 
-                                setForm(
-                                  record
-                                );
+                          {isOwner ? (
 
-                                window.scrollTo(
-                                  {
-                                    top: 0,
-                                    behavior:
-                                      "smooth",
-                                  }
-                                );
-                              }}
-                            >
-                              Edit
-                            </button>
+                            <div className="actionButtons">
 
-                            <button
-                              className="deleteButton"
-                              onClick={async () => {
-                                if (
-                                  !window.confirm(
-                                    "Delete this insurance policy?"
+                              <button
+                                className="editButton"
+                                onClick={() =>
+                                  handleEdit(
+                                    record
                                   )
-                                ) {
-                                  return;
                                 }
+                              >
+                                Edit
+                              </button>
 
-                                try {
-                                  await deleteInsurance(
-                                    record.id
-                                  );
 
-                                  await loadPolicies();
-
-                                  alert(
-                                    "Insurance policy deleted successfully."
-                                  );
-                                } catch (
-                                  err
-                                ) {
-                                  console.error(
-                                    err
-                                  );
-
-                                  alert(
-                                    "Failed to delete insurance policy."
-                                  );
+                              <button
+                                className="deleteButton"
+                                onClick={() =>
+                                  void handleDelete(
+                                    record
+                                  )
                                 }
+                              >
+                                Delete
+                              </button>
+
+                            </div>
+
+                          ) : (
+
+                            <span
+                              style={{
+                                color:
+                                  "#6b7280",
+                                fontSize:
+                                  "13px",
                               }}
                             >
-                              Delete
-                            </button>
-                          </div>
+                              View only
+                            </span>
+
+                          )}
+
                         </td>
+
                       </tr>
                     );
                   }
                 )
+
               )}
+
             </tbody>
+
           </table>
+
         </div>
+
       </div>
     </>
   );

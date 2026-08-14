@@ -1,5 +1,6 @@
 export interface DocumentRecord {
     id: number;
+    user_id: string;
     title: string;
     category: string;
     vehicle: string;

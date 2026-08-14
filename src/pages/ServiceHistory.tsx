@@ -1,5 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
-import type { ServiceRecord } from "../types/service";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import type {
+  ServiceRecord,
+} from "../types/service";
 
 import {
   getServiceRecords,
@@ -8,8 +15,12 @@ import {
   deleteServiceRecord,
 } from "../services/serviceHistoryService";
 
+import { getCurrentUserId } from "../services/authHelper";
+
 import { vehicles } from "../data/vehicles";
+
 import ReceiptUploader from "../components/ReceiptUploader";
+
 
 const emptyRecord: ServiceRecord = {
   id: 0,
@@ -23,45 +34,104 @@ const emptyRecord: ServiceRecord = {
   attachment: "",
 };
 
+
 export default function ServiceHistory() {
   const [records, setRecords] =
     useState<ServiceRecord[]>([]);
 
+
+  /*
+   * ID of the currently authenticated
+   * Supabase user.
+   *
+   * Used by the UI only to determine
+   * whether Edit/Delete should be shown.
+   *
+   * RLS remains the real security boundary.
+   */
+  const [currentUserId, setCurrentUserId] =
+    useState<string | null>(null);
+
+
   const [form, setForm] =
-    useState<ServiceRecord>(emptyRecord);
+    useState<ServiceRecord>(
+      emptyRecord
+    );
+
 
   const [search, setSearch] =
     useState("");
 
+
   const [editingId, setEditingId] =
     useState<number | null>(null);
 
+
   function getTodayLocalDate() {
-    const today = new Date();
+    const today =
+      new Date();
 
     const year =
       today.getFullYear();
 
-    const month = String(
-      today.getMonth() + 1
-    ).padStart(2, "0");
+    const month =
+      String(
+        today.getMonth() + 1
+      ).padStart(2, "0");
 
-    const day = String(
-      today.getDate()
-    ).padStart(2, "0");
+    const day =
+      String(
+        today.getDate()
+      ).padStart(2, "0");
 
     return `${year}-${month}-${day}`;
   }
 
+
   const today =
     getTodayLocalDate();
+
+
+  /*
+   * ============================================================
+   * LOAD CURRENT USER + SERVICE RECORDS
+   * ============================================================
+   */
+
+  async function initialize() {
+    try {
+      const userId =
+        await getCurrentUserId();
+
+      setCurrentUserId(
+        userId
+      );
+
+      await loadRecords();
+
+    } catch (err: any) {
+      console.error(
+        "Failed to initialize service history:",
+        err
+      );
+
+      alert(
+        err?.message ||
+          "Failed to initialize Service History."
+      );
+    }
+  }
+
 
   async function loadRecords() {
     try {
       const data =
         await getServiceRecords();
 
-      setRecords(data);
+      setRecords(
+        data
+      );
+
     } catch (err: any) {
       console.error(
         "Failed to load service history:",
@@ -73,10 +143,14 @@ export default function ServiceHistory() {
       alert(
         JSON.stringify(
           {
-            message: err?.message,
-            details: err?.details,
-            hint: err?.hint,
-            code: err?.code,
+            message:
+              err?.message,
+            details:
+              err?.details,
+            hint:
+              err?.hint,
+            code:
+              err?.code,
           },
           null,
           2
@@ -85,44 +159,273 @@ export default function ServiceHistory() {
     }
   }
 
+
   useEffect(() => {
-    loadRecords();
+    void initialize();
   }, []);
 
-  const filtered = useMemo(() => {
-    const text =
-      search.toLowerCase();
 
-    return records.filter(
-      (r) =>
-        r.serviceType
-          .toLowerCase()
-          .includes(text) ||
-        r.serviceCenter
-          .toLowerCase()
-          .includes(text) ||
-        (r.notes ?? "")
-          .toLowerCase()
-          .includes(text)
-    );
-  }, [records, search]);
+  /*
+   * ============================================================
+   * SEARCH
+   * ============================================================
+   */
+
+  const filtered =
+    useMemo(() => {
+      const text =
+        search.toLowerCase();
+
+      return records.filter(
+        (r) =>
+          r.serviceType
+            .toLowerCase()
+            .includes(text) ||
+          r.serviceCenter
+            .toLowerCase()
+            .includes(text) ||
+          (r.notes ?? "")
+            .toLowerCase()
+            .includes(text)
+      );
+    }, [
+      records,
+      search,
+    ]);
+
 
   const totalCost =
     filtered.reduce(
-      (sum, r) => sum + r.amount,
+      (sum, r) =>
+        sum + r.amount,
       0
     );
+
+
+  /*
+   * ============================================================
+   * SAVE / UPDATE
+   * ============================================================
+   */
+
+  async function handleSave() {
+    if (
+      !form.vehicle ||
+      !form.date ||
+      !form.serviceType ||
+      !form.serviceCenter
+    ) {
+      alert(
+        "Please complete all required fields."
+      );
+
+      return;
+    }
+
+
+    if (
+      form.date > today
+    ) {
+      alert(
+        "Service date cannot be in the future."
+      );
+
+      return;
+    }
+
+
+    try {
+      if (
+        editingId !== null
+      ) {
+        /*
+         * RLS ensures that only the
+         * owner of this record can
+         * actually update it.
+         */
+        await updateServiceRecord({
+          ...form,
+          id: editingId,
+        });
+
+        alert(
+          "Service updated successfully."
+        );
+
+      } else {
+        const {
+          id,
+          ...newRecord
+        } = form;
+
+        await addServiceRecord(
+          newRecord
+        );
+
+        alert(
+          "Service record added successfully."
+        );
+      }
+
+
+      await loadRecords();
+
+
+      setEditingId(
+        null
+      );
+
+      setForm(
+        emptyRecord
+      );
+
+    } catch (
+      error: any
+    ) {
+      console.error(
+        "Supabase error:",
+        error
+      );
+
+      alert(
+        error?.message ||
+          error?.details ||
+          error?.hint ||
+          JSON.stringify(
+            error
+          )
+      );
+    }
+  }
+
+
+  /*
+   * ============================================================
+   * DELETE
+   * ============================================================
+   */
+
+  async function handleDelete(
+    record: ServiceRecord
+  ) {
+    /*
+     * UI-side ownership check.
+     *
+     * The database RLS provides
+     * the actual security enforcement.
+     */
+    if (
+      record.user_id !==
+      currentUserId
+    ) {
+      alert(
+        "You can only delete your own service records."
+      );
+
+      return;
+    }
+
+
+    if (
+      !window.confirm(
+        "Delete this service record?"
+      )
+    ) {
+      return;
+    }
+
+
+    try {
+      await deleteServiceRecord(
+        record.id
+      );
+
+      await loadRecords();
+
+
+      alert(
+        "Service record deleted successfully."
+      );
+
+    } catch (
+      error
+    ) {
+      console.error(
+        error
+      );
+
+      alert(
+        "Failed to delete service record."
+      );
+    }
+  }
+
+
+  /*
+   * ============================================================
+   * START EDIT
+   * ============================================================
+   */
+
+  function handleEdit(
+    record: ServiceRecord
+  ) {
+    /*
+     * Family members can see
+     * another user's record, but
+     * cannot edit it.
+     */
+    if (
+      record.user_id !==
+      currentUserId
+    ) {
+      alert(
+        "You can only edit your own service records."
+      );
+
+      return;
+    }
+
+
+    setEditingId(
+      record.id
+    );
+
+    setForm(
+      record
+    );
+
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
+
+  /*
+   * ============================================================
+   * RENDER
+   * ============================================================
+   */
 
   return (
     <>
       <div className="welcome">
-        <h2>🔧 Service History</h2>
+        <h2>
+          🔧 Service History
+        </h2>
 
         <p>
-          Track maintenance and servicing
-          of your EV.
+          Track maintenance and
+          servicing of your EV.
         </p>
       </div>
+
+
+      {/* ======================================================
+          ADD / EDIT SERVICE
+          ====================================================== */}
 
       <div className="card">
         <h3>
@@ -131,39 +434,54 @@ export default function ServiceHistory() {
             : "Add Service Record"}
         </h3>
 
+
         <div className="formGrid">
+
           <div>
-            <label>Date</label>
+            <label>
+              Date
+            </label>
 
             <input
               type="date"
-              value={form.date}
+              value={
+                form.date
+              }
               max={today}
               onChange={(e) =>
                 setForm({
                   ...form,
-                  date: e.target.value,
+                  date:
+                    e.target.value,
                 })
               }
             />
 
             <p
               style={{
-                fontSize: "12px",
-                color: "#6b7280",
-                marginTop: "6px",
+                fontSize:
+                  "12px",
+                color:
+                  "#6b7280",
+                marginTop:
+                  "6px",
               }}
             >
-              Service date cannot be in
-              the future.
+              Service date cannot
+              be in the future.
             </p>
           </div>
 
+
           <div>
-            <label>Vehicle</label>
+            <label>
+              Vehicle
+            </label>
 
             <select
-              value={form.vehicle}
+              value={
+                form.vehicle
+              }
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -185,13 +503,18 @@ export default function ServiceHistory() {
                     key={`${vehicle.country}-${vehicle.id}`}
                     value={`${vehicle.brand} ${vehicle.model}`}
                   >
-                    {vehicle.brand}{" "}
-                    {vehicle.model}
+                    {
+                      vehicle.brand
+                    }{" "}
+                    {
+                      vehicle.model
+                    }
                   </option>
                 )
               )}
             </select>
           </div>
+
 
           <div>
             <label>
@@ -200,7 +523,9 @@ export default function ServiceHistory() {
 
             <input
               type="number"
-              value={form.odometer}
+              value={
+                form.odometer
+              }
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -212,6 +537,7 @@ export default function ServiceHistory() {
               }
             />
           </div>
+
 
           <div>
             <label>
@@ -233,35 +559,45 @@ export default function ServiceHistory() {
               <option value="">
                 Select
               </option>
+
               <option>
                 Regular Service
               </option>
+
               <option>
                 Battery Check
               </option>
+
               <option>
                 Brake Service
               </option>
+
               <option>
                 Coolant Change
               </option>
+
               <option>
                 Software Update
               </option>
+
               <option>
                 Tyre Rotation
               </option>
+
               <option>
                 Wheel Alignment
               </option>
+
               <option>
                 General Inspection
               </option>
+
               <option>
                 Other
               </option>
             </select>
           </div>
+
 
           <div>
             <label>
@@ -282,6 +618,7 @@ export default function ServiceHistory() {
             />
           </div>
 
+
           <div>
             <label>
               Amount (INR)
@@ -289,7 +626,9 @@ export default function ServiceHistory() {
 
             <input
               type="number"
-              value={form.amount}
+              value={
+                form.amount
+              }
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -301,26 +640,36 @@ export default function ServiceHistory() {
               }
             />
           </div>
+
         </div>
 
-        <label>Notes</label>
+
+        <label>
+          Notes
+        </label>
 
         <textarea
           rows={3}
-          value={form.notes}
+          value={
+            form.notes
+          }
           onChange={(e) =>
             setForm({
               ...form,
-              notes: e.target.value,
+              notes:
+                e.target.value,
             })
           }
         />
 
+
         <br />
+
 
         <label>
           Invoice / Receipt
         </label>
+
 
         <ReceiptUploader
           value={
@@ -336,11 +685,15 @@ export default function ServiceHistory() {
           }
         />
 
+
         <p
           style={{
-            fontSize: "12px",
-            color: "#6b7280",
-            marginTop: "6px",
+            fontSize:
+              "12px",
+            color:
+              "#6b7280",
+            marginTop:
+              "6px",
           }}
         >
           Supported file types:
@@ -348,91 +701,22 @@ export default function ServiceHistory() {
           document formats.
           Recommended maximum
           file size:{" "}
-          <strong>5 MB</strong>{" "}
+          <strong>
+            5 MB
+          </strong>{" "}
           per file for optimal
           performance.
         </p>
 
+
         <br />
+
 
         <button
           className="saveButton"
-          onClick={async () => {
-            if (
-              !form.vehicle ||
-              !form.date ||
-              !form.serviceType ||
-              !form.serviceCenter
-            ) {
-              alert(
-                "Please complete all required fields."
-              );
-              return;
-            }
-
-            if (
-              form.date > today
-            ) {
-              alert(
-                "Service date cannot be in the future."
-              );
-              return;
-            }
-
-            try {
-              if (
-                editingId !== null
-              ) {
-                await updateServiceRecord(
-                  {
-                    ...form,
-                    id: editingId,
-                  }
-                );
-
-                alert(
-                  "Service updated successfully."
-                );
-              } else {
-                const {
-                  id,
-                  ...newRecord
-                } = form;
-
-                await addServiceRecord(
-                  newRecord
-                );
-
-                alert(
-                  "Service record added successfully."
-                );
-              }
-
-              await loadRecords();
-
-              setEditingId(null);
-
-              setForm(
-                emptyRecord
-              );
-            } catch (
-              error: any
-            ) {
-              console.error(
-                "Supabase error:",
-                error
-              );
-
-              alert(
-                error?.message ||
-                  error?.details ||
-                  error?.hint ||
-                  JSON.stringify(
-                    error
-                  )
-              );
-            }
-          }}
+          onClick={() =>
+            void handleSave()
+          }
         >
           {editingId !== null
             ? "Update Service"
@@ -440,16 +724,25 @@ export default function ServiceHistory() {
         </button>
       </div>
 
+
+      {/* ======================================================
+          KPIs
+          ====================================================== */}
+
       <div className="kpiGrid">
+
         <div className="kpiCard">
           <h3>
             Total Services
           </h3>
 
           <h2>
-            {filtered.length}
+            {
+              filtered.length
+            }
           </h2>
         </div>
+
 
         <div className="kpiCard">
           <h3>
@@ -458,14 +751,23 @@ export default function ServiceHistory() {
 
           <h2>
             INR{" "}
-            {totalCost.toFixed(
-              2
-            )}
+            {
+              totalCost.toFixed(
+                2
+              )
+            }
           </h2>
         </div>
+
       </div>
 
+
+      {/* ======================================================
+          SERVICE HISTORY
+          ====================================================== */}
+
       <div className="card">
+
         <input
           type="text"
           placeholder="Search..."
@@ -477,148 +779,190 @@ export default function ServiceHistory() {
           }
         />
 
+
         <div className="tableContainer">
+
           <table className="table">
+
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Type</th>
-                <th>Centre</th>
-                <th>Cost</th>
-                <th>Receipt</th>
-                <th>Actions</th>
+                <th>
+                  Date
+                </th>
+
+                <th>
+                  Type
+                </th>
+
+                <th>
+                  Centre
+                </th>
+
+                <th>
+                  Cost
+                </th>
+
+                <th>
+                  Receipt
+                </th>
+
+                <th>
+                  Actions
+                </th>
               </tr>
             </thead>
 
+
             <tbody>
+
               {filtered.length ===
               0 ? (
+
                 <tr>
                   <td colSpan={6}>
                     No service
                     records found.
                   </td>
                 </tr>
+
               ) : (
+
                 filtered.map(
-                  (record) => (
-                    <tr
-                      key={
-                        record.id
-                      }
-                    >
-                      <td>
-                        {
-                          record.date
+                  (record) => {
+
+                    /*
+                     * IMPORTANT:
+                     *
+                     * Family records are visible,
+                     * but only the creator can
+                     * edit/delete them.
+                     */
+                    const isOwner =
+                      currentUserId !==
+                        null &&
+                      record.user_id ===
+                        currentUserId;
+
+
+                    return (
+                      <tr
+                        key={
+                          record.id
                         }
-                      </td>
+                      >
 
-                      <td>
-                        {
-                          record.serviceType
-                        }
-                      </td>
+                        <td>
+                          {
+                            record.date
+                          }
+                        </td>
 
-                      <td>
-                        {
-                          record.serviceCenter
-                        }
-                      </td>
 
-                      <td>
-                        INR{" "}
-                        {record.amount.toFixed(
-                          2
-                        )}
-                      </td>
+                        <td>
+                          {
+                            record.serviceType
+                          }
+                        </td>
 
-                      <td>
-                        {record.attachment ? (
-                          <a
-                            href={
-                              record.attachment
-                            }
-                            download={`${record.vehicle}-${record.serviceType}-Receipt`}
-                            className="downloadButton"
-                          >
-                            ⬇
-                            Download
-                          </a>
-                        ) : (
-                          "-"
-                        )}
-                      </td>
 
-                      <td>
-                        <div className="actionButtons">
-                          <button
-                            className="editButton"
-                            onClick={() => {
-                              setEditingId(
-                                record.id
-                              );
+                        <td>
+                          {
+                            record.serviceCenter
+                          }
+                        </td>
 
-                              setForm(
-                                record
-                              );
 
-                              window.scrollTo(
-                                {
-                                  top: 0,
-                                  behavior:
-                                    "smooth",
+                        <td>
+                          INR{" "}
+                          {
+                            record.amount.toFixed(
+                              2
+                            )
+                          }
+                        </td>
+
+
+                        <td>
+                          {record.attachment ? (
+
+                            <a
+                              href={
+                                record.attachment
+                              }
+                              download={`${record.vehicle}-${record.serviceType}-Receipt`}
+                              className="downloadButton"
+                            >
+                              ⬇
+                              Download
+                            </a>
+
+                          ) : (
+                            "-"
+                          )}
+                        </td>
+
+
+                        <td>
+
+                          {isOwner ? (
+
+                            <div className="actionButtons">
+
+                              <button
+                                className="editButton"
+                                onClick={() =>
+                                  handleEdit(
+                                    record
+                                  )
                                 }
-                              );
-                            }}
-                          >
-                            Edit
-                          </button>
+                              >
+                                Edit
+                              </button>
 
-                          <button
-                            className="deleteButton"
-                            onClick={async () => {
-                              if (
-                                !window.confirm(
-                                  "Delete this service record?"
-                                )
-                              ) {
-                                return;
-                              }
 
-                              try {
-                                await deleteServiceRecord(
-                                  record.id
-                                );
+                              <button
+                                className="deleteButton"
+                                onClick={() =>
+                                  void handleDelete(
+                                    record
+                                  )
+                                }
+                              >
+                                Delete
+                              </button>
 
-                                await loadRecords();
+                            </div>
 
-                                alert(
-                                  "Service record deleted successfully."
-                                );
-                              } catch (
-                                error
-                              ) {
-                                console.error(
-                                  error
-                                );
+                          ) : (
 
-                                alert(
-                                  "Failed to delete service record."
-                                );
-                              }
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
+                            <span
+                              style={{
+                                color:
+                                  "#6b7280",
+                                fontSize:
+                                  "13px",
+                              }}
+                            >
+                              View only
+                            </span>
+
+                          )}
+
+                        </td>
+
+                      </tr>
+                    );
+                  }
                 )
+
               )}
+
             </tbody>
+
           </table>
+
         </div>
+
       </div>
     </>
   );

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
-import { getCurrentUserId } from "../services/authHelper";
 import ReportToolbar from "../components/reports/ReportToolbar";
 
 import {
@@ -21,8 +20,10 @@ import {
   Legend,
 } from "recharts";
 
+
 interface Session {
   id: number;
+  user_id: string;
   vehicle: string;
   charger: string;
   energy: number;
@@ -31,133 +32,202 @@ interface Session {
   date: string;
 }
 
+
 interface SummaryStats {
   sessions: number;
   energy: number;
   cost: number;
 }
 
+
 function Analytics() {
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [sessions, setSessions] =
+    useState<Session[]>([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
 
   useEffect(() => {
-    loadSessions();
+    void loadSessions();
   }, []);
+
+
+  /*
+   * ============================================================
+   * LOAD FAMILY CHARGING DATA
+   * ============================================================
+   *
+   * IMPORTANT:
+   *
+   * We intentionally do NOT use:
+   *
+   *   .eq("user_id", userId)
+   *
+   * here.
+   *
+   * Supabase RLS controls which records are returned.
+   *
+   * Therefore:
+   *
+   *   Rakesh -> Rakesh + family members
+   *   Sushma -> Sushma + family members
+   *
+   * Users outside the family remain protected by RLS.
+   */
 
   async function loadSessions() {
     try {
       setLoading(true);
 
-      const userId = await getCurrentUserId();
 
-      const { data, error } = await supabase
+      const {
+        data,
+        error,
+      } = await supabase
         .from("charging_sessions")
         .select("*")
-        .eq("user_id", userId)
-        .order("date", { ascending: false });
+        .order("date", {
+          ascending: false,
+        });
+
 
       if (error) {
         throw error;
       }
 
-      const mappedSessions: Session[] = (data ?? []).map(
-        (row) => ({
-          id: row.id,
-          vehicle: row.vehicle ?? "",
-          charger: row.charger ?? "",
-          energy: Number(row.energy ?? 0),
-          cost: Number(row.cost ?? 0),
-          station: row.station ?? "",
-          date: row.date ?? "",
-        })
+
+      const mappedSessions: Session[] =
+        (data ?? []).map(
+          (row) => ({
+            id: row.id,
+
+            user_id:
+              row.user_id,
+
+            vehicle:
+              row.vehicle ?? "",
+
+            charger:
+              row.charger ?? "",
+
+            energy:
+              Number(
+                row.energy ?? 0
+              ),
+
+            cost:
+              Number(
+                row.cost ?? 0
+              ),
+
+            station:
+              row.station ?? "",
+
+            date:
+              row.date ?? "",
+          })
+        );
+
+
+      setSessions(
+        mappedSessions
       );
 
-      setSessions(mappedSessions);
     } catch (error) {
       console.error(
-        "Failed to load charging sessions:",
+        "Failed to load family charging sessions:",
         error
       );
 
       setSessions([]);
+
     } finally {
       setLoading(false);
     }
   }
 
-  if (loading) {
-    return (
-      <div className="welcome">
-        <h2>Loading analytics...</h2>
-      </div>
+
+  /*
+   * ============================================================
+   * FAMILY-WIDE SUMMARY
+   * ============================================================
+   */
+
+  const totalSessions =
+    sessions.length;
+
+
+  const totalEnergy =
+    sessions.reduce(
+      (sum, session) =>
+        sum + session.energy,
+      0
     );
-  }
 
-  const totalSessions = sessions.length;
 
-  const totalEnergy = sessions.reduce(
-    (sum, session) => sum + session.energy,
-    0
-  );
+  const totalCost =
+    sessions.reduce(
+      (sum, session) =>
+        sum + session.cost,
+      0
+    );
 
-  const totalCost = sessions.reduce(
-    (sum, session) => sum + session.cost,
-    0
-  );
 
   const averageEnergy =
     totalSessions > 0
-      ? totalEnergy / totalSessions
+      ? totalEnergy /
+        totalSessions
       : 0;
+
 
   const averageCost =
     totalSessions > 0
-      ? totalCost / totalSessions
+      ? totalCost /
+        totalSessions
       : 0;
 
-  /*
-   * Estimated Distance
-   *
-   * Uses the efficiency defined for each vehicle.
-   *
-   * Formula:
-   *
-   * distance = energy / efficiency × 100
-   *
-   * Example:
-   * 100 kWh / 10.6 kWh/100km × 100
-   * = approximately 943 km
-   *
-   * Each session is calculated using its own vehicle's
-   * efficiency, so this remains correct if multiple
-   * vehicles are added later.
-   */
 
+  /*
+   * ============================================================
+   * STATISTICS
+   * ============================================================
+   */
 
   const vehicleStats: Record<
     string,
     SummaryStats
   > = {};
 
+
   const stationStats: Record<
     string,
     SummaryStats
   > = {};
+
 
   const monthlyStats: Record<
     string,
     SummaryStats
   > = {};
 
+
   const yearlyStats: Record<
     string,
     SummaryStats
   > = {};
 
-  const chargerStats: Record<string, number> = {};
 
-  const weeklyStats: Record<string, number> = {
+  const chargerStats: Record<
+    string,
+    number
+  > = {};
+
+
+  const weeklyStats: Record<
+    string,
+    number
+  > = {
     Sunday: 0,
     Monday: 0,
     Tuesday: 0,
@@ -167,136 +237,286 @@ function Analytics() {
     Saturday: 0,
   };
 
-  sessions.forEach((session) => {
-    // --------------------------------------------------
-    // Vehicle
-    // --------------------------------------------------
 
-    if (!vehicleStats[session.vehicle]) {
-      vehicleStats[session.vehicle] = {
-        sessions: 0,
-        energy: 0,
-        cost: 0,
-      };
-    }
+  sessions.forEach(
+    (session) => {
 
-    vehicleStats[session.vehicle].sessions++;
-    vehicleStats[session.vehicle].energy +=
-      session.energy;
-    vehicleStats[session.vehicle].cost +=
-      session.cost;
+      /*
+       * ========================================================
+       * VEHICLE
+       * ========================================================
+       */
 
-    // --------------------------------------------------
-    // Station
-    // --------------------------------------------------
-
-    const station =
-      session.station || "Home";
-
-    if (!stationStats[station]) {
-      stationStats[station] = {
-        sessions: 0,
-        energy: 0,
-        cost: 0,
-      };
-    }
-
-    stationStats[station].sessions++;
-    stationStats[station].energy +=
-      session.energy;
-    stationStats[station].cost +=
-      session.cost;
-
-    // --------------------------------------------------
-    // Charger
-    // --------------------------------------------------
-
-    chargerStats[session.charger] =
-      (chargerStats[session.charger] || 0) + 1;
-
-    // --------------------------------------------------
-    // Date
-    // --------------------------------------------------
-
-    if (session.date) {
-      const date = new Date(session.date);
-
-      const month = date.toLocaleString(
-        "default",
-        {
-          month: "long",
-          year: "numeric",
-        }
-      );
-
-      const year =
-        date.getFullYear().toString();
-
-      const weekday = date.toLocaleString(
-        "default",
-        {
-          weekday: "long",
-        }
-      );
-
-      if (!monthlyStats[month]) {
-        monthlyStats[month] = {
+      if (
+        !vehicleStats[
+          session.vehicle
+        ]
+      ) {
+        vehicleStats[
+          session.vehicle
+        ] = {
           sessions: 0,
           energy: 0,
           cost: 0,
         };
       }
 
-      monthlyStats[month].sessions++;
-      monthlyStats[month].energy +=
+
+      vehicleStats[
+        session.vehicle
+      ].sessions++;
+
+
+      vehicleStats[
+        session.vehicle
+      ].energy +=
         session.energy;
-      monthlyStats[month].cost +=
+
+
+      vehicleStats[
+        session.vehicle
+      ].cost +=
         session.cost;
 
-      if (!yearlyStats[year]) {
-        yearlyStats[year] = {
+
+      /*
+       * ========================================================
+       * STATION
+       * ========================================================
+       */
+
+      const station =
+        session.station ||
+        "Home";
+
+
+      if (
+        !stationStats[
+          station
+        ]
+      ) {
+        stationStats[
+          station
+        ] = {
           sessions: 0,
           energy: 0,
           cost: 0,
         };
       }
 
-      yearlyStats[year].sessions++;
-      yearlyStats[year].energy +=
+
+      stationStats[
+        station
+      ].sessions++;
+
+
+      stationStats[
+        station
+      ].energy +=
         session.energy;
-      yearlyStats[year].cost +=
+
+
+      stationStats[
+        station
+      ].cost +=
         session.cost;
 
-      weeklyStats[weekday]++;
+
+      /*
+       * ========================================================
+       * CHARGER
+       * ========================================================
+       */
+
+      chargerStats[
+        session.charger
+      ] =
+        (
+          chargerStats[
+            session.charger
+          ] || 0
+        ) + 1;
+
+
+      /*
+       * ========================================================
+       * DATE
+       * ========================================================
+       */
+
+      if (session.date) {
+
+        const date =
+          new Date(
+            session.date
+          );
+
+
+        const month =
+          date.toLocaleString(
+            "default",
+            {
+              month:
+                "long",
+
+              year:
+                "numeric",
+            }
+          );
+
+
+        const year =
+          date
+            .getFullYear()
+            .toString();
+
+
+        const weekday =
+          date.toLocaleString(
+            "default",
+            {
+              weekday:
+                "long",
+            }
+          );
+
+
+        /*
+         * ------------------------------------------------------
+         * MONTH
+         * ------------------------------------------------------
+         */
+
+        if (
+          !monthlyStats[
+            month
+          ]
+        ) {
+          monthlyStats[
+            month
+          ] = {
+            sessions: 0,
+            energy: 0,
+            cost: 0,
+          };
+        }
+
+
+        monthlyStats[
+          month
+        ].sessions++;
+
+
+        monthlyStats[
+          month
+        ].energy +=
+          session.energy;
+
+
+        monthlyStats[
+          month
+        ].cost +=
+          session.cost;
+
+
+        /*
+         * ------------------------------------------------------
+         * YEAR
+         * ------------------------------------------------------
+         */
+
+        if (
+          !yearlyStats[
+            year
+          ]
+        ) {
+          yearlyStats[
+            year
+          ] = {
+            sessions: 0,
+            energy: 0,
+            cost: 0,
+          };
+        }
+
+
+        yearlyStats[
+          year
+        ].sessions++;
+
+
+        yearlyStats[
+          year
+        ].energy +=
+          session.energy;
+
+
+        yearlyStats[
+          year
+        ].cost +=
+          session.cost;
+
+
+        /*
+         * ------------------------------------------------------
+         * WEEKDAY
+         * ------------------------------------------------------
+         */
+
+        weeklyStats[
+          weekday
+        ]++;
+      }
     }
-  });
+  );
 
-  // --------------------------------------------------
-  // Chart Data
-  // --------------------------------------------------
 
-  const monthlyChartData = Object.entries(
-    monthlyStats
-  ).map(([month, stats]) => ({
-    month,
-    sessions: stats.sessions,
-    energy: stats.energy,
-    cost: stats.cost,
-  }));
+  /*
+   * ============================================================
+   * CHART DATA
+   * ============================================================
+   */
 
-  const weeklyChartData = Object.entries(
-    weeklyStats
-  ).map(([day, sessions]) => ({
-    day,
-    sessions,
-  }));
+  const monthlyChartData =
+    Object.entries(
+      monthlyStats
+    ).map(
+      ([month, stats]) => ({
+        month,
 
-  const chargingTypeData = Object.entries(
-    chargerStats
-  ).map(([name, value]) => ({
-    name,
-    value,
-  }));
+        sessions:
+          stats.sessions,
+
+        energy:
+          stats.energy,
+
+        cost:
+          stats.cost,
+      })
+    );
+
+
+  const weeklyChartData =
+    Object.entries(
+      weeklyStats
+    ).map(
+      ([day, sessions]) => ({
+        day,
+        sessions,
+      })
+    );
+
+
+  const chargingTypeData =
+    Object.entries(
+      chargerStats
+    ).map(
+      ([name, value]) => ({
+        name,
+        value,
+      })
+    );
+
 
   const COLORS = [
     "#22c55e",
@@ -309,88 +529,163 @@ function Analytics() {
     "#84cc16",
   ];
 
-  // --------------------------------------------------
-  // Report Data
-  // --------------------------------------------------
+
+  /*
+   * ============================================================
+   * REPORT DATA
+   * ============================================================
+   */
 
   const reportData = {
     totalSessions,
+
     totalEnergy,
+
     totalCost,
+
     averageEnergy,
+
     averageCost,
 
     vehicleStats,
+
     stationStats,
+
     monthlyStats,
+
     yearlyStats,
+
     weeklyStats,
 
     sessions,
   };
 
+
+  if (loading) {
+    return (
+      <div className="welcome">
+
+        <h2>
+          Loading analytics...
+        </h2>
+
+      </div>
+    );
+  }
+
+
   return (
     <>
       <div className="welcome">
-        <h2>📊 Analytics Dashboard</h2>
+
+        <h2>
+          📊 Analytics Dashboard
+        </h2>
+
 
         <p>
-          Detailed insights into your EV charging
-          history.
+          Family-wide insights into
+          your EV charging history.
         </p>
 
-        <div style={{ marginTop: "16px" }}>
+
+        <div
+          style={{
+            marginTop: "16px",
+          }}
+        >
           <ReportToolbar
-            reportData={reportData}
+            reportData={
+              reportData
+            }
           />
         </div>
+
       </div>
+
 
       {/* ==================================================
           KPI CARDS
           ================================================== */}
 
       <div className="statsGrid">
-        <div className="statCard">
-          <h3>Total Sessions</h3>
-
-          <h1>{totalSessions}</h1>
-        </div>
 
         <div className="statCard">
-          <h3>Total Energy</h3>
+
+          <h3>
+            Total Sessions
+          </h3>
 
           <h1>
-            {totalEnergy.toFixed(1)} kWh
+            {totalSessions}
           </h1>
+
         </div>
+
 
         <div className="statCard">
-          <h3>Total Spend</h3>
+
+          <h3>
+            Total Energy
+          </h3>
 
           <h1>
-            ₹{totalCost.toLocaleString()}
+            {totalEnergy.toFixed(
+              1
+            )}{" "}
+            kWh
           </h1>
+
         </div>
+
 
         <div className="statCard">
-          <h3>Avg. Cost / Session</h3>
+
+          <h3>
+            Total Spend
+          </h3>
 
           <h1>
-            ₹{averageCost.toFixed(2)}
+            ₹
+            {totalCost.toLocaleString()}
           </h1>
+
         </div>
+
 
         <div className="statCard">
-          <h3>Avg. Energy / Session</h3>
+
+          <h3>
+            Avg. Cost / Session
+          </h3>
 
           <h1>
-            {averageEnergy.toFixed(1)} kWh
+            ₹
+            {averageCost.toFixed(
+              2
+            )}
           </h1>
+
         </div>
 
+
+        <div className="statCard">
+
+          <h3>
+            Avg. Energy / Session
+          </h3>
+
+          <h1>
+            {averageEnergy.toFixed(
+              1
+            )}{" "}
+            kWh
+          </h1>
+
+        </div>
 
       </div>
+
 
       {/* ==================================================
           MONTHLY SPEND
@@ -400,18 +695,30 @@ function Analytics() {
         id="monthlySpendChart"
         className="card"
       >
-        <h3>💰 Monthly Spend Trend</h3>
+
+        <h3>
+          💰 Monthly Spend Trend
+        </h3>
+
 
         <ResponsiveContainer
           width="100%"
           height={320}
         >
-          <AreaChart
-            data={monthlyChartData}
-          >
-            <CartesianGrid strokeDasharray="3 3" />
 
-            <XAxis dataKey="month" />
+          <AreaChart
+            data={
+              monthlyChartData
+            }
+          >
+
+            <CartesianGrid
+              strokeDasharray="3 3"
+            />
+
+            <XAxis
+              dataKey="month"
+            />
 
             <YAxis />
 
@@ -425,9 +732,13 @@ function Analytics() {
               stroke="#2563eb"
               fill="#93c5fd"
             />
+
           </AreaChart>
+
         </ResponsiveContainer>
+
       </div>
+
 
       {/* ==================================================
           MONTHLY ENERGY
@@ -437,18 +748,30 @@ function Analytics() {
         id="monthlyEnergyChart"
         className="card"
       >
-        <h3>⚡ Monthly Energy Trend</h3>
+
+        <h3>
+          ⚡ Monthly Energy Trend
+        </h3>
+
 
         <ResponsiveContainer
           width="100%"
           height={320}
         >
-          <LineChart
-            data={monthlyChartData}
-          >
-            <CartesianGrid strokeDasharray="3 3" />
 
-            <XAxis dataKey="month" />
+          <LineChart
+            data={
+              monthlyChartData
+            }
+          >
+
+            <CartesianGrid
+              strokeDasharray="3 3"
+            />
+
+            <XAxis
+              dataKey="month"
+            />
 
             <YAxis />
 
@@ -462,67 +785,113 @@ function Analytics() {
               stroke="#22c55e"
               strokeWidth={3}
             />
+
           </LineChart>
+
         </ResponsiveContainer>
+
       </div>
+
 
       {/* ==================================================
           CHARGING OVERVIEW
           ================================================== */}
 
       <div className="card">
-        <h3>Charging Overview</h3>
+
+        <h3>
+          Charging Overview
+        </h3>
+
 
         <div className="tableContainer">
+
           <table className="table">
+
             <tbody>
-              <tr>
-                <td>Total Sessions</td>
-
-                <td>{totalSessions}</td>
-              </tr>
 
               <tr>
-                <td>Total Energy</td>
 
                 <td>
-                  {totalEnergy.toFixed(1)} kWh
+                  Total Sessions
                 </td>
-              </tr>
-
-              <tr>
-                <td>Total Spend</td>
 
                 <td>
-                  ₹{totalCost.toLocaleString()}
+                  {totalSessions}
                 </td>
+
               </tr>
 
+
               <tr>
+
+                <td>
+                  Total Energy
+                </td>
+
+                <td>
+                  {totalEnergy.toFixed(
+                    1
+                  )}{" "}
+                  kWh
+                </td>
+
+              </tr>
+
+
+              <tr>
+
+                <td>
+                  Total Spend
+                </td>
+
+                <td>
+                  ₹
+                  {totalCost.toLocaleString()}
+                </td>
+
+              </tr>
+
+
+              <tr>
+
                 <td>
                   Average Cost / Session
                 </td>
 
                 <td>
-                  ₹{averageCost.toFixed(2)}
+                  ₹
+                  {averageCost.toFixed(
+                    2
+                  )}
                 </td>
+
               </tr>
 
+
               <tr>
+
                 <td>
                   Average Energy / Session
                 </td>
 
                 <td>
-                  {averageEnergy.toFixed(1)} kWh
+                  {averageEnergy.toFixed(
+                    1
+                  )}{" "}
+                  kWh
                 </td>
+
               </tr>
 
-            
             </tbody>
+
           </table>
+
         </div>
+
       </div>
+
 
       {/* ==================================================
           WEEKLY CHART
@@ -532,18 +901,30 @@ function Analytics() {
         id="weeklyChart"
         className="card"
       >
-        <h3>📅 Weekly Sessions</h3>
+
+        <h3>
+          📅 Weekly Sessions
+        </h3>
+
 
         <ResponsiveContainer
           width="100%"
           height={320}
         >
-          <BarChart
-            data={weeklyChartData}
-          >
-            <CartesianGrid strokeDasharray="3 3" />
 
-            <XAxis dataKey="day" />
+          <BarChart
+            data={
+              weeklyChartData
+            }
+          >
+
+            <CartesianGrid
+              strokeDasharray="3 3"
+            />
+
+            <XAxis
+              dataKey="day"
+            />
 
             <YAxis />
 
@@ -555,113 +936,227 @@ function Analytics() {
               dataKey="sessions"
               fill="#22c55e"
             />
+
           </BarChart>
+
         </ResponsiveContainer>
+
       </div>
+
 
       {/* ==================================================
           WEEKLY SUMMARY
           ================================================== */}
 
       <div className="card">
-        <h3>Weekly Summary</h3>
+
+        <h3>
+          Weekly Summary
+        </h3>
+
 
         <div className="tableContainer">
+
           <table className="table">
+
             <thead>
+
               <tr>
-                <th>Day</th>
-                <th>Sessions</th>
+
+                <th>
+                  Day
+                </th>
+
+                <th>
+                  Sessions
+                </th>
+
               </tr>
+
             </thead>
 
+
             <tbody>
+
               {Object.entries(
                 weeklyStats
-              ).map(([day, count]) => (
-                <tr key={day}>
-                  <td>{day}</td>
+              ).map(
+                ([day, count]) => (
 
-                  <td>{count}</td>
-                </tr>
-              ))}
+                  <tr key={day}>
+
+                    <td>
+                      {day}
+                    </td>
+
+                    <td>
+                      {count}
+                    </td>
+
+                  </tr>
+
+                )
+              )}
+
             </tbody>
+
           </table>
+
         </div>
+
       </div>
+
 
       {/* ==================================================
           MONTHLY SUMMARY
           ================================================== */}
 
       <div className="card">
-        <h3>Monthly Summary</h3>
+
+        <h3>
+          Monthly Summary
+        </h3>
+
 
         <div className="tableContainer">
+
           <table className="table">
+
             <thead>
+
               <tr>
-                <th>Month</th>
-                <th>Sessions</th>
-                <th>Energy</th>
-                <th>Spend</th>
+
+                <th>
+                  Month
+                </th>
+
+                <th>
+                  Sessions
+                </th>
+
+                <th>
+                  Energy
+                </th>
+
+                <th>
+                  Spend
+                </th>
+
               </tr>
+
             </thead>
 
+
             <tbody>
+
               {Object.entries(
                 monthlyStats
-              ).map(([month, stats]) => (
-                <tr key={month}>
-                  <td>{month}</td>
+              ).map(
+                ([month, stats]) => (
 
-                  <td>{stats.sessions}</td>
+                  <tr key={month}>
 
-                  <td>
-                    {stats.energy.toFixed(1)} kWh
-                  </td>
+                    <td>
+                      {month}
+                    </td>
 
-                  <td>
-                    ₹{stats.cost.toLocaleString()}
-                  </td>
-                </tr>
-              ))}
+                    <td>
+                      {stats.sessions}
+                    </td>
+
+                    <td>
+                      {stats.energy.toFixed(
+                        1
+                      )}{" "}
+                      kWh
+                    </td>
+
+                    <td>
+                      ₹
+                      {stats.cost.toLocaleString()}
+                    </td>
+
+                  </tr>
+
+                )
+              )}
+
             </tbody>
+
           </table>
+
         </div>
+
       </div>
+
 
       {/* ==================================================
           VEHICLE STATISTICS
           ================================================== */}
 
       <div className="card">
-        <h3>🚗 Vehicle Statistics</h3>
 
-        {Object.keys(vehicleStats).length ===
-        0 ? (
+        <h3>
+          🚗 Vehicle Statistics
+        </h3>
+
+
+        {Object.keys(
+          vehicleStats
+        ).length === 0 ? (
+
           <p>
-            No charging data available.
+            No charging data
+            available.
           </p>
+
         ) : (
+
           <div className="tableContainer">
+
             <table className="table">
+
               <thead>
+
                 <tr>
-                  <th>Vehicle</th>
-                  <th>Sessions</th>
-                  <th>Energy</th>
-                  <th>Spend</th>
+
+                  <th>
+                    Vehicle
+                  </th>
+
+                  <th>
+                    Sessions
+                  </th>
+
+                  <th>
+                    Energy
+                  </th>
+
+                  <th>
+                    Spend
+                  </th>
+
                 </tr>
+
               </thead>
 
+
               <tbody>
+
                 {Object.entries(
                   vehicleStats
                 ).map(
                   ([vehicle, stats]) => (
-                    <tr key={vehicle}>
-                      <td>{vehicle}</td>
+
+                    <tr
+                      key={
+                        vehicle
+                      }
+                    >
+
+                      <td>
+                        {vehicle}
+                      </td>
 
                       <td>
                         {stats.sessions}
@@ -678,49 +1173,91 @@ function Analytics() {
                         ₹
                         {stats.cost.toLocaleString()}
                       </td>
+
                     </tr>
+
                   )
                 )}
+
               </tbody>
+
             </table>
+
           </div>
+
         )}
+
       </div>
+
 
       {/* ==================================================
           STATION STATISTICS
           ================================================== */}
 
       <div className="card">
+
         <h3>
-          🏢 Charging Station Statistics
+          🏢 Charging Station
+          Statistics
         </h3>
 
-        {Object.keys(stationStats).length ===
-        0 ? (
+
+        {Object.keys(
+          stationStats
+        ).length === 0 ? (
+
           <p>
-            No charging station data
-            available.
+            No charging station
+            data available.
           </p>
+
         ) : (
+
           <div className="tableContainer">
+
             <table className="table">
+
               <thead>
+
                 <tr>
-                  <th>Station</th>
-                  <th>Sessions</th>
-                  <th>Energy</th>
-                  <th>Spend</th>
+
+                  <th>
+                    Station
+                  </th>
+
+                  <th>
+                    Sessions
+                  </th>
+
+                  <th>
+                    Energy
+                  </th>
+
+                  <th>
+                    Spend
+                  </th>
+
                 </tr>
+
               </thead>
 
+
               <tbody>
+
                 {Object.entries(
                   stationStats
                 ).map(
                   ([station, stats]) => (
-                    <tr key={station}>
-                      <td>{station}</td>
+
+                    <tr
+                      key={
+                        station
+                      }
+                    >
+
+                      <td>
+                        {station}
+                      </td>
 
                       <td>
                         {stats.sessions}
@@ -737,14 +1274,22 @@ function Analytics() {
                         ₹
                         {stats.cost.toLocaleString()}
                       </td>
+
                     </tr>
+
                   )
                 )}
+
               </tbody>
+
             </table>
+
           </div>
+
         )}
+
       </div>
+
 
       {/* ==================================================
           CHARGING TYPE
@@ -754,24 +1299,33 @@ function Analytics() {
         id="chargingTypeChart"
         className="card"
       >
+
         <h3>
-          🔌 Charging Type Distribution
+          🔌 Charging Type
+          Distribution
         </h3>
+
 
         <ResponsiveContainer
           width="100%"
           height={350}
         >
+
           <PieChart>
+
             <Pie
-              data={chargingTypeData}
+              data={
+                chargingTypeData
+              }
               dataKey="value"
               nameKey="name"
               outerRadius={120}
               label
             >
+
               {chargingTypeData.map(
                 (_, index) => (
+
                   <Cell
                     key={index}
                     fill={
@@ -781,94 +1335,183 @@ function Analytics() {
                       ]
                     }
                   />
+
                 )
               )}
+
             </Pie>
+
 
             <Tooltip />
 
             <Legend />
+
           </PieChart>
+
         </ResponsiveContainer>
+
       </div>
+
 
       {/* ==================================================
           YEARLY SUMMARY
           ================================================== */}
 
       <div className="card">
-        <h3>📅 Yearly Summary</h3>
+
+        <h3>
+          📅 Yearly Summary
+        </h3>
+
 
         <div className="tableContainer">
+
           <table className="table">
+
             <thead>
+
               <tr>
-                <th>Year</th>
-                <th>Sessions</th>
-                <th>Energy</th>
-                <th>Spend</th>
+
+                <th>
+                  Year
+                </th>
+
+                <th>
+                  Sessions
+                </th>
+
+                <th>
+                  Energy
+                </th>
+
+                <th>
+                  Spend
+                </th>
+
               </tr>
+
             </thead>
 
+
             <tbody>
+
               {Object.entries(
                 yearlyStats
-              ).map(([year, stats]) => (
-                <tr key={year}>
-                  <td>{year}</td>
+              ).map(
+                ([year, stats]) => (
 
-                  <td>{stats.sessions}</td>
+                  <tr key={year}>
 
-                  <td>
-                    {stats.energy.toFixed(
-                      1
-                    )}{" "}
-                    kWh
-                  </td>
+                    <td>
+                      {year}
+                    </td>
 
-                  <td>
-                    ₹
-                    {stats.cost.toLocaleString()}
-                  </td>
-                </tr>
-              ))}
+                    <td>
+                      {stats.sessions}
+                    </td>
+
+                    <td>
+                      {stats.energy.toFixed(
+                        1
+                      )}{" "}
+                      kWh
+                    </td>
+
+                    <td>
+                      ₹
+                      {stats.cost.toLocaleString()}
+                    </td>
+
+                  </tr>
+
+                )
+              )}
+
             </tbody>
+
           </table>
+
         </div>
+
       </div>
+
 
       {/* ==================================================
           RECENT SESSIONS
           ================================================== */}
 
       <div className="card">
+
         <h3>
-          📝 Recent Charging Sessions
+          📝 Recent Family Charging
+          Sessions
         </h3>
 
+
         {sessions.length === 0 ? (
+
           <p>
-            No charging sessions found.
+            No charging sessions
+            found.
           </p>
+
         ) : (
+
           <div className="tableContainer">
+
             <table className="table">
+
               <thead>
+
                 <tr>
-                  <th>No.</th>
-                  <th>Date</th>
-                  <th>Vehicle</th>
-                  <th>Station</th>
-                  <th>Type</th>
-                  <th>Energy</th>
-                  <th>Cost</th>
+
+                  <th>
+                    No.
+                  </th>
+
+                  <th>
+                    Date
+                  </th>
+
+                  <th>
+                    Vehicle
+                  </th>
+
+                  <th>
+                    Station
+                  </th>
+
+                  <th>
+                    Type
+                  </th>
+
+                  <th>
+                    Energy
+                  </th>
+
+                  <th>
+                    Cost
+                  </th>
+
                 </tr>
+
               </thead>
 
+
               <tbody>
+
                 {sessions.map(
-                  (session, index) => (
-                    <tr key={session.id}>
+                  (
+                    session,
+                    index
+                  ) => (
+
+                    <tr
+                      key={
+                        session.id
+                      }
+                    >
+
                       <td>
                         {sessions.length -
                           index}
@@ -902,16 +1545,24 @@ function Analytics() {
                         ₹
                         {session.cost.toLocaleString()}
                       </td>
+
                     </tr>
+
                   )
                 )}
+
               </tbody>
+
             </table>
+
           </div>
+
         )}
+
       </div>
     </>
   );
 }
+
 
 export default Analytics;

@@ -1,13 +1,14 @@
 export interface ServiceRecord {
   id: number;
+  user_id: string;
   vehicle: string;
   date: string;
   odometer: number;
   serviceType: string;
   serviceCenter: string;
   amount: number;
-  notes?: string;
-  attachment?: string;
+  notes: string;
+  attachment: string;
 }
 
 export const serviceHistory: ServiceRecord[] = [];

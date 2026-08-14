@@ -1,5 +1,6 @@
 export interface InsuranceRecord {
   id: number;
+  user_id: string;
   vehicle: string;
   company: string;
   policy_number: string;

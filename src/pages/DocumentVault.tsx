@@ -15,62 +15,133 @@ import {
   deleteDocument,
 } from "../services/documentVaultService";
 
+import { getCurrentUserId } from "../services/authHelper";
+
 import { vehicles } from "../data/vehicles";
+
 import ReceiptUploader from "../components/ReceiptUploader";
+
 
 const emptyRecord: DocumentRecord = {
   id: 0,
+  user_id: "",
+
   title: "",
   category: "",
   vehicle: "",
   documentDate: "",
   file: "",
   notes: "",
+  createdAt: "",
 };
+
 
 export default function DocumentVault() {
   const [records, setRecords] =
     useState<DocumentRecord[]>([]);
+
+
+  const [
+    currentUserId,
+    setCurrentUserId,
+  ] = useState<string | null>(
+    null
+  );
+
 
   const [form, setForm] =
     useState<DocumentRecord>(
       emptyRecord
     );
 
-  const [editingId, setEditingId] =
-    useState<number | null>(null);
+
+  const [
+    editingId,
+    setEditingId,
+  ] = useState<number | null>(
+    null
+  );
+
 
   const [search, setSearch] =
     useState("");
 
+
+  /* =========================================================
+     DATE
+     ========================================================= */
+
   function getTodayLocalDate() {
-    const today = new Date();
+    const today =
+      new Date();
 
     const year =
       today.getFullYear();
 
-    const month = String(
-      today.getMonth() + 1
-    ).padStart(2, "0");
+    const month =
+      String(
+        today.getMonth() + 1
+      ).padStart(2, "0");
 
-    const day = String(
-      today.getDate()
-    ).padStart(2, "0");
+    const day =
+      String(
+        today.getDate()
+      ).padStart(2, "0");
 
     return `${year}-${month}-${day}`;
   }
 
+
   const today =
     getTodayLocalDate();
+
+
+  /* =========================================================
+     LOAD CURRENT USER + DOCUMENTS
+     ========================================================= */
+
+  useEffect(() => {
+    async function initialize() {
+      try {
+        const userId =
+          await getCurrentUserId();
+
+        setCurrentUserId(
+          userId
+        );
+
+        await loadDocuments();
+
+      } catch (err) {
+        console.error(
+          "Failed to initialize document vault:",
+          err
+        );
+
+        alert(
+          "Failed to initialize Document Vault."
+        );
+      }
+    }
+
+
+    void initialize();
+  }, []);
+
 
   async function loadDocuments() {
     try {
       const data =
         await getDocuments();
 
-      setRecords(data);
+      setRecords(
+        data
+      );
+
     } catch (err) {
-      console.error(err);
+      console.error(
+        err
+      );
 
       alert(
         "Failed to load documents."
@@ -78,37 +149,264 @@ export default function DocumentVault() {
     }
   }
 
-  useEffect(() => {
-    loadDocuments();
-  }, []);
 
-  const filtered = useMemo(() => {
-    const text =
-      search.toLowerCase();
+  /* =========================================================
+     SEARCH
+     ========================================================= */
 
-    return records.filter(
-      (r) =>
-        r.title
-          .toLowerCase()
-          .includes(text) ||
-        r.category
-          .toLowerCase()
-          .includes(text) ||
-        r.vehicle
-          .toLowerCase()
-          .includes(text) ||
-        (r.notes ?? "")
-          .toLowerCase()
-          .includes(text)
-    );
-  }, [records, search]);
+  const filtered =
+    useMemo(() => {
+      const text =
+        search.toLowerCase();
+
+      return records.filter(
+        (r) =>
+          r.title
+            .toLowerCase()
+            .includes(text) ||
+
+          r.category
+            .toLowerCase()
+            .includes(text) ||
+
+          r.vehicle
+            .toLowerCase()
+            .includes(text) ||
+
+          (r.notes ?? "")
+            .toLowerCase()
+            .includes(text)
+      );
+    }, [
+      records,
+      search,
+    ]);
+
 
   const totalDocuments =
     filtered.length;
 
+
+  /* =========================================================
+     EDIT
+     ========================================================= */
+
+  function handleEdit(
+    record: DocumentRecord
+  ) {
+    /*
+     * Family members can view another
+     * user's document, but cannot edit it.
+     */
+
+    if (
+      record.user_id !==
+      currentUserId
+    ) {
+      alert(
+        "You can only edit your own documents."
+      );
+
+      return;
+    }
+
+
+    setEditingId(
+      record.id
+    );
+
+
+    setForm(
+      record
+    );
+
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
+
+  /* =========================================================
+     DELETE
+     ========================================================= */
+
+  async function handleDelete(
+    record: DocumentRecord
+  ) {
+    /*
+     * UI-side ownership check.
+     *
+     * RLS remains the actual security boundary.
+     */
+
+    if (
+      record.user_id !==
+      currentUserId
+    ) {
+      alert(
+        "You can only delete your own documents."
+      );
+
+      return;
+    }
+
+
+    if (
+      !window.confirm(
+        "Delete this document?"
+      )
+    ) {
+      return;
+    }
+
+
+    try {
+      await deleteDocument(
+        record.id
+      );
+
+
+      await loadDocuments();
+
+
+      alert(
+        "Document deleted successfully."
+      );
+
+    } catch (err) {
+      console.error(
+        err
+      );
+
+      alert(
+        "Failed to delete document."
+      );
+    }
+  }
+
+
+  /* =========================================================
+     SAVE / UPDATE
+     ========================================================= */
+
+  async function handleSave() {
+    if (
+      !form.vehicle ||
+      !form.category ||
+      !form.title ||
+      !form.documentDate
+    ) {
+      alert(
+        "Please complete all required fields."
+      );
+
+      return;
+    }
+
+
+    if (
+      form.documentDate >
+      today
+    ) {
+      alert(
+        "Document date cannot be in the future."
+      );
+
+      return;
+    }
+
+
+    try {
+      if (
+        editingId !== null
+      ) {
+        /*
+         * Extra ownership check before UPDATE.
+         */
+
+        if (
+          form.user_id !==
+          currentUserId
+        ) {
+          alert(
+            "You can only update your own documents."
+          );
+
+          return;
+        }
+
+
+        await updateDocument({
+          ...form,
+          id: editingId,
+        });
+
+
+        alert(
+          "Document updated successfully."
+        );
+
+      } else {
+        /*
+         * New document belongs to the
+         * currently authenticated user.
+         */
+
+        const {
+          id,
+          user_id,
+          createdAt,
+          ...newDocument
+        } = form;
+
+
+        await addDocument(
+          newDocument
+        );
+
+
+        alert(
+          "Document added successfully."
+        );
+      }
+
+
+      await loadDocuments();
+
+
+      setEditingId(
+        null
+      );
+
+
+      setForm(
+        emptyRecord
+      );
+
+    } catch (error) {
+      console.error(
+        error
+      );
+
+      alert(
+        editingId !== null
+          ? "Failed to update document."
+          : "Failed to add document."
+      );
+    }
+  }
+
+
+  /* =========================================================
+     RENDER
+     ========================================================= */
+
   return (
     <>
       <div className="welcome">
+
         <h2>
           📁 Document Vault
         </h2>
@@ -118,21 +416,34 @@ export default function DocumentVault() {
           vehicle-related documents
           in one place.
         </p>
+
       </div>
 
+
+      {/* =====================================================
+          ADD / EDIT DOCUMENT
+          ===================================================== */}
+
       <div className="card">
+
         <h3>
           {editingId !== null
             ? "Edit Document"
             : "Add Document"}
         </h3>
 
+
         <div className="formGrid">
+
           <div>
-            <label>Vehicle</label>
+            <label>
+              Vehicle
+            </label>
 
             <select
-              value={form.vehicle}
+              value={
+                form.vehicle
+              }
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -141,6 +452,7 @@ export default function DocumentVault() {
                 })
               }
             >
+
               <option value="">
                 Select Vehicle
               </option>
@@ -156,8 +468,10 @@ export default function DocumentVault() {
                   </option>
                 )
               )}
+
             </select>
           </div>
+
 
           <div>
             <label>
@@ -176,6 +490,7 @@ export default function DocumentVault() {
                 })
               }
             >
+
               <option value="">
                 Select Category
               </option>
@@ -227,8 +542,10 @@ export default function DocumentVault() {
               <option>
                 Other
               </option>
+
             </select>
           </div>
+
 
           <div>
             <label>
@@ -250,6 +567,7 @@ export default function DocumentVault() {
               placeholder="Insurance Policy 2026"
             />
           </div>
+
 
           <div>
             <label>
@@ -273,22 +591,33 @@ export default function DocumentVault() {
 
             <p
               style={{
-                fontSize: "12px",
-                color: "#6b7280",
-                marginTop: "6px",
+                fontSize:
+                  "12px",
+                color:
+                  "#6b7280",
+                marginTop:
+                  "6px",
               }}
             >
               Document date cannot
               be in the future.
             </p>
+
           </div>
+
         </div>
 
-        <label>Notes</label>
+
+        <label>
+          Notes
+        </label>
+
 
         <textarea
           rows={3}
-          value={form.notes}
+          value={
+            form.notes
+          }
           onChange={(e) =>
             setForm({
               ...form,
@@ -298,14 +627,19 @@ export default function DocumentVault() {
           }
         />
 
+
         <br />
+
 
         <label>
           Attachment
         </label>
 
+
         <ReceiptUploader
-          value={form.file}
+          value={
+            form.file
+          }
           onChange={(file) =>
             setForm({
               ...form,
@@ -313,6 +647,7 @@ export default function DocumentVault() {
             })
           }
         />
+
 
         <p
           style={{
@@ -326,103 +661,53 @@ export default function DocumentVault() {
           other document formats.
           Recommended maximum
           file size:{" "}
-          <strong>5 MB</strong>.
+          <strong>
+            5 MB
+          </strong>
+          .
         </p>
+
 
         <br />
 
+
         <button
           className="saveButton"
-          onClick={async () => {
-            if (
-              !form.vehicle ||
-              !form.category ||
-              !form.title ||
-              !form.documentDate
-            ) {
-              alert(
-                "Please complete all required fields."
-              );
-              return;
-            }
-
-            if (
-              form.documentDate >
-              today
-            ) {
-              alert(
-                "Document date cannot be in the future."
-              );
-              return;
-            }
-
-            try {
-              if (
-                editingId !== null
-              ) {
-                await updateDocument(
-                  {
-                    ...form,
-                    id: editingId,
-                  }
-                );
-
-                alert(
-                  "Document updated successfully."
-                );
-              } else {
-                const {
-                  id,
-                  ...newDocument
-                } = form;
-
-                await addDocument(
-                  newDocument
-                );
-
-                alert(
-                  "Document added successfully."
-                );
-              }
-
-              await loadDocuments();
-
-              setEditingId(null);
-
-              setForm(
-                emptyRecord
-              );
-            } catch (
-              error
-            ) {
-              console.error(
-                error
-              );
-
-              alert(
-                "Failed to save document."
-              );
-            }
-          }}
+          onClick={() =>
+            void handleSave()
+          }
         >
           {editingId !== null
             ? "Update Document"
             : "Add Document"}
         </button>
+
       </div>
 
+
+      {/* =====================================================
+          KPIs
+          ===================================================== */}
+
       <div className="kpiGrid">
+
         <div className="kpiCard">
+
           <h3>
             Total Documents
           </h3>
 
           <h2>
-            {totalDocuments}
+            {
+              totalDocuments
+            }
           </h2>
+
         </div>
 
+
         <div className="kpiCard">
+
           <h3>
             Categories
           </h3>
@@ -437,9 +722,12 @@ export default function DocumentVault() {
               ).size
             }
           </h2>
+
         </div>
 
+
         <div className="kpiCard">
+
           <h3>
             Vehicles
           </h3>
@@ -454,14 +742,24 @@ export default function DocumentVault() {
               ).size
             }
           </h2>
+
         </div>
+
       </div>
 
+
+      {/* =====================================================
+          DOCUMENT TABLE
+          ===================================================== */}
+
       <div className="card">
+
         <input
           type="text"
           placeholder="Search documents..."
-          value={search}
+          value={
+            search
+          }
           onChange={(e) =>
             setSearch(
               e.target.value
@@ -469,161 +767,210 @@ export default function DocumentVault() {
           }
         />
 
+
         <div className="tableContainer">
+
           <table className="table">
+
             <thead>
+
               <tr>
-                <th>#</th>
-                <th>Vehicle</th>
-                <th>Category</th>
-                <th>Title</th>
-                <th>Date</th>
+
+                <th>
+                  #
+                </th>
+
+                <th>
+                  Vehicle
+                </th>
+
+                <th>
+                  Category
+                </th>
+
+                <th>
+                  Title
+                </th>
+
+                <th>
+                  Date
+                </th>
+
                 <th>
                   Attachment
                 </th>
+
                 <th>
                   Actions
                 </th>
+
               </tr>
+
             </thead>
 
+
             <tbody>
+
               {filtered.length ===
               0 ? (
+
                 <tr>
+
                   <td colSpan={7}>
                     No documents
                     found.
                   </td>
+
                 </tr>
+
               ) : (
+
                 filtered.map(
                   (
                     record,
                     index
-                  ) => (
-                    <tr
-                      key={
-                        record.id
-                      }
-                    >
-                      <td>
-                        {index + 1}
-                      </td>
+                  ) => {
 
-                      <td>
-                        {
-                          record.vehicle
+                    /*
+                     * Family records are visible,
+                     * but only the owner can modify
+                     * them.
+                     */
+
+                    const isOwner =
+                      currentUserId !==
+                        null &&
+                      record.user_id ===
+                        currentUserId;
+
+
+                    return (
+                      <tr
+                        key={
+                          record.id
                         }
-                      </td>
+                      >
 
-                      <td>
-                        {
-                          record.category
-                        }
-                      </td>
+                        <td>
+                          {
+                            index + 1
+                          }
+                        </td>
 
-                      <td>
-                        {
-                          record.title
-                        }
-                      </td>
 
-                      <td>
-                        {
-                          record.documentDate
-                        }
-                      </td>
+                        <td>
+                          {
+                            record.vehicle
+                          }
+                        </td>
 
-                      <td>
-                        {record.file ? (
-                          <a
-                            href={
-                              record.file
-                            }
-                            download={
-                              record.title
-                            }
-                            className="downloadButton"
-                          >
-                            ⬇
-                            Download
-                          </a>
-                        ) : (
-                          "-"
-                        )}
-                      </td>
 
-                      <td>
-                        <div className="actionButtons">
-                          <button
-                            className="editButton"
-                            onClick={() => {
-                              setEditingId(
-                                record.id
-                              );
+                        <td>
+                          {
+                            record.category
+                          }
+                        </td>
 
-                              setForm(
-                                record
-                              );
 
-                              window.scrollTo(
-                                {
-                                  top: 0,
-                                  behavior:
-                                    "smooth",
+                        <td>
+                          {
+                            record.title
+                          }
+                        </td>
+
+
+                        <td>
+                          {
+                            record.documentDate
+                          }
+                        </td>
+
+
+                        <td>
+
+                          {record.file ? (
+
+                            <a
+                              href={
+                                record.file
+                              }
+                              download={
+                                record.title
+                              }
+                              className="downloadButton"
+                            >
+                              ⬇
+                              Download
+                            </a>
+
+                          ) : (
+                            "-"
+                          )}
+
+                        </td>
+
+
+                        <td>
+
+                          {isOwner ? (
+
+                            <div className="actionButtons">
+
+                              <button
+                                className="editButton"
+                                onClick={() =>
+                                  handleEdit(
+                                    record
+                                  )
                                 }
-                              );
-                            }}
-                          >
-                            Edit
-                          </button>
+                              >
+                                Edit
+                              </button>
 
-                          <button
-                            className="deleteButton"
-                            onClick={async () => {
-                              if (
-                                !window.confirm(
-                                  "Delete this document?"
-                                )
-                              ) {
-                                return;
-                              }
 
-                              try {
-                                await deleteDocument(
-                                  record.id
-                                );
+                              <button
+                                className="deleteButton"
+                                onClick={() =>
+                                  void handleDelete(
+                                    record
+                                  )
+                                }
+                              >
+                                Delete
+                              </button>
 
-                                await loadDocuments();
+                            </div>
 
-                                alert(
-                                  "Document deleted successfully."
-                                );
-                              } catch (
-                                err
-                              ) {
-                                console.error(
-                                  err
-                                );
+                          ) : (
 
-                                alert(
-                                  "Failed to delete document."
-                                );
-                              }
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
+                            <span
+                              style={{
+                                color:
+                                  "#6b7280",
+                                fontSize:
+                                  "13px",
+                              }}
+                            >
+                              View only
+                            </span>
+
+                          )}
+
+                        </td>
+
+                      </tr>
+                    );
+                  }
                 )
+
               )}
+
             </tbody>
+
           </table>
+
         </div>
+
       </div>
     </>
   );

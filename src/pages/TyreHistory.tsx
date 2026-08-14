@@ -15,8 +15,14 @@ import {
   deleteTyre,
 } from "../services/tyreService";
 
+import { getCurrentUserId } from "../services/authHelper";
+
+
 const emptyRecord: TyreRecord = {
   id: 0,
+
+  user_id: "",
+
   brand: "",
   model: "",
   size: "",
@@ -38,51 +44,96 @@ const emptyRecord: TyreRecord = {
   updatedAt: "",
 };
 
+
 export default function TyreHistory() {
   const [records, setRecords] =
     useState<TyreRecord[]>([]);
+
+
+  const [currentUserId, setCurrentUserId] =
+    useState<string | null>(null);
+
 
   const [form, setForm] =
     useState<TyreRecord>(
       emptyRecord
     );
 
+
   const [search, setSearch] =
     useState("");
+
 
   const [editingId, setEditingId] =
     useState<number | null>(null);
 
+
   function getTodayLocalDate() {
-    const today = new Date();
+    const today =
+      new Date();
 
     const year =
       today.getFullYear();
 
-    const month = String(
-      today.getMonth() + 1
-    ).padStart(2, "0");
+    const month =
+      String(
+        today.getMonth() + 1
+      ).padStart(2, "0");
 
-    const day = String(
-      today.getDate()
-    ).padStart(2, "0");
+    const day =
+      String(
+        today.getDate()
+      ).padStart(2, "0");
 
     return `${year}-${month}-${day}`;
   }
 
+
   const today =
     getTodayLocalDate();
 
+
+  /* =========================================================
+     LOAD CURRENT USER + TYRES
+     ========================================================= */
+
   useEffect(() => {
-    loadTyres();
+    async function initialize() {
+      try {
+        const userId =
+          await getCurrentUserId();
+
+        setCurrentUserId(
+          userId
+        );
+
+        await loadTyres();
+
+      } catch (err) {
+        console.error(
+          "Failed to initialize tyre history:",
+          err
+        );
+
+        alert(
+          "Failed to load tyre history."
+        );
+      }
+    }
+
+    void initialize();
   }, []);
+
 
   async function loadTyres() {
     try {
       const tyres =
         await getTyres();
 
-      setRecords(tyres);
+      setRecords(
+        tyres
+      );
+
     } catch (err) {
       console.error(err);
 
@@ -92,29 +143,43 @@ export default function TyreHistory() {
     }
   }
 
-  const filtered = useMemo(() => {
-    const text =
-      search.toLowerCase();
 
-    return records.filter(
-      (r) =>
-        r.brand
-          .toLowerCase()
-          .includes(text) ||
-        r.model
-          .toLowerCase()
-          .includes(text) ||
-        r.size
-          .toLowerCase()
-          .includes(text) ||
-        r.dealer
-          .toLowerCase()
-          .includes(text) ||
-        (r.notes ?? "")
-          .toLowerCase()
-          .includes(text)
-    );
-  }, [records, search]);
+  /* =========================================================
+     SEARCH
+     ========================================================= */
+
+  const filtered =
+    useMemo(() => {
+      const text =
+        search.toLowerCase();
+
+      return records.filter(
+        (r) =>
+          r.brand
+            .toLowerCase()
+            .includes(text) ||
+
+          r.model
+            .toLowerCase()
+            .includes(text) ||
+
+          r.size
+            .toLowerCase()
+            .includes(text) ||
+
+          r.dealer
+            .toLowerCase()
+            .includes(text) ||
+
+          (r.notes ?? "")
+            .toLowerCase()
+            .includes(text)
+      );
+    }, [
+      records,
+      search,
+    ]);
+
 
   const totalInvestment =
     filtered.reduce(
@@ -122,6 +187,7 @@ export default function TyreHistory() {
         sum + r.cost,
       0
     );
+
 
   const currentTyre =
     filtered.length > 0
@@ -136,7 +202,9 @@ export default function TyreHistory() {
         )[0]
       : null;
 
+
   let tyreAge = "-";
+
 
   if (currentTyre) {
     const diff =
@@ -144,6 +212,7 @@ export default function TyreHistory() {
       new Date(
         currentTyre.installDate
       ).getTime();
+
 
     const days =
       Math.floor(
@@ -154,6 +223,7 @@ export default function TyreHistory() {
             24)
       );
 
+
     tyreAge =
       days < 30
         ? `${days} Days`
@@ -161,6 +231,240 @@ export default function TyreHistory() {
             days / 30
           )} Months`;
   }
+
+
+  /* =========================================================
+     START EDIT
+     ========================================================= */
+
+  function handleEdit(
+    record: TyreRecord
+  ) {
+    /*
+     * UI-side ownership protection.
+     *
+     * The database RLS independently
+     * enforces the same rule.
+     */
+
+    if (
+      record.user_id !==
+      currentUserId
+    ) {
+      alert(
+        "You can only edit your own tyre records."
+      );
+
+      return;
+    }
+
+
+    setEditingId(
+      record.id
+    );
+
+
+    setForm(
+      record
+    );
+
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
+
+  /* =========================================================
+     DELETE
+     ========================================================= */
+
+  async function handleDelete(
+    record: TyreRecord
+  ) {
+    /*
+     * Only the owner can delete.
+     */
+
+    if (
+      record.user_id !==
+      currentUserId
+    ) {
+      alert(
+        "You can only delete your own tyre records."
+      );
+
+      return;
+    }
+
+
+    if (
+      !window.confirm(
+        "Delete this tyre record?"
+      )
+    ) {
+      return;
+    }
+
+
+    try {
+      await deleteTyre(
+        record.id
+      );
+
+      await loadTyres();
+
+
+      alert(
+        "Tyre record deleted successfully."
+      );
+
+    } catch (
+      err
+    ) {
+      console.error(
+        err
+      );
+
+      alert(
+        "Delete failed."
+      );
+    }
+  }
+
+
+  /* =========================================================
+     SAVE / UPDATE
+     ========================================================= */
+
+  async function handleSave() {
+    if (
+      !form.brand ||
+      !form.model ||
+      !form.size ||
+      !form.installDate
+    ) {
+      alert(
+        "Please complete all required fields."
+      );
+
+      return;
+    }
+
+
+    if (
+      form.purchaseDate &&
+      form.purchaseDate >
+        today
+    ) {
+      alert(
+        "Purchase date cannot be in the future."
+      );
+
+      return;
+    }
+
+
+    if (
+      form.installDate >
+      today
+    ) {
+      alert(
+        "Install date cannot be in the future."
+      );
+
+      return;
+    }
+
+
+    if (
+      form.purchaseDate &&
+      form.installDate &&
+      form.purchaseDate >
+        form.installDate
+    ) {
+      alert(
+        "Purchase date cannot be after the install date."
+      );
+
+      return;
+    }
+
+
+    try {
+      if (
+        editingId !== null
+      ) {
+        /*
+         * Extra application-side ownership check.
+         *
+         * The database RLS is the final authority.
+         */
+
+        if (
+          form.user_id !==
+          currentUserId
+        ) {
+          alert(
+            "You can only update your own tyre records."
+          );
+
+          return;
+        }
+
+
+        await updateTyre({
+          ...form,
+          id: editingId,
+        });
+
+      } else {
+        /*
+         * addTyre() assigns the current
+         * authenticated user's user_id.
+         */
+
+        await addTyre(
+          form
+        );
+      }
+
+
+      await loadTyres();
+
+
+      setEditingId(
+        null
+      );
+
+
+      setForm(
+        emptyRecord
+      );
+
+
+      alert(
+        editingId !== null
+          ? "Tyre updated successfully."
+          : "Tyre added successfully."
+      );
+
+    } catch (
+      err
+    ) {
+      console.error(
+        err
+      );
+
+      alert(
+        editingId !== null
+          ? "Failed to update tyre."
+          : "Failed to save tyre."
+      );
+    }
+  }
+
 
   return (
     <>
@@ -176,6 +480,11 @@ export default function TyreHistory() {
         </p>
       </div>
 
+
+      {/* ======================================================
+          ADD / EDIT TYRE
+          ====================================================== */}
+
       <div className="card">
         <h3>
           {editingId !== null
@@ -183,13 +492,19 @@ export default function TyreHistory() {
             : "Add Tyre Record"}
         </h3>
 
+
         <div className="formGrid">
+
           <div>
-            <label>Brand</label>
+            <label>
+              Brand
+            </label>
 
             <input
               type="text"
-              value={form.brand}
+              value={
+                form.brand
+              }
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -201,12 +516,17 @@ export default function TyreHistory() {
             />
           </div>
 
+
           <div>
-            <label>Model</label>
+            <label>
+              Model
+            </label>
 
             <input
               type="text"
-              value={form.model}
+              value={
+                form.model
+              }
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -218,6 +538,7 @@ export default function TyreHistory() {
             />
           </div>
 
+
           <div>
             <label>
               Tyre Size
@@ -225,7 +546,9 @@ export default function TyreHistory() {
 
             <input
               type="text"
-              value={form.size}
+              value={
+                form.size
+              }
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -236,6 +559,7 @@ export default function TyreHistory() {
               placeholder="215/55 R18"
             />
           </div>
+
 
           <div>
             <label>
@@ -258,6 +582,7 @@ export default function TyreHistory() {
             />
           </div>
 
+
           <div>
             <label>
               Install Date
@@ -278,6 +603,7 @@ export default function TyreHistory() {
               }
             />
           </div>
+
 
           <div>
             <label>
@@ -301,8 +627,11 @@ export default function TyreHistory() {
             />
           </div>
 
+
           <div>
-            <label>Dealer</label>
+            <label>
+              Dealer
+            </label>
 
             <input
               type="text"
@@ -320,6 +649,7 @@ export default function TyreHistory() {
             />
           </div>
 
+
           <div>
             <label>
               Cost (INR)
@@ -327,7 +657,9 @@ export default function TyreHistory() {
 
             <input
               type="number"
-              value={form.cost}
+              value={
+                form.cost
+              }
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -339,6 +671,7 @@ export default function TyreHistory() {
               }
             />
           </div>
+
 
           <div>
             <label>
@@ -361,24 +694,36 @@ export default function TyreHistory() {
               }
             />
           </div>
+
         </div>
+
 
         <p
           style={{
-            fontSize: "12px",
-            color: "#6b7280",
-            marginTop: "8px",
+            fontSize:
+              "12px",
+            color:
+              "#6b7280",
+            marginTop:
+              "8px",
           }}
         >
           Purchase and installation
-          dates cannot be in the future.
+          dates cannot be in the
+          future.
         </p>
 
-        <label>Notes</label>
+
+        <label>
+          Notes
+        </label>
+
 
         <textarea
           rows={3}
-          value={form.notes}
+          value={
+            form.notes
+          }
           onChange={(e) =>
             setForm({
               ...form,
@@ -388,15 +733,22 @@ export default function TyreHistory() {
           }
         />
 
+
         <br />
+
 
         <label>
           Invoice / Receipt
         </label>
 
+
         <ReceiptUploader
-          value={form.receipt}
-          onChange={(receipt) =>
+          value={
+            form.receipt
+          }
+          onChange={(
+            receipt
+          ) =>
             setForm({
               ...form,
               receipt,
@@ -404,11 +756,15 @@ export default function TyreHistory() {
           }
         />
 
+
         <p
           style={{
-            fontSize: "12px",
-            color: "#6b7280",
-            marginTop: "6px",
+            fontSize:
+              "12px",
+            color:
+              "#6b7280",
+            marginTop:
+              "6px",
           }}
         >
           Supported file types:
@@ -416,113 +772,49 @@ export default function TyreHistory() {
           document formats.
           Recommended maximum
           file size:{" "}
-          <strong>5 MB</strong>{" "}
+          <strong>
+            5 MB
+          </strong>{" "}
           per file for optimal
           performance.
         </p>
 
+
         <br />
+
 
         <button
           className="primaryButton"
-          onClick={async () => {
-            if (
-              !form.brand ||
-              !form.model ||
-              !form.size ||
-              !form.installDate
-            ) {
-              alert(
-                "Please complete all required fields."
-              );
-              return;
-            }
-
-            if (
-              form.purchaseDate &&
-              form.purchaseDate >
-                today
-            ) {
-              alert(
-                "Purchase date cannot be in the future."
-              );
-              return;
-            }
-
-            if (
-              form.installDate >
-              today
-            ) {
-              alert(
-                "Install date cannot be in the future."
-              );
-              return;
-            }
-
-            if (
-              form.purchaseDate &&
-              form.installDate &&
-              form.purchaseDate >
-                form.installDate
-            ) {
-              alert(
-                "Purchase date cannot be after the install date."
-              );
-              return;
-            }
-
-            try {
-              if (
-                editingId !== null
-              ) {
-                await updateTyre({
-                  ...form,
-                  id: editingId,
-                });
-              } else {
-                await addTyre(
-                  form
-                );
-              }
-
-              await loadTyres();
-
-              setEditingId(null);
-
-              setForm(
-                emptyRecord
-              );
-
-              alert(
-                editingId !== null
-                  ? "Tyre updated successfully."
-                  : "Tyre added successfully."
-              );
-            } catch (err) {
-              console.error(err);
-
-              alert(
-                "Failed to save tyre."
-              );
-            }
-          }}
+          onClick={() =>
+            void handleSave()
+          }
         >
           {editingId !== null
             ? "Update Tyre"
             : "Add Tyre"}
         </button>
+
       </div>
 
+
+      {/* ======================================================
+          KPIs
+          ====================================================== */}
+
       <div className="kpiGrid">
+
         <div className="kpiCard">
           <h3>
             Total Tyre Records
           </h3>
 
           <h2>
-            {filtered.length}
+            {
+              filtered.length
+            }
           </h2>
         </div>
+
 
         <div className="kpiCard">
           <h3>
@@ -531,11 +823,14 @@ export default function TyreHistory() {
 
           <h2>
             ₹{" "}
-            {totalInvestment.toFixed(
-              2
-            )}
+            {
+              totalInvestment.toFixed(
+                2
+              )
+            }
           </h2>
         </div>
+
 
         <div className="kpiCard">
           <h3>
@@ -549,20 +844,32 @@ export default function TyreHistory() {
           </h2>
         </div>
 
+
         <div className="kpiCard">
-          <h3>Tyre Age</h3>
+          <h3>
+            Tyre Age
+          </h3>
 
           <h2>
             {tyreAge}
           </h2>
         </div>
+
       </div>
 
+
+      {/* ======================================================
+          TYRE RECORDS
+          ====================================================== */}
+
       <div className="card">
+
         <input
           type="text"
           placeholder="Search by brand, model, dealer or size..."
-          value={search}
+          value={
+            search
+          }
           onChange={(e) =>
             setSearch(
               e.target.value
@@ -570,171 +877,240 @@ export default function TyreHistory() {
           }
         />
 
+
         <div className="tableContainer">
+
           <table className="table">
+
             <thead>
               <tr>
-                <th>#</th>
-                <th>Brand</th>
-                <th>Model</th>
-                <th>Size</th>
-                <th>Installed</th>
-                <th>Odometer</th>
-                <th>Cost</th>
-                <th>Warranty</th>
-                <th>Receipt</th>
-                <th>Actions</th>
+                <th>
+                  #
+                </th>
+
+                <th>
+                  Brand
+                </th>
+
+                <th>
+                  Model
+                </th>
+
+                <th>
+                  Size
+                </th>
+
+                <th>
+                  Installed
+                </th>
+
+                <th>
+                  Odometer
+                </th>
+
+                <th>
+                  Cost
+                </th>
+
+                <th>
+                  Warranty
+                </th>
+
+                <th>
+                  Receipt
+                </th>
+
+                <th>
+                  Actions
+                </th>
               </tr>
             </thead>
 
+
             <tbody>
+
               {filtered.length ===
               0 ? (
+
                 <tr>
-                  <td colSpan={10}>
+                  <td
+                    colSpan={10}
+                  >
                     No tyre records
                     found.
                   </td>
                 </tr>
+
               ) : (
+
                 filtered.map(
                   (
                     record,
                     index
-                  ) => (
-                    <tr
-                      key={
-                        record.id
-                      }
-                    >
-                      <td>
-                        {index + 1}
-                      </td>
+                  ) => {
 
-                      <td>
-                        {
-                          record.brand
+                    /*
+                     * OWNERSHIP CHECK
+                     *
+                     * Family records are visible,
+                     * but only the record owner
+                     * gets Edit/Delete.
+                     */
+
+                    const isOwner =
+                      currentUserId !==
+                        null &&
+                      record.user_id ===
+                        currentUserId;
+
+
+                    return (
+                      <tr
+                        key={
+                          record.id
                         }
-                      </td>
+                      >
 
-                      <td>
-                        {
-                          record.model
-                        }
-                      </td>
+                        <td>
+                          {
+                            index + 1
+                          }
+                        </td>
 
-                      <td>
-                        {
-                          record.size
-                        }
-                      </td>
 
-                      <td>
-                        {
-                          record.installDate
-                        }
-                      </td>
+                        <td>
+                          {
+                            record.brand
+                          }
+                        </td>
 
-                      <td>
-                        {record.odometer.toLocaleString()}{" "}
-                        km
-                      </td>
 
-                      <td>
-                        ₹{" "}
-                        {record.cost.toLocaleString()}
-                      </td>
+                        <td>
+                          {
+                            record.model
+                          }
+                        </td>
 
-                      <td>
-                        {
-                          record.warrantyMonths
-                        }{" "}
-                        Months
-                      </td>
 
-                      <td>
-                        {record.receipt ? (
-                          <a
-                            href={
-                              record.receipt
-                            }
-                            download={`${record.brand}-${record.model}-Receipt`}
-                            className="downloadButton"
-                          >
-                            ⬇
-                            Download
-                          </a>
-                        ) : (
-                          "-"
-                        )}
-                      </td>
+                        <td>
+                          {
+                            record.size
+                          }
+                        </td>
 
-                      <td>
-                        <div className="actionButtons">
-                          <button
-                            className="editButton"
-                            onClick={() => {
-                              setEditingId(
-                                record.id
-                              );
 
-                              setForm(
-                                record
-                              );
+                        <td>
+                          {
+                            record.installDate
+                          }
+                        </td>
 
-                              window.scrollTo(
-                                {
-                                  top: 0,
-                                  behavior:
-                                    "smooth",
+
+                        <td>
+                          {
+                            record.odometer.toLocaleString()
+                          }{" "}
+                          km
+                        </td>
+
+
+                        <td>
+                          ₹{" "}
+                          {
+                            record.cost.toLocaleString()
+                          }
+                        </td>
+
+
+                        <td>
+                          {
+                            record.warrantyMonths
+                          }{" "}
+                          Months
+                        </td>
+
+
+                        <td>
+                          {record.receipt ? (
+
+                            <a
+                              href={
+                                record.receipt
+                              }
+                              download={`${record.brand}-${record.model}-Receipt`}
+                              className="downloadButton"
+                            >
+                              ⬇
+                              Download
+                            </a>
+
+                          ) : (
+                            "-"
+                          )}
+                        </td>
+
+
+                        <td>
+
+                          {isOwner ? (
+
+                            <div className="actionButtons">
+
+                              <button
+                                className="editButton"
+                                onClick={() =>
+                                  handleEdit(
+                                    record
+                                  )
                                 }
-                              );
-                            }}
-                          >
-                            Edit
-                          </button>
+                              >
+                                Edit
+                              </button>
 
-                          <button
-                            className="deleteButton"
-                            onClick={async () => {
-                              if (
-                                !window.confirm(
-                                  "Delete this tyre record?"
-                                )
-                              ) {
-                                return;
-                              }
 
-                              try {
-                                await deleteTyre(
-                                  record.id
-                                );
+                              <button
+                                className="deleteButton"
+                                onClick={() =>
+                                  void handleDelete(
+                                    record
+                                  )
+                                }
+                              >
+                                Delete
+                              </button>
 
-                                await loadTyres();
-                              } catch (
-                                err
-                              ) {
-                                console.error(
-                                  err
-                                );
+                            </div>
 
-                                alert(
-                                  "Delete failed"
-                                );
-                              }
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
+                          ) : (
+
+                            <span
+                              style={{
+                                color:
+                                  "#6b7280",
+                                fontSize:
+                                  "13px",
+                              }}
+                            >
+                              View only
+                            </span>
+
+                          )}
+
+                        </td>
+
+                      </tr>
+                    );
+                  }
                 )
+
               )}
+
             </tbody>
+
           </table>
+
         </div>
+
       </div>
     </>
   );
