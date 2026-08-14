@@ -58,7 +58,6 @@ const DEFAULT_HOME_RATES: Record<string, number> = {
 
 interface CustomVehicle {
   id: number;
-  user_id: string;
   brand: string;
   model: string;
   year: number;
