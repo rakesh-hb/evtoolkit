@@ -1,4 +1,8 @@
-import { useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -21,24 +25,113 @@ import DocumentVault from "./pages/DocumentVault";
 import About from "./pages/About";
 import UserProfile from "./pages/UserProfile";
 
+
 function App() {
-  const { session, loading } =
-    useAuth();
+  const {
+    session,
+    loading,
+  } = useAuth();
+
 
   const [page, setPage] =
     useState("dashboard");
 
+
   const [drawerOpen, setDrawerOpen] =
     useState(false);
 
+
   const [authPage, setAuthPage] =
-    useState<"login" | "forgot">(
-      "login"
-    );
+    useState<
+      "login" | "forgot"
+    >("login");
+
+
+  /*
+   * Keep track of whether the previous
+   * auth state was authenticated.
+   *
+   * This lets us detect a NEW login.
+   */
+  const wasAuthenticated =
+    useRef(false);
+
+
+  /*
+   * ============================================================
+   * RESET PAGE AFTER LOGIN
+   * ============================================================
+   *
+   * If the user was previously logged out
+   * and is now authenticated, always start
+   * them on Home.
+   *
+   * This prevents:
+   *
+   *   Sushma -> Analytics
+   *   Logout
+   *   Rakesh login
+   *   Analytics
+   *
+   * and instead gives:
+   *
+   *   Sushma -> Analytics
+   *   Logout
+   *   Rakesh login
+   *   Home
+   */
+
+  useEffect(() => {
+    if (loading) {
+      return;
+    }
+
+
+    const isAuthenticated =
+      !!session;
+
+
+    /*
+     * Detect:
+     *
+     * unauthenticated
+     *       ↓
+     * authenticated
+     */
+
+    if (
+      isAuthenticated &&
+      !wasAuthenticated.current
+    ) {
+      setPage(
+        "dashboard"
+      );
+
+      setDrawerOpen(
+        false
+      );
+    }
+
+
+    wasAuthenticated.current =
+      isAuthenticated;
+
+  }, [
+    session,
+    loading,
+  ]);
+
 
   const isResetPassword =
     window.location.pathname ===
     "/reset-password";
+
+
+  /*
+   * ============================================================
+   * LOADING
+   * ============================================================
+   */
 
   if (loading) {
     return (
@@ -56,19 +149,27 @@ function App() {
     );
   }
 
+
   /*
+   * ============================================================
+   * PASSWORD RESET
+   * ============================================================
+   *
    * Password recovery must be handled
    * before the normal login check.
    */
+
   if (isResetPassword) {
     return (
       <ResetPassword
         onComplete={() => {
+
           window.history.replaceState(
             {},
             "",
             "/"
           );
+
 
           window.location.reload();
         }}
@@ -76,154 +177,287 @@ function App() {
     );
   }
 
+
   /*
-   * Not authenticated
+   * ============================================================
+   * NOT AUTHENTICATED
+   * ============================================================
    */
+
   if (!session) {
-    if (authPage === "forgot") {
+
+    if (
+      authPage ===
+      "forgot"
+    ) {
       return (
         <ForgotPassword
           onBack={() =>
-            setAuthPage("login")
+            setAuthPage(
+              "login"
+            )
           }
         />
       );
     }
 
+
     return (
       <Login
         onForgotPassword={() =>
-          setAuthPage("forgot")
+          setAuthPage(
+            "forgot"
+          )
         }
       />
     );
   }
 
+
+  /*
+   * ============================================================
+   * PAGE ROUTING
+   * ============================================================
+   */
+
   function renderPage() {
+
     switch (page) {
+
       case "dashboard":
-        return <Dashboard />;
+        return (
+          <Dashboard />
+        );
+
 
       case "planner":
-        return <Planner />;
+        return (
+          <Planner />
+        );
+
 
       case "tracker":
-        return <Tracker />;
+        return (
+          <Tracker />
+        );
+
 
       case "analytics":
-        return <Analytics />;
+        return (
+          <Analytics />
+        );
+
 
       case "service":
-        return <ServiceHistory />;
+        return (
+          <ServiceHistory />
+        );
+
 
       case "tyres":
-        return <TyreHistory />;
+        return (
+          <TyreHistory />
+        );
+
 
       case "insurance":
-        return <Insurance />;
+        return (
+          <Insurance />
+        );
+
 
       case "documents":
-        return <DocumentVault />;
+        return (
+          <DocumentVault />
+        );
+
 
       case "settings":
-        return <Settings />;
+        return (
+          <Settings />
+        );
+
 
       case "about":
-        return <About />;
+        return (
+          <About />
+        );
+
 
       case "profile":
-        return <UserProfile />;
+        return (
+          <UserProfile />
+        );
+
 
       default:
-        return <Dashboard />;
+        return (
+          <Dashboard />
+        );
     }
   }
+
+
+  /*
+   * ============================================================
+   * AUTHENTICATED APPLICATION
+   * ============================================================
+   */
 
   return (
     <>
       <SideDrawer
-        open={drawerOpen}
-        currentPage={page}
-        onClose={() =>
-          setDrawerOpen(false)
+        open={
+          drawerOpen
         }
-        onNavigate={(selectedPage) => {
-          setPage(selectedPage);
+
+        currentPage={
+          page
+        }
+
+        onClose={() =>
+          setDrawerOpen(
+            false
+          )
+        }
+
+        onNavigate={(
+          selectedPage
+        ) => {
+
+          setPage(
+            selectedPage
+          );
+
         }}
       />
 
+
       <main className="content">
+
         {renderPage()}
+
       </main>
 
+
       <nav className="bottomNav">
-        <button
-          className={
-            page === "dashboard"
-              ? "active"
-              : ""
-          }
-          onClick={() =>
-            setPage("dashboard")
-          }
-        >
-          <span>🏠</span>
-          <span>Home</span>
-        </button>
 
         <button
           className={
-            page === "planner"
+            page ===
+            "dashboard"
               ? "active"
               : ""
           }
+
           onClick={() =>
-            setPage("planner")
+            setPage(
+              "dashboard"
+            )
           }
         >
-          <span>⚡</span>
-          <span>Planner</span>
+          <span>
+            🏠
+          </span>
+
+          <span>
+            Home
+          </span>
         </button>
+
 
         <button
           className={
-            page === "tracker"
+            page ===
+            "planner"
               ? "active"
               : ""
           }
+
           onClick={() =>
-            setPage("tracker")
+            setPage(
+              "planner"
+            )
           }
         >
-          <span>🔋</span>
-          <span>Charging</span>
+          <span>
+            ⚡
+          </span>
+
+          <span>
+            Planner
+          </span>
         </button>
+
 
         <button
           className={
-            page === "analytics"
+            page ===
+            "tracker"
               ? "active"
               : ""
           }
+
           onClick={() =>
-            setPage("analytics")
+            setPage(
+              "tracker"
+            )
           }
         >
-          <span>📊</span>
-          <span>Analytics</span>
+          <span>
+            🔋
+          </span>
+
+          <span>
+            Charging
+          </span>
         </button>
+
+
+        <button
+          className={
+            page ===
+            "analytics"
+              ? "active"
+              : ""
+          }
+
+          onClick={() =>
+            setPage(
+              "analytics"
+            )
+          }
+        >
+          <span>
+            📊
+          </span>
+
+          <span>
+            Analytics
+          </span>
+        </button>
+
 
         <button
           onClick={() =>
-            setDrawerOpen(true)
+            setDrawerOpen(
+              true
+            )
           }
         >
-          <span>☰</span>
-          <span>More</span>
+          <span>
+            ☰
+          </span>
+
+          <span>
+            More
+          </span>
         </button>
+
       </nav>
     </>
   );
 }
+
 
 export default App;
