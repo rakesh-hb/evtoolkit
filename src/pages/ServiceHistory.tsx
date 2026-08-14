@@ -24,6 +24,7 @@ import ReceiptUploader from "../components/ReceiptUploader";
 
 const emptyRecord: ServiceRecord = {
   id: 0,
+  user_id: "",
   vehicle: "",
   date: "",
   odometer: 0,
