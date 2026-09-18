@@ -147,20 +147,21 @@ export default function Login({
 
       /*
        * Plan selection is currently informational only.
+       * Plan selection is informational only.
        * Premium access is NOT granted by selecting Premium.
-       * It will be activated only after the future ₹49
-       * payment is successfully verified.
+       * Premium Plus is displayed as Coming Soon and cannot
+       * be selected during registration.
        */
       if (result.session) {
         alert(
           selectedPlan === "premium"
-            ? "Account created successfully.\n\nPremium is selected. Complete the ₹49 one-time payment to activate Premium features."
+            ? "Account created successfully.\n\nPremium is selected. Complete the ₹69 one-time payment to activate Premium features."
             : "Account created successfully."
         );
       } else {
         alert(
           selectedPlan === "premium"
-            ? "Account created successfully.\n\nPlease check your email to confirm your account. After confirmation, complete the ₹49 one-time payment to activate Premium features."
+            ? "Account created successfully.\n\nPlease check your email to confirm your account. After confirmation, complete the ₹69 one-time payment to activate Premium features."
             : "Account created successfully.\n\nPlease check your email to confirm your account before signing in."
         );
       }
@@ -291,15 +292,15 @@ export default function Login({
                 }}
               >
                 Choose the plan that fits your EV
-                ownership needs. You can start with
-                Free and upgrade to Premium later.
+                ownership needs. Premium Plus is
+                shown as Coming Soon.
               </p>
 
               <div
                 style={{
                   display: "grid",
                   gridTemplateColumns:
-                    "repeat(2, minmax(0, 1fr))",
+                    "1fr",
                   gap: 12,
                 }}
               >
@@ -314,7 +315,7 @@ export default function Login({
                     padding: 14,
                     border:
                       selectedPlan === "free"
-                        ? "2px solid #2563eb"
+                        ? "2px solid #16a34a"
                         : "1px solid #d1d5db",
                     borderRadius: 12,
                     background:
@@ -348,7 +349,7 @@ export default function Login({
                   <div
                     style={{
                       fontSize: 12,
-                      color: "#6b7280",
+                      color: "#374151",
                       marginTop: 8,
                       lineHeight: 1.5,
                     }}
@@ -378,7 +379,7 @@ export default function Login({
                     padding: 14,
                     border:
                       selectedPlan === "premium"
-                        ? "2px solid #2563eb"
+                        ? "2px solid #dc2626"
                         : "1px solid #d1d5db",
                     borderRadius: 12,
                     background:
@@ -406,13 +407,13 @@ export default function Login({
                       marginTop: 4,
                     }}
                   >
-                    ₹49
+                    ₹69
                   </div>
 
                   <div
                     style={{
                       fontSize: 12,
-                      color: "#6b7280",
+                      color: "#374151",
                       marginTop: 8,
                       lineHeight: 1.5,
                     }}
@@ -423,7 +424,7 @@ export default function Login({
                     <br />
                     • Automatic backup
                     <br />
-                    • More records & documents
+                    • More records
                     <br />
                     • Unlimited charging sessions
                     <br />
@@ -432,6 +433,88 @@ export default function Login({
                     • Analytics PDF export
                   </div>
                 </button>
+
+                <div
+                  style={{
+                    textAlign: "left",
+                    padding: 14,
+                    border: "2px solid #2563eb",
+                    borderRadius: 12,
+                    background: "#bfdbfe",
+                    color: "#1e3a8a",
+                    position: "relative",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontWeight: 700,
+                        fontSize: 16,
+                      }}
+                    >
+                      Premium Plus
+                    </div>
+
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: "4px 8px",
+                        borderRadius: 999,
+                        background: "#2563eb",
+                        color: "#ffffff",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      COMING SOON
+                    </span>
+                  </div>
+
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      fontSize: 18,
+                      marginTop: 8,
+                    }}
+                  >
+                    Subscription
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 12,
+                      marginTop: 8,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    • All Premium features
+                    <br />
+                    • File uploads
+                    <br />
+                    • Cloud storage
+                    <br />
+                    • Cloud backup
+                    <br />
+                    • Additional Premium Plus features
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: 10,
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Pricing and activation will be announced in a future release.
+                  </div>
+                </div>
               </div>
 
               <div
@@ -446,8 +529,8 @@ export default function Login({
                 }}
               >
                 {selectedPlan === "premium"
-                  ? "Premium access is activated only after the ₹49 payment is successfully verified."
-                  : "Free access is available without payment. You can upgrade later."}
+                  ? "Premium access is activated only after the ₹69 one-time payment is successfully verified."
+                  : "Free access is available without payment. Premium Plus is coming soon."}
               </div>
             </div>
           </>

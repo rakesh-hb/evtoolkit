@@ -7,6 +7,10 @@ import {
 
 import { supabase } from "../lib/supabase";
 import UserDetails from "../components/UserDetails";
+import {
+  getCurrentPlan,
+  type SubscriptionPlan,
+} from "../services/subscriptionService";
 
 const ReportToolbar = lazy(
   () => import("../components/reports/ReportToolbar")
@@ -74,6 +78,12 @@ function Analytics({
   const [expandedChart, setExpandedChart] =
     useState<ExpandedChart>(null);
 
+  const [subscriptionPlan, setSubscriptionPlan] =
+    useState<SubscriptionPlan>("free");
+
+  const [subscriptionLoading, setSubscriptionLoading] =
+    useState(true);
+
 
   /*
    * ============================================================
@@ -83,7 +93,23 @@ function Analytics({
 
   useEffect(() => {
     loadSessions();
+    loadSubscriptionPlan();
   }, []);
+
+  async function loadSubscriptionPlan() {
+    try {
+      const plan = await getCurrentPlan();
+      setSubscriptionPlan(plan);
+    } catch (error) {
+      console.error(
+        "Failed to load subscription plan:",
+        error
+      );
+      setSubscriptionPlan("free");
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  }
 
 
   async function loadSessions() {
@@ -2032,28 +2058,55 @@ function Analytics({
           }}
         >
 
-          <Suspense
-            fallback={
-
-              <div
-                style={{
-                  padding:
-                    "12px",
-                }}
-              >
-                Loading report tools...
-              </div>
-
-            }
-          >
-
-            <ReportToolbar
-              reportData={
-                reportData
+          {subscriptionLoading ? (
+            <div
+              style={{
+                padding:
+                  "12px",
+              }}
+            >
+              Loading report tools...
+            </div>
+          ) : subscriptionPlan === "free" ? (
+            <div
+              style={{
+                padding:
+                  "12px 14px",
+                border:
+                  "1px solid rgba(220,38,38,0.30)",
+                borderRadius:
+                  "10px",
+                background:
+                  "rgba(220,38,38,0.08)",
+                color:
+                  "#cbd5e1",
+                fontSize:
+                  "13px",
+              }}
+            >
+              📄 Analytics PDF Export is available with Premium and Premium Plus.
+              Premium is ₹69 one-time.
+            </div>
+          ) : (
+            <Suspense
+              fallback={
+                <div
+                  style={{
+                    padding:
+                      "12px",
+                  }}
+                >
+                  Loading report tools...
+                </div>
               }
-            />
-
-          </Suspense>
+            >
+              <ReportToolbar
+                reportData={
+                  reportData
+                }
+              />
+            </Suspense>
+          )}
 
         </div>
 

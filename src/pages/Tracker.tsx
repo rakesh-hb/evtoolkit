@@ -24,7 +24,9 @@ import UserDetails from "../components/UserDetails";
 import {
   getCurrentPlan,
   canAddChargingSession,
+  canUseFileUploads,
   FREE_LIMITS,
+  type SubscriptionPlan,
 } from "../services/subscriptionService";
 
 
@@ -146,6 +148,10 @@ function Tracker({ onNavigate }: TrackerProps) {
    */
   const [currentUserId, setCurrentUserId] =
     useState<string | null>(null);
+
+
+  const [subscriptionPlan, setSubscriptionPlan] =
+    useState<SubscriptionPlan>("free");
 
 
   const [charger, setCharger] =
@@ -310,6 +316,9 @@ function Tracker({ onNavigate }: TrackerProps) {
           await getCurrentUserId();
 
         setCurrentUserId(userId);
+
+        const plan = await getCurrentPlan();
+        setSubscriptionPlan(plan);
 
         await loadSessions();
         await loadStations();
@@ -1216,32 +1225,52 @@ function Tracker({ onNavigate }: TrackerProps) {
         </label>
 
 
-        <ReceiptUploader
-          key={
-            invoiceResetKey
-          }
-          value={invoice}
-          onChange={(value) =>
-            setInvoice(value)
-          }
-        />
+        {canUseFileUploads(subscriptionPlan) ? (
+          <>
+            <ReceiptUploader
+              key={
+                invoiceResetKey
+              }
+              value={invoice}
+              onChange={(value) =>
+                setInvoice(value)
+              }
+            />
 
-
-        <p
-          style={{
-            fontSize:
-              "12px",
-            color:
-              "#6b7280",
-            marginTop:
-              "6px",
-          }}
-        >
-          Upload a PDF, image, or
-          other document. Recommended
-          maximum file size:
-          <strong> 5 MB</strong>.
-        </p>
+            <p
+              style={{
+                fontSize:
+                  "12px",
+                color:
+                  "#6b7280",
+                marginTop:
+                  "6px",
+              }}
+            >
+              Upload a PDF, image, or
+              other document. Recommended
+              maximum file size:
+              <strong> 5 MB</strong>.
+            </p>
+          </>
+        ) : (
+          <div
+            style={{
+              padding: "12px 14px",
+              border: "1px solid #bfdbfe",
+              borderRadius: "8px",
+              background: "#eff6ff",
+              color: "#1e40af",
+              fontSize: "13px",
+              lineHeight: 1.5,
+            }}
+          >
+            <strong>Premium Plus feature</strong>
+            <br />
+            File uploads are available only with Premium Plus.
+            Premium Plus is coming soon.
+          </div>
+        )}
 
 
         <div className="buttonGroup">

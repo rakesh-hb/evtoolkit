@@ -10,6 +10,7 @@ import UserDetails from "../components/UserDetails";
 import {
   getCurrentPlan,
   canUseAutoBackup,
+  type SubscriptionPlan,
 } from "../services/subscriptionService";
 
 import {
@@ -68,15 +69,6 @@ interface SettingsProps {
 }
 
 function Settings({ onNavigate }: SettingsProps) {
-  const [currency, setCurrency] =
-    useState("INR (₹)");
-
-  const [tariff, setTariff] =
-    useState(7);
-
-  const [distanceUnit, setDistanceUnit] =
-    useState("km");
-
 
   const [backupSchedule, setBackupSchedule] =
     useState<BackupSchedule | null>(null);
@@ -108,6 +100,12 @@ function Settings({ onNavigate }: SettingsProps) {
 
   const [currentUserEmail, setCurrentUserEmail] =
     useState("");
+
+  const [subscriptionPlan, setSubscriptionPlan] =
+    useState<SubscriptionPlan>("free");
+
+  const [loadingSubscriptionPlan, setLoadingSubscriptionPlan] =
+    useState(true);
 
 
   const [familyMembers, setFamilyMembers] =
@@ -162,6 +160,7 @@ function Settings({ onNavigate }: SettingsProps) {
 
   async function loadFamilyData() {
     setLoadingFamily(true);
+    setLoadingSubscriptionPlan(true);
 
     try {
       const {
@@ -194,6 +193,8 @@ function Settings({ onNavigate }: SettingsProps) {
         user.email ?? ""
       );
 
+      const plan = await getCurrentPlan();
+      setSubscriptionPlan(plan);
 
       await loadLastBackup(user.id);
 
@@ -283,6 +284,7 @@ function Settings({ onNavigate }: SettingsProps) {
 
     } finally {
       setLoadingFamily(false);
+      setLoadingSubscriptionPlan(false);
     }
   }
 
@@ -396,7 +398,7 @@ function Settings({ onNavigate }: SettingsProps) {
 
     if (!canUseAutoBackup(plan)) {
       alert(
-        "Automatic Backup is a Premium feature. Upgrade to Premium for ₹49 one-time to use automatic backups."
+        "Automatic Backup is a Premium feature. Upgrade to Premium for ₹69 one-time to use automatic backups."
       );
       return;
     }
@@ -1043,82 +1045,6 @@ function Settings({ onNavigate }: SettingsProps) {
 
 
       {/* ======================================================
-          GENERAL SETTINGS
-          ====================================================== */}
-
-      <div className="card">
-
-        <label>
-          Currency
-        </label>
-
-        <select
-          value={
-            currency
-          }
-          onChange={(e) =>
-            setCurrency(
-              e.target.value
-            )
-          }
-        >
-          <option>
-            INR (₹)
-          </option>
-        </select>
-
-
-        <label>
-          Default Electricity Tariff
-          (₹/kWh)
-        </label>
-
-        <input
-          type="number"
-          value={
-            tariff
-          }
-          min={0}
-          step={0.1}
-          onChange={(e) =>
-            setTariff(
-              Number(
-                e.target.value
-              )
-            )
-          }
-        />
-
-
-        <label>
-          Distance Unit
-        </label>
-
-        <select
-          value={
-            distanceUnit
-          }
-          onChange={(e) =>
-            setDistanceUnit(
-              e.target.value
-            )
-          }
-        >
-
-          <option value="km">
-            km
-          </option>
-
-          <option value="mi">
-            mi
-          </option>
-
-        </select>
-
-      </div>
-
-
-      {/* ======================================================
           FAMILY SHARING
           ====================================================== */}
 
@@ -1128,12 +1054,46 @@ function Settings({ onNavigate }: SettingsProps) {
           👨‍👩‍👧 Family Sharing
         </h3>
 
+        {loadingSubscriptionPlan ? (
 
-        {loadingFamily ? (
+          <p style={{ marginTop: 12 }}>
+            Loading family sharing...
+          </p>
+
+        ) : subscriptionPlan === "free" ? (
+
+          <div
+            style={{
+              marginTop: "16px",
+              padding: "14px 16px",
+              border: "1px solid #93c5fd",
+              borderRadius: "8px",
+              background: "#eff6ff",
+              color: "#1e3a8a",
+              maxWidth: "520px",
+            }}
+          >
+            <div style={{ fontWeight: 700 }}>
+              Premium feature
+            </div>
+
+            <div
+              style={{
+                fontSize: "13px",
+                marginTop: "5px",
+                lineHeight: 1.5,
+              }}
+            >
+              Family Sharing is available with Premium for
+              ₹69 one-time. Upgrade to add and invite family
+              members.
+            </div>
+          </div>
+
+        ) : loadingFamily ? (
 
           <p>
-            Loading family
-            information...
+            Loading family information...
           </p>
 
         ) : family ? (
@@ -1148,7 +1108,6 @@ function Settings({ onNavigate }: SettingsProps) {
               {family.family_name}
             </p>
 
-
             <p
               style={{
                 fontSize: "13px",
@@ -1156,28 +1115,19 @@ function Settings({ onNavigate }: SettingsProps) {
                 marginTop: "6px",
               }}
             >
-              Family members can view
-              each other's EV Toolkit
-              data. Each member can
-              modify only records they
+              Family members can view each other's EV Toolkit
+              data. Each member can modify only records they
               created.
             </p>
-
-
-            {/* ==================================================
-                FAMILY MEMBERS
-                ================================================== */}
 
             <div
               style={{
                 marginTop: "20px",
               }}
             >
-
               <h4>
                 Family Members
               </h4>
-
 
               <div
                 style={{
@@ -1187,7 +1137,6 @@ function Settings({ onNavigate }: SettingsProps) {
                   marginTop: "12px",
                 }}
               >
-
                 {familyMembers.map(
                   (member) => {
 
@@ -1199,10 +1148,8 @@ function Settings({ onNavigate }: SettingsProps) {
                       member.role ===
                       "owner";
 
-
                     const displayName =
                       member.email;
-
 
                     return (
                       <div
@@ -1220,9 +1167,7 @@ function Settings({ onNavigate }: SettingsProps) {
                           flexWrap: "wrap",
                         }}
                       >
-
                         <div>
-
                           <div
                             style={{
                               fontWeight: 600,
@@ -1243,7 +1188,6 @@ function Settings({ onNavigate }: SettingsProps) {
                             )}
                           </div>
 
-
                           <div
                             style={{
                               fontSize: "12px",
@@ -1255,13 +1199,10 @@ function Settings({ onNavigate }: SettingsProps) {
                               ? "Owner"
                               : "Member"}
                           </div>
-
                         </div>
-
 
                         {isFamilyOwner &&
                           !isOwner && (
-
                             <button
                               className="deleteButton"
                               disabled={
@@ -1279,25 +1220,15 @@ function Settings({ onNavigate }: SettingsProps) {
                                 ? "Removing..."
                                 : "Remove"}
                             </button>
-
                           )}
-
                       </div>
                     );
                   }
                 )}
-
               </div>
-
             </div>
 
-
-            {/* ==================================================
-                INVITE MEMBER
-                ================================================== */}
-
             {isFamilyOwner && (
-
               <div
                 style={{
                   marginTop: "24px",
@@ -1306,11 +1237,9 @@ function Settings({ onNavigate }: SettingsProps) {
                     "1px solid #e5e7eb",
                 }}
               >
-
                 <h4>
                   Invite Family Member
                 </h4>
-
 
                 <p
                   style={{
@@ -1324,11 +1253,6 @@ function Settings({ onNavigate }: SettingsProps) {
                   or email address.
                 </p>
 
-
-                {/* ==================================================
-                    SEARCH
-                    ================================================== */}
-
                 <div
                   style={{
                     position: "relative",
@@ -1336,7 +1260,6 @@ function Settings({ onNavigate }: SettingsProps) {
                     maxWidth: "520px",
                   }}
                 >
-
                   <input
                     type="text"
                     value={
@@ -1347,7 +1270,6 @@ function Settings({ onNavigate }: SettingsProps) {
                       sendingInvitation
                     }
                     onChange={(e) => {
-
                       setSearchText(
                         e.target.value
                       );
@@ -1361,14 +1283,8 @@ function Settings({ onNavigate }: SettingsProps) {
                     }}
                   />
 
-
-                  {/* ==================================================
-                      SEARCH RESULTS
-                      ================================================== */}
-
                   {searchText.trim() !== "" &&
                     !selectedUser && (
-
                     <div
                       style={{
                         position: "absolute",
@@ -1386,17 +1302,14 @@ function Settings({ onNavigate }: SettingsProps) {
                           "0 4px 12px rgba(0,0,0,0.08)",
                       }}
                     >
-
                       {availableUsers.length >
                       0 ? (
-
                         availableUsers.map(
                           (user) => {
 
                             const fullName =
                               `${user.first_name ?? ""} ${user.last_name ?? ""}`
                                 .trim();
-
 
                             return (
                               <button
@@ -1405,7 +1318,6 @@ function Settings({ onNavigate }: SettingsProps) {
                                 }
                                 type="button"
                                 onClick={() => {
-
                                   setSelectedUser(
                                     user
                                   );
@@ -1425,7 +1337,6 @@ function Settings({ onNavigate }: SettingsProps) {
                                   cursor: "pointer",
                                 }}
                               >
-
                                 <div
                                   style={{
                                     fontWeight: 600,
@@ -1434,7 +1345,6 @@ function Settings({ onNavigate }: SettingsProps) {
                                   {fullName ||
                                     user.email}
                                 </div>
-
 
                                 <div
                                   style={{
@@ -1447,14 +1357,11 @@ function Settings({ onNavigate }: SettingsProps) {
                                     user.email
                                   }
                                 </div>
-
                               </button>
                             );
                           }
                         )
-
                       ) : (
-
                         <div
                           style={{
                             padding: "12px 14px",
@@ -1464,22 +1371,12 @@ function Settings({ onNavigate }: SettingsProps) {
                         >
                           No matching users found.
                         </div>
-
                       )}
-
                     </div>
-
                   )}
-
                 </div>
 
-
-                {/* ==================================================
-                    SELECTED USER
-                    ================================================== */}
-
                 {selectedUser && (
-
                   <div
                     style={{
                       marginTop: "12px",
@@ -1494,9 +1391,7 @@ function Settings({ onNavigate }: SettingsProps) {
                       gap: "12px",
                     }}
                   >
-
                     <div>
-
                       <div
                         style={{
                           fontWeight: 600,
@@ -1506,7 +1401,6 @@ function Settings({ onNavigate }: SettingsProps) {
                           .trim() ||
                           selectedUser.email}
                       </div>
-
 
                       <div
                         style={{
@@ -1520,7 +1414,6 @@ function Settings({ onNavigate }: SettingsProps) {
                         }
                       </div>
 
-
                       <div
                         style={{
                           fontSize: "12px",
@@ -1529,9 +1422,7 @@ function Settings({ onNavigate }: SettingsProps) {
                       >
                         Role: <strong>Member</strong>
                       </div>
-
                     </div>
-
 
                     <button
                       type="button"
@@ -1539,7 +1430,6 @@ function Settings({ onNavigate }: SettingsProps) {
                         sendingInvitation
                       }
                       onClick={() => {
-
                         setSelectedUser(
                           null
                         );
@@ -1558,15 +1448,8 @@ function Settings({ onNavigate }: SettingsProps) {
                     >
                       ×
                     </button>
-
                   </div>
-
                 )}
-
-
-                {/* ==================================================
-                    INVITE BUTTON
-                    ================================================== */}
 
                 <button
                   className="primaryButton"
@@ -1585,22 +1468,14 @@ function Settings({ onNavigate }: SettingsProps) {
                     ? "Sending..."
                     : "Invite Member"}
                 </button>
-
               </div>
-
             )}
-
-
-            {/* ==================================================
-                PENDING INVITATIONS
-                ================================================== */}
 
             {invitations.some(
               (invitation) =>
                 invitation.status ===
                 "pending"
             ) && (
-
               <div
                 style={{
                   marginTop: "24px",
@@ -1609,11 +1484,9 @@ function Settings({ onNavigate }: SettingsProps) {
                     "1px solid #e5e7eb",
                 }}
               >
-
                 <h4>
                   Pending Invitations
                 </h4>
-
 
                 <div
                   style={{
@@ -1623,7 +1496,6 @@ function Settings({ onNavigate }: SettingsProps) {
                     marginTop: "12px",
                   }}
                 >
-
                   {invitations
                     .filter(
                       (invitation) =>
@@ -1640,7 +1512,6 @@ function Settings({ onNavigate }: SettingsProps) {
                           normalizeEmail(
                             currentUserEmail
                           );
-
 
                         return (
                           <div
@@ -1661,9 +1532,7 @@ function Settings({ onNavigate }: SettingsProps) {
                                 "wrap",
                             }}
                           >
-
                             <div>
-
                               <div
                                 style={{
                                   fontWeight: 600,
@@ -1673,7 +1542,6 @@ function Settings({ onNavigate }: SettingsProps) {
                                   invitation.email
                                 }
                               </div>
-
 
                               <div
                                 style={{
@@ -1687,12 +1555,9 @@ function Settings({ onNavigate }: SettingsProps) {
                                 }
                                 {" • Member"}
                               </div>
-
                             </div>
 
-
                             {invitationIsForCurrentUser ? (
-
                               <button
                                 className="primaryButton"
                                 disabled={
@@ -1710,9 +1575,7 @@ function Settings({ onNavigate }: SettingsProps) {
                                   ? "Accepting..."
                                   : "Accept"}
                               </button>
-
                             ) : (
-
                               <span
                                 style={{
                                   fontSize: "12px",
@@ -1721,35 +1584,26 @@ function Settings({ onNavigate }: SettingsProps) {
                               >
                                 Pending
                               </span>
-
                             )}
-
                           </div>
                         );
                       }
                     )}
-
                 </div>
-
               </div>
-
             )}
-
           </>
 
         ) : (
 
           <div>
-
             <p
               style={{
                 marginTop: "8px",
               }}
             >
-              You are not currently a
-              member of a family.
+              You are not currently a member of a family.
             </p>
-
 
             {invitations
               .filter(
@@ -1778,7 +1632,6 @@ function Settings({ onNavigate }: SettingsProps) {
                         "8px",
                     }}
                   >
-
                     <p>
                       You have been invited
                       to join{" "}
@@ -1789,7 +1642,6 @@ function Settings({ onNavigate }: SettingsProps) {
                       </strong>
                       .
                     </p>
-
 
                     <button
                       className="primaryButton"
@@ -1811,13 +1663,10 @@ function Settings({ onNavigate }: SettingsProps) {
                         ? "Accepting..."
                         : "Accept Invitation"}
                     </button>
-
                   </div>
                 )
               )}
-
           </div>
-
         )}
 
       </div>
@@ -1967,15 +1816,44 @@ function Settings({ onNavigate }: SettingsProps) {
           or monthly schedule.
         </p>
 
-        {loadingBackupSchedule ? (
+        {loadingSubscriptionPlan || loadingBackupSchedule ? (
 
           <p
             style={{
               marginTop: 16,
             }}
           >
-            Loading backup schedule...
+            Loading backup settings...
           </p>
+
+        ) : subscriptionPlan === "free" ? (
+
+          <div
+            style={{
+              marginTop: "16px",
+              padding: "14px 16px",
+              border: "1px solid #93c5fd",
+              borderRadius: "8px",
+              background: "#eff6ff",
+              color: "#1e3a8a",
+              maxWidth: "520px",
+            }}
+          >
+            <div style={{ fontWeight: 700 }}>
+              Premium feature
+            </div>
+            <div
+              style={{
+                fontSize: "13px",
+                marginTop: "5px",
+                lineHeight: 1.5,
+              }}
+            >
+              Automatic Backup is available with Premium for
+              ₹69 one-time. Free users can still create and
+              restore backups manually.
+            </div>
+          </div>
 
         ) : (
 
@@ -2207,7 +2085,7 @@ function Settings({ onNavigate }: SettingsProps) {
               }}
             >
               Automatic Backup is included
-              with Premium for ₹49 one-time.
+              with Premium and Premium Plus.
               Free users can still create
               and restore backups manually.
             </p>

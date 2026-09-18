@@ -21,7 +21,9 @@ import { getCurrentUserId } from "../services/authHelper";
 import {
   getCurrentPlan,
   canAddInsurance,
+  canUseFileUploads,
   FREE_LIMITS,
+  type SubscriptionPlan,
 } from "../services/subscriptionService";
 
 import {
@@ -192,6 +194,11 @@ export default function Insurance({
     setCurrentUserId,
   ] = useState<string | null>(null);
 
+  const [
+    subscriptionPlan,
+    setSubscriptionPlan,
+  ] = useState<SubscriptionPlan>("free");
+
   const [form, setForm] =
     useState<InsuranceRecord>(
       emptyPolicy
@@ -304,6 +311,9 @@ export default function Insurance({
         setCurrentUserId(
           userId
         );
+
+        const plan = await getCurrentPlan();
+        setSubscriptionPlan(plan);
 
         await Promise.all([
           loadPolicies(),
@@ -999,7 +1009,7 @@ export default function Insurance({
           )
         ) {
           alert(
-            `The Free plan is limited to ${FREE_LIMITS.insurance} insurance policy. Upgrade to Premium for ₹49 one-time to add more insurance policies.`
+            `The Free plan is limited to ${FREE_LIMITS.insurance} insurance policy. Upgrade to Premium for ₹69 one-time to add more insurance policies.`
           );
 
           return;
@@ -1728,46 +1738,66 @@ export default function Insurance({
           Policy Document
         </label>
 
-        <ReceiptUploader
-          value={form.attachment}
-          fileName={form.attachment_name}
-          onChange={(attachment) => {
-            setForm({
-              ...form,
-              attachment,
-            });
-            handleAutosaveBlur();
-          }}
-          onFileNameChange={(attachment_name) => {
-            setForm({
-              ...form,
-              attachment_name,
-            });
-            handleAutosaveBlur();
-          }}
-        />
+        {canUseFileUploads(subscriptionPlan) ? (
+          <>
+            <ReceiptUploader
+              value={form.attachment}
+              fileName={form.attachment_name}
+              onChange={(attachment) => {
+                setForm({
+                  ...form,
+                  attachment,
+                });
+                handleAutosaveBlur();
+              }}
+              onFileNameChange={(attachment_name) => {
+                setForm({
+                  ...form,
+                  attachment_name,
+                });
+                handleAutosaveBlur();
+              }}
+            />
 
-
-        <p
-          style={{
-            fontSize:
-              "12px",
-            color:
-              "#6b7280",
-            marginTop:
-              "6px",
-          }}
-        >
-          Upload your insurance
-          policy (PDF or image).
-          Recommended maximum
-          file size:
-          <strong>
-            {" "}
-            5 MB
-          </strong>
-          .
-        </p>
+            <p
+              style={{
+                fontSize:
+                  "12px",
+                color:
+                  "#6b7280",
+                marginTop:
+                  "6px",
+              }}
+            >
+              Upload your insurance
+              policy (PDF or image).
+              Recommended maximum
+              file size:
+              <strong>
+                {" "}
+                5 MB
+              </strong>
+              .
+            </p>
+          </>
+        ) : (
+          <div
+            style={{
+              padding: "12px 14px",
+              border: "1px solid #bfdbfe",
+              borderRadius: "8px",
+              background: "#eff6ff",
+              color: "#1e40af",
+              fontSize: "13px",
+              lineHeight: 1.5,
+            }}
+          >
+            <strong>Premium Plus feature</strong>
+            <br />
+            Policy document uploads are available only with Premium Plus.
+            Premium Plus is coming soon.
+          </div>
+        )}
 
 
         <br />

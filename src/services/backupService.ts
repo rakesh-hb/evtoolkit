@@ -54,10 +54,43 @@ export async function createBackup() {
       .toISOString()
       .split("T")[0];
 
+    // Use the signed-in user's first and last name in the
+    // backup filename so exported backups are easy to identify.
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError) {
+      console.error(
+        "Could not get current user for backup filename:",
+        userError
+      );
+    }
+
+    const firstName =
+      user?.user_metadata?.first_name
+        ?.toString()
+        .trim() || "";
+
+    const lastName =
+      user?.user_metadata?.last_name
+        ?.toString()
+        .trim() || "";
+
+    const userName =
+      [firstName, lastName]
+        .filter(Boolean)
+        .join("_")
+        .replace(/[^A-Za-z0-9_-]/g, "");
+
+    const fileNameUser =
+      userName || "User";
+
     a.href = url;
 
     a.download =
-      `EVToolkit_Backup_${today}.json`;
+      `EVToolkit_Backup_${fileNameUser}_${today}.json`;
 
     document.body.appendChild(a);
 
@@ -69,11 +102,6 @@ export async function createBackup() {
 
     // Record the successful backup in Supabase so the
     // Settings page can show the correct Last Backup time.
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
     if (userError) {
       console.error(
         "Could not get current user for backup registry:",

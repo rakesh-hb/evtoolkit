@@ -5,7 +5,7 @@ import { supabase } from "../lib/supabase";
  * EV TOOLKIT SUBSCRIPTION SERVICE
  * =========================================================
  *
- * Premium is currently a ₹49 one-time purchase.
+ * Premium is currently a ₹69 one-time purchase.
  *
  * IMPORTANT:
  * - This service reads the user's entitlement from Supabase.
@@ -18,7 +18,8 @@ import { supabase } from "../lib/supabase";
 
 export type SubscriptionPlan =
   | "free"
-  | "premium";
+  | "premium"
+  | "premium_plus";
 
 export type SubscriptionStatus =
   | "active"
@@ -32,7 +33,7 @@ export interface UserSubscription {
   status: SubscriptionStatus;
   amount: number;
   currency: "INR";
-  purchase_type: "one_time";
+  purchase_type: "one_time" | "subscription";
   purchased_at: string | null;
   payment_reference: string | null;
   created_at: string;
@@ -48,9 +49,16 @@ export const SUBSCRIPTION_PLANS = {
   },
   premium: {
     name: "Premium",
-    price: 49,
+    price: 69,
     currency: "INR",
     purchaseType: "one_time",
+  },
+  premium_plus: {
+    name: "Premium Plus",
+    price: null,
+    currency: "INR",
+    purchaseType: "subscription",
+    comingSoon: true,
   },
 } as const;
 
@@ -149,11 +157,19 @@ export async function isPremiumUser(): Promise<boolean> {
  */
 
 export async function getCurrentPlan(): Promise<SubscriptionPlan> {
-  const premium = await isPremiumUser();
+  const subscription = await getCurrentSubscription();
 
-  return premium
-    ? "premium"
-    : "free";
+  if (
+    subscription?.status === "active" &&
+    (
+      subscription.plan === "premium" ||
+      subscription.plan === "premium_plus"
+    )
+  ) {
+    return subscription.plan;
+  }
+
+  return "free";
 }
 
 /*
@@ -185,7 +201,7 @@ export function canAddInsurance(
 ): boolean {
   return canAddWithinLimit(
     currentCount,
-    plan === "premium"
+    (plan === "premium" || plan === "premium_plus")
       ? PREMIUM_LIMITS.insurance
       : FREE_LIMITS.insurance
   );
@@ -197,7 +213,7 @@ export function canAddDocument(
 ): boolean {
   return canAddWithinLimit(
     currentCount,
-    plan === "premium"
+    (plan === "premium" || plan === "premium_plus")
       ? PREMIUM_LIMITS.documents
       : FREE_LIMITS.documents
   );
@@ -209,7 +225,7 @@ export function canAddTyreHistory(
 ): boolean {
   return canAddWithinLimit(
     currentCount,
-    plan === "premium"
+    (plan === "premium" || plan === "premium_plus")
       ? PREMIUM_LIMITS.tyreHistory
       : FREE_LIMITS.tyreHistory
   );
@@ -221,7 +237,7 @@ export function canAddServiceHistory(
 ): boolean {
   return canAddWithinLimit(
     currentCount,
-    plan === "premium"
+    (plan === "premium" || plan === "premium_plus")
       ? PREMIUM_LIMITS.serviceHistory
       : FREE_LIMITS.serviceHistory
   );
@@ -233,7 +249,7 @@ export function canAddChargingSession(
 ): boolean {
   return canAddWithinLimit(
     currentCount,
-    plan === "premium"
+    (plan === "premium" || plan === "premium_plus")
       ? PREMIUM_LIMITS.chargingSessions
       : FREE_LIMITS.chargingSessions
   );
@@ -247,25 +263,25 @@ export function canAddChargingSession(
 export function canUseFamily(
   plan: SubscriptionPlan
 ): boolean {
-  return plan === "premium";
+  return plan === "premium" || plan === "premium_plus";
 }
 
 export function canUseAutoBackup(
   plan: SubscriptionPlan
 ): boolean {
-  return plan === "premium";
+  return plan === "premium" || plan === "premium_plus";
 }
 
 export function canUseAnalytics(
   plan: SubscriptionPlan
 ): boolean {
-  return plan === "premium";
+  return plan === "premium" || plan === "premium_plus";
 }
 
 export function canExportAnalyticsPdf(
   plan: SubscriptionPlan
 ): boolean {
-  return plan === "premium";
+  return plan === "premium" || plan === "premium_plus";
 }
 
 /*
@@ -279,8 +295,44 @@ export function getUpgradeMessage(
   limit?: number
 ): string {
   if (typeof limit === "number") {
-    return `${featureName} is limited to ${limit} on the Free plan. Upgrade to Premium for ₹49 one-time to unlock more.`;
+    return `${featureName} is limited to ${limit} on the Free plan. Upgrade to Premium for ₹69 one-time to unlock more.`;
   }
 
-  return `${featureName} is available with Premium for ₹49 one-time.`;
+  return `${featureName} is available with Premium for ₹69 one-time.`;
+}
+
+
+/*
+ * =========================================================
+ * PREMIUM PLUS FEATURE HELPERS
+ * =========================================================
+ *
+ * Premium Plus is a separate subscription tier.
+ * These helpers identify features reserved for Premium Plus.
+ * The actual cloud storage/backup implementation will be
+ * added in a future step.
+ */
+
+export function canUsePremiumPlus(
+  plan: SubscriptionPlan
+): boolean {
+  return plan === "premium_plus";
+}
+
+export function canUseFileUploads(
+  plan: SubscriptionPlan
+): boolean {
+  return plan === "premium_plus";
+}
+
+export function canUseCloudStorage(
+  plan: SubscriptionPlan
+): boolean {
+  return plan === "premium_plus";
+}
+
+export function canUseCloudBackup(
+  plan: SubscriptionPlan
+): boolean {
+  return plan === "premium_plus";
 }

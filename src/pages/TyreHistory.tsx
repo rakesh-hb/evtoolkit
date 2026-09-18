@@ -22,7 +22,9 @@ import { getCurrentUserId } from "../services/authHelper";
 import {
   getCurrentPlan,
   canAddTyreHistory,
+  canUseFileUploads,
   FREE_LIMITS,
+  type SubscriptionPlan,
 } from "../services/subscriptionService";
 
 import {
@@ -76,6 +78,9 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
 
   const [currentUserId, setCurrentUserId] =
     useState<string | null>(null);
+
+  const [subscriptionPlan, setSubscriptionPlan] =
+    useState<SubscriptionPlan>("free");
 
 
   const [form, setForm] =
@@ -151,6 +156,9 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
         setCurrentUserId(
           userId
         );
+
+        const plan = await getCurrentPlan();
+        setSubscriptionPlan(plan);
 
         await loadTyres();
 
@@ -648,7 +656,7 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
           )
         ) {
           alert(
-            `The Free plan is limited to ${FREE_LIMITS.tyreHistory} tyre history records. Upgrade to Premium for ₹49 one-time to add more tyre history records.`
+            `The Free plan is limited to ${FREE_LIMITS.tyreHistory} tyre history records. Upgrade to Premium for ₹69 one-time to add more tyre history records.`
           );
 
           return;
@@ -1018,48 +1026,68 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
           Invoice / Receipt
         </label>
 
+        {canUseFileUploads(subscriptionPlan) ? (
+          <>
+            <ReceiptUploader
+              value={form.receipt}
+              fileName={form.attachment_name}
+              onChange={(receipt) => {
+                setForm({
+                  ...form,
+                  receipt,
+                });
+                handleAutosaveBlur();
+              }}
+              onFileNameChange={(attachment_name) => {
+                setForm({
+                  ...form,
+                  attachment_name,
+                });
+                handleAutosaveBlur();
+              }}
+            />
 
-        <ReceiptUploader
-          value={form.receipt}
-          fileName={form.attachment_name}
-          onChange={(receipt) => {
-            setForm({
-              ...form,
-              receipt,
-            });
-            handleAutosaveBlur();
-          }}
-          onFileNameChange={(attachment_name) => {
-            setForm({
-              ...form,
-              attachment_name,
-            });
-            handleAutosaveBlur();
-          }}
-        />
-
-
-        <p
-          style={{
-            fontSize:
-              "12px",
-            color:
-              "#6b7280",
-            marginTop:
-              "6px",
-          }}
-        >
-          Supported file types:
-          PDF, images, and other
-          document formats.
-          Recommended maximum
-          file size:{" "}
-          <strong>
-            5 MB
-          </strong>{" "}
-          per file for optimal
-          performance.
-        </p>
+            <p
+              style={{
+                fontSize:
+                  "12px",
+                color:
+                  "#6b7280",
+                marginTop:
+                  "6px",
+              }}
+            >
+              Supported file types:
+              PDF, images, and other
+              document formats.
+              Recommended maximum
+              file size:{" "}
+              <strong>
+                5 MB
+              </strong>{" "}
+              per file for optimal
+              performance.
+            </p>
+          </>
+        ) : (
+          <div
+            style={{
+              border: "1px solid #2563eb",
+              borderRadius: "8px",
+              padding: "12px 14px",
+              marginTop: "6px",
+              background: "#eff6ff",
+              color: "#1d4ed8",
+              fontSize: "13px",
+            }}
+          >
+            <strong>Premium Plus feature</strong>
+            <div style={{ marginTop: "4px" }}>
+              Invoice and receipt uploads are available only with Premium Plus.
+              Premium Plus is coming soon.
+            </div>
+          </div>
+        )}
 
 
         <br />

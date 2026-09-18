@@ -227,6 +227,36 @@ export default function UserProfile() {
     }
   }
 
+  async function handleLogout() {
+    const confirmed = window.confirm(
+      "Are you sure you want to log out?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const { error } =
+        await supabase.auth.signOut();
+
+      if (error) {
+        throw error;
+      }
+    } catch (error) {
+      console.error(
+        "Logout error:",
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to log out."
+      );
+    }
+  }
+
   return (
     <>
       <div
@@ -454,6 +484,32 @@ export default function UserProfile() {
           {changingPassword
             ? "Changing Password..."
             : "Change Password"}
+        </button>
+      </div>
+
+      <div
+        className="card"
+        style={{
+          marginTop: "24px",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => void handleLogout()}
+          style={{
+            display: "block",
+            width: "100%",
+            background: "#dc2626",
+            color: "#ffffff",
+            border: "none",
+            borderRadius: "6px",
+            padding: "12px 18px",
+            cursor: "pointer",
+            fontWeight: 600,
+            fontSize: "14px",
+          }}
+        >
+          Logout
         </button>
       </div>
     </>

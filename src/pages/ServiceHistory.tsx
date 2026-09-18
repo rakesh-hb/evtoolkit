@@ -21,7 +21,9 @@ import { getCurrentUserId } from "../services/authHelper";
 import {
   getCurrentPlan,
   canAddServiceHistory,
+  canUseFileUploads,
   FREE_LIMITS,
+  type SubscriptionPlan,
 } from "../services/subscriptionService";
 
 import {
@@ -35,12 +37,6 @@ import {
   addCustomVehicle,
   type CustomVehicleRecord,
 } from "../services/customVehicleService";
-
-import {
-  getServiceTypes,
-  addServiceType,
-  type ServiceTypeRecord,
-} from "../services/serviceTypeService";
 
 import { vehicles } from "../data/vehicles";
 
@@ -89,6 +85,9 @@ export default function ServiceHistory({
   const [currentUserId, setCurrentUserId] =
     useState<string | null>(null);
 
+  const [subscriptionPlan, setSubscriptionPlan] =
+    useState<SubscriptionPlan>("free");
+
   const [form, setForm] =
     useState<ServiceRecord>(
       emptyRecord
@@ -118,23 +117,6 @@ export default function ServiceHistory({
     useState("");
 
   const [savingVehicle, setSavingVehicle] =
-    useState(false);
-
-
-  /* ============================================================
-     CUSTOM SERVICE TYPES
-     ============================================================ */
-
-  const [customServiceTypes, setCustomServiceTypes] =
-    useState<ServiceTypeRecord[]>([]);
-
-  const [showServiceTypeForm, setShowServiceTypeForm] =
-    useState(false);
-
-  const [serviceTypeName, setServiceTypeName] =
-    useState("");
-
-  const [savingServiceType, setSavingServiceType] =
     useState(false);
 
 
@@ -199,10 +181,12 @@ export default function ServiceHistory({
         userId
       );
 
+      const plan = await getCurrentPlan();
+      setSubscriptionPlan(plan);
+
       await Promise.all([
         loadRecords(),
         loadCustomVehicles(),
-        loadCustomServiceTypes(),
       ]);
 
       await restoreDraft("service-history:new");
@@ -279,27 +263,6 @@ export default function ServiceHistory({
     }
   }
 
-
-  async function loadCustomServiceTypes() {
-    try {
-      const data =
-        await getServiceTypes();
-
-      setCustomServiceTypes(
-        data
-      );
-
-    } catch (err) {
-      console.error(
-        "Failed to load custom service types:",
-        err
-      );
-
-      alert(
-        "Failed to load custom service types."
-      );
-    }
-  }
 
 
   useEffect(() => {
@@ -424,250 +387,143 @@ export default function ServiceHistory({
 
 
   /* ============================================================
-     SERVICE TYPE LIST
+     SERVICE OPTIONS
      ============================================================ */
 
-  const allServiceTypes =
-    useMemo(() => {
-      const combined = [
-        ...builtInServiceTypes,
-        ...customServiceTypes.map(
-          (serviceType) =>
-            serviceType.name
-        ),
-      ];
+  const serviceOptions = {
+    "Free Service": [
+      "General Inspection",
+      "Battery Check",
+      "12V Battery Check",
+      "Tyre Pressure Check",
+      "Tyre Rotation",
+      "Wheel Alignment",
+      "Brake Inspection",
+      "Brake Fluid Check",
+      "Coolant Level Check",
+      "Washer Fluid Top-up",
+      "Charging System Check",
+      "Charging Port Inspection",
+      "Software Update",
+      "Firmware Update",
+      "Road Test",
+      "Safety Inspection",
+      "Other",
+    ],
+    "Paid Service": [
+      "Oil Change",
+      "Coolant Change",
+      "Brake Service",
+      "Brake Pad Replacement",
+      "Brake Disc Replacement",
+      "Brake Fluid Change",
+      "Brake Caliper Service",
+      "Tyre Replacement",
+      "Wheel Alignment",
+      "Wheel Balancing",
+      "Tyre Rotation",
+      "Wheel Bearing Replacement",
+      "Battery Replacement",
+      "12V Battery Replacement",
+      "Battery Health Check",
+      "AC Service",
+      "AC Filter Replacement",
+      "Cabin Filter Replacement",
+      "Air Filter Replacement",
+      "Wiper Blade Replacement",
+      "Suspension Service",
+      "Shock Absorber Replacement",
+      "Steering Service",
+      "Wheel Hub Service",
+      "Charging Port Service",
+      "Charging System Repair",
+      "Coolant System Repair",
+      "Software / Firmware Repair",
+      "Software Update",
+      "General Repair",
+      "Electrical Repair",
+      "Body Repair",
+      "Other",
+    ],
+    "Other Service": [],
+  };
 
-      const seen =
-        new Set<string>();
+  const serviceCategories = Object.keys(serviceOptions) as Array<
+    keyof typeof serviceOptions
+  >;
 
-      return combined.filter(
-        (serviceType) => {
-          const key =
-            serviceType
-              .trim()
-              .toLowerCase();
+  const [selectedServiceCategory, setSelectedServiceCategory] =
+    useState<keyof typeof serviceOptions | "">("");
 
-          if (seen.has(key)) {
-            return false;
-          }
+  const [selectedServiceToAdd, setSelectedServiceToAdd] = useState("");
+  const [otherServiceDetail, setOtherServiceDetail] = useState("");
 
-          seen.add(key);
-
-          return true;
-        }
-      );
-    }, [
-      customServiceTypes,
-    ]);
-
+  const availableServices = selectedServiceCategory
+    ? serviceOptions[selectedServiceCategory]
+    : [];
 
   /* ============================================================
-     ADD CUSTOM VEHICLE
+     SERVICES PERFORMED
      ============================================================ */
 
-  async function handleAddVehicle() {
-    const brand =
-      vehicleBrand.trim();
+  const selectedServiceTypes = useMemo(
+    () =>
+      form.serviceType
+        .split(",")
+        .map((service) => service.trim())
+        .filter(Boolean),
+    [form.serviceType]
+  );
 
-    const model =
-      vehicleModel.trim();
+  function addServiceToForm() {
+    const selectedService = selectedServiceToAdd.trim();
+    const customDetail = otherServiceDetail.trim();
 
-    if (!brand || !model) {
-      alert(
-        "Please enter the vehicle brand and model."
-      );
+    if (!selectedServiceCategory) return;
 
+    const isOtherCategory = selectedServiceCategory === "Other Service";
+
+    const service =
+      isOtherCategory
+        ? customDetail
+          ? `Other Service - ${customDetail}`
+          : ""
+        : selectedService === "Other"
+          ? customDetail
+            ? `${selectedServiceCategory} - Other - ${customDetail}`
+            : ""
+          : selectedService;
+
+    if (!service) {
+      alert("Please enter the custom service detail.");
       return;
     }
 
-    const vehicleName =
-      `${brand} ${model}`;
-
-
-    const duplicate =
-      allVehicles.some(
-        (vehicle) =>
-          vehicle.value
-            .trim()
-            .toLowerCase() ===
-          vehicleName
-            .trim()
-            .toLowerCase()
-      );
-
-    if (duplicate) {
-      alert(
-        "This vehicle already exists."
-      );
-
+    if (selectedServiceTypes.some((selected) => selected.toLowerCase() === service.toLowerCase())) {
+      setSelectedServiceToAdd("");
+      setOtherServiceDetail("");
       return;
     }
 
+    setForm((previous) => ({
+      ...previous,
+      serviceType: [...selectedServiceTypes, service].join(", "),
+    }));
 
-    try {
-      setSavingVehicle(
-        true
-      );
-
-      const created =
-        await addCustomVehicle({
-          brand,
-          model,
-        });
-
-
-      setCustomVehicles(
-        (previous) => [
-          ...previous,
-          created,
-        ]
-      );
-
-
-      const createdVehicle =
-        `${created.brand} ${created.model}`;
-
-
-      setForm(
-        (previous) => ({
-          ...previous,
-          vehicle:
-            createdVehicle,
-        })
-      );
-
-
-      setVehicleBrand(
-        ""
-      );
-
-      setVehicleModel(
-        ""
-      );
-
-      setShowVehicleForm(
-        false
-      );
-
-
-      alert(
-        "Vehicle added successfully."
-      );
-
-    } catch (error) {
-      console.error(
-        "Failed to add vehicle:",
-        error
-      );
-
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Failed to add vehicle."
-      );
-
-    } finally {
-      setSavingVehicle(
-        false
-      );
-    }
+    setSelectedServiceToAdd("");
+    setOtherServiceDetail("");
   }
 
-
-  /* ============================================================
-     ADD CUSTOM SERVICE TYPE
-     ============================================================ */
-
-  async function handleAddServiceType() {
-    const name =
-      serviceTypeName.trim();
-
-    if (!name) {
-      alert(
-        "Please enter a service type."
-      );
-
-      return;
-    }
-
-
-    const duplicate =
-      allServiceTypes.some(
-        (serviceType) =>
-          serviceType
-            .trim()
-            .toLowerCase() ===
-          name.toLowerCase()
-      );
-
-
-    if (duplicate) {
-      alert(
-        "This service type already exists."
-      );
-
-      return;
-    }
-
-
-    try {
-      setSavingServiceType(
-        true
-      );
-
-      const created =
-        await addServiceType(
-          name
-        );
-
-
-      setCustomServiceTypes(
-        (previous) => [
-          ...previous,
-          created,
-        ]
-      );
-
-
-      setForm(
-        (previous) => ({
-          ...previous,
-          serviceType:
-            created.name,
-        })
-      );
-
-
-      setServiceTypeName(
-        ""
-      );
-
-      setShowServiceTypeForm(
-        false
-      );
-
-
-      alert(
-        "Service type added successfully."
-      );
-
-    } catch (error) {
-      console.error(
-        "Failed to add service type:",
-        error
-      );
-
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Failed to add service type."
-      );
-
-    } finally {
-      setSavingServiceType(
-        false
-      );
-    }
+  function removeServiceFromForm(serviceToRemove: string) {
+    setForm((previous) => ({
+      ...previous,
+      serviceType: selectedServiceTypes
+        .filter(
+          (service) =>
+            service.toLowerCase() !== serviceToRemove.toLowerCase()
+        )
+        .join(", "),
+    }));
   }
 
 
@@ -731,8 +587,11 @@ export default function ServiceHistory({
     setShowVehicleForm(false);
     setVehicleBrand("");
     setVehicleModel("");
-    setShowServiceTypeForm(false);
-    setServiceTypeName("");
+    setSelectedServiceToAdd("");
+    setSelectedServiceCategory("");
+    setSelectedServiceCategory("");
+    setSelectedServiceToAdd("");
+    setOtherServiceDetail("");
     setDraftStatus("idle");
 
     window.setTimeout(() => {
@@ -741,6 +600,63 @@ export default function ServiceHistory({
     }, 0);
   }
 
+
+  function getServiceCategoryFromRecord(serviceType: string): "Free Service" | "Paid Service" | null {
+    const normalized = serviceType.trim().toLowerCase();
+
+    if (
+      normalized.startsWith("1st free service") ||
+      normalized.startsWith("2nd free service") ||
+      normalized.startsWith("3rd free service") ||
+      normalized.startsWith("4th free service") ||
+      normalized.startsWith("5th free service") ||
+      normalized.startsWith("free service")
+    ) {
+      return "Free Service";
+    }
+
+    if (
+      normalized.startsWith("1st paid service") ||
+      normalized.startsWith("2nd paid service") ||
+      normalized.startsWith("3rd paid service") ||
+      normalized.startsWith("4th paid service") ||
+      normalized.startsWith("5th paid service") ||
+      normalized.startsWith("paid service")
+    ) {
+      return "Paid Service";
+    }
+
+    return null;
+  }
+
+  function getOrdinal(count: number) {
+    if (count % 100 >= 11 && count % 100 <= 13) return `${count}th`;
+    switch (count % 10) {
+      case 1: return `${count}st`;
+      case 2: return `${count}nd`;
+      case 3: return `${count}rd`;
+      default: return `${count}th`;
+    }
+  }
+
+  function getServiceRecordDisplayType(record: ServiceRecord) {
+    const existingCategory = getServiceCategoryFromRecord(record.serviceType);
+
+    if (existingCategory) {
+      return record.serviceType;
+    }
+
+    return record.serviceType;
+  }
+
+  function getNextServiceLabel(category: "Free Service" | "Paid Service") {
+    const count = records.filter((record) => {
+      if (record.user_id !== currentUserId) return false;
+      return getServiceCategoryFromRecord(record.serviceType) === category;
+    }).length;
+
+    return `${getOrdinal(count + 1)} ${category}`;
+  }
 
   /* ============================================================
      SAVE / UPDATE
@@ -822,16 +738,36 @@ export default function ServiceHistory({
           )
         ) {
           alert(
-            `The Free plan is limited to ${FREE_LIMITS.serviceHistory} service history records. Upgrade to Premium for ₹49 one-time to add more service history records.`
+            `The Free plan is limited to ${FREE_LIMITS.serviceHistory} service history records. Upgrade to Premium for ₹69 one-time to add more service history records.`
           );
 
           return;
         }
 
+        const serviceLabel = getNextServiceLabel(
+          selectedServiceCategory === "Free Service" ||
+          selectedServiceCategory === "Paid Service"
+            ? selectedServiceCategory
+            : form.serviceType.toLowerCase().startsWith("paid")
+              ? "Paid Service"
+              : "Free Service"
+        );
+
+        const serviceDetails = form.serviceType
+          .split(",")
+          .map((service) => service.trim())
+          .filter(Boolean)
+          .join(", ");
+
+        const recordWithServiceLabel = {
+          ...form,
+          serviceType: `${serviceLabel} - ${serviceDetails}`,
+        };
+
         const {
           id,
           ...newRecord
-        } = form;
+        } = recordWithServiceLabel;
 
 
         await addServiceRecord(
@@ -861,6 +797,9 @@ export default function ServiceHistory({
         emptyRecord
       );
 
+      setSelectedServiceCategory("");
+      setSelectedServiceToAdd("");
+      setOtherServiceDetail("");
       setDraftStatus("idle");
 
       window.setTimeout(() => {
@@ -1294,158 +1233,146 @@ export default function ServiceHistory({
 
 
           {/* ==================================================
-              SERVICE TYPE
+              SERVICES PERFORMED
               ================================================== */}
 
           <div>
 
             <label>
-              Service Type
+              Services Performed
             </label>
 
             <div
               style={{
-                display:
-                  "flex",
-                gap:
-                  "8px",
-                alignItems:
-                  "center",
+                display: "flex",
+                gap: "8px",
+                alignItems: "center",
               }}
             >
 
               <select
-                value={
-                  form.serviceType
-                }
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    serviceType:
-                      e.target.value,
-                  })
-                }
-                style={{
-                  flex: 1,
+                value={selectedServiceCategory}
+                onChange={(e) => {
+                  setSelectedServiceCategory(e.target.value as keyof typeof serviceOptions | "");
+                  setSelectedServiceToAdd("");
+                  setOtherServiceDetail("");
                 }}
+                onBlur={handleAutosaveBlur}
+                style={{ flex: 1 }}
               >
-
-                <option value="">
-                  Select Service Type
-                </option>
-
-                {allServiceTypes.map(
-                  (serviceType) => (
-                    <option
-                      key={
-                        serviceType
-                      }
-                      value={
-                        serviceType
-                      }
-                    >
-                      {
-                        serviceType
-                      }
-                    </option>
-                  )
-                )}
-
+                <option value="">Select Service Type</option>
+                {serviceCategories.map((category) => (
+                  <option key={category} value={category}>{category}</option>
+                ))}
               </select>
 
+              {selectedServiceCategory !== "Other Service" && (
+                <select
+                  value={selectedServiceToAdd}
+                  onChange={(e) => {
+                    setSelectedServiceToAdd(e.target.value);
+                    if (e.target.value !== "Other") setOtherServiceDetail("");
+                  }}
+                  onBlur={handleAutosaveBlur}
+                  disabled={!selectedServiceCategory}
+                  style={{ flex: 1 }}
+                >
+                  <option value="">Select Service</option>
+                  {availableServices.map((service) => (
+                    <option key={service} value={service}>{service}</option>
+                  ))}
+                </select>
+              )}
+
+              {(selectedServiceCategory === "Other Service" || selectedServiceToAdd === "Other") && (
+                <input
+                  type="text"
+                  value={otherServiceDetail}
+                  onChange={(e) => setOtherServiceDetail(e.target.value)}
+                  onBlur={handleAutosaveBlur}
+                  placeholder="Enter custom service detail"
+                  aria-label="Custom service detail"
+                  style={{ flex: 1 }}
+                />
+              )}
 
               <button
                 type="button"
                 className="saveButton"
-                onClick={() =>
-                  setShowServiceTypeForm(
-                    (value) =>
-                      !value
-                  )
+                disabled={
+                  !selectedServiceCategory ||
+                  (selectedServiceCategory !== "Other Service" && !selectedServiceToAdd) ||
+                  ((selectedServiceCategory === "Other Service" || selectedServiceToAdd === "Other") &&
+                    !otherServiceDetail.trim())
                 }
+                onClick={addServiceToForm}
               >
-                ＋ Add Service Type
+                ＋ Add
               </button>
-
             </div>
 
-
-            {showServiceTypeForm && (
+            {selectedServiceTypes.length > 0 && (
               <div
                 style={{
-                  marginTop:
-                    "10px",
-                  padding:
-                    "12px",
-                  border:
-                    "1px solid #e5e7eb",
-                  borderRadius:
-                    "8px",
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "8px",
+                  marginTop: "10px",
                 }}
               >
-
-                <input
-                  type="text"
-                  placeholder="Service type"
-                  value={
-                    serviceTypeName
-                  }
-                  onChange={(e) =>
-                    setServiceTypeName(
-                      e.target.value
-                    )
-                  }
-                />
-
-
-                <div
-                  style={{
-                    display:
-                      "flex",
-                    gap:
-                      "8px",
-                    marginTop:
-                      "10px",
-                  }}
-                >
-
-                  <button
-                    type="button"
-                    className="saveButton"
-                    disabled={
-                      savingServiceType
-                    }
-                    onClick={() =>
-                      void handleAddServiceType()
-                    }
-                  >
-                    {savingServiceType
-                      ? "Saving..."
-                      : "Save Service Type"}
-                  </button>
-
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowServiceTypeForm(
-                        false
-                      );
-                      setServiceTypeName(
-                        ""
-                      );
+                {selectedServiceTypes.map((service) => (
+                  <span
+                    key={service}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "6px 10px",
+                      borderRadius: "16px",
+                      background: "#2563eb",
+                      border: "1px solid #60a5fa",
+                      color: "#ffffff",
+                      fontSize: "13px",
                     }}
                   >
-                    Cancel
-                  </button>
+                    {service}
 
-                </div>
-
+                    <button
+                      type="button"
+                      onClick={() =>
+                        removeServiceFromForm(service)
+                      }
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        cursor: "pointer",
+                        fontWeight: 700,
+                        color: "#dbeafe",
+                        padding: 0,
+                      }}
+                      aria-label={`Remove ${service}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
               </div>
             )}
 
-          </div>
+            {selectedServiceTypes.length === 0 && (
+              <p
+                style={{
+                  fontSize: "12px",
+                  color: "#6b7280",
+                  marginTop: "6px",
+                }}
+              >
+                Select Free Service or Paid Service, choose the services
+                performed, and press Add. You can add multiple services.
+              </p>
+            )}
 
+          </div>
 
           {/* ==================================================
               SERVICE CENTRE
@@ -1541,48 +1468,67 @@ export default function ServiceHistory({
           Invoice / Receipt
         </label>
 
+        {canUseFileUploads(subscriptionPlan) ? (
+          <>
+            <ReceiptUploader
+              value={form.attachment}
+              fileName={form.attachment_name}
+              onChange={(attachment) => {
+                setForm({
+                  ...form,
+                  attachment,
+                });
+                handleAutosaveBlur();
+              }}
+              onFileNameChange={(attachment_name) => {
+                setForm({
+                  ...form,
+                  attachment_name,
+                });
+                handleAutosaveBlur();
+              }}
+            />
 
-        <ReceiptUploader
-          value={form.attachment}
-          fileName={form.attachment_name}
-          onChange={(attachment) => {
-            setForm({
-              ...form,
-              attachment,
-            });
-            handleAutosaveBlur();
-          }}
-          onFileNameChange={(attachment_name) => {
-            setForm({
-              ...form,
-              attachment_name,
-            });
-            handleAutosaveBlur();
-          }}
-        />
-
-
-        <p
-          style={{
-            fontSize:
-              "12px",
-            color:
-              "#6b7280",
-            marginTop:
-              "6px",
-          }}
-        >
-          Supported file types:
-          PDF, images, and other
-          document formats.
-          Recommended maximum
-          file size:{" "}
-          <strong>
-            5 MB
-          </strong>{" "}
-          per file for optimal
-          performance.
-        </p>
+            <p
+              style={{
+                fontSize:
+                  "12px",
+                color:
+                  "#6b7280",
+                marginTop:
+                  "6px",
+              }}
+            >
+              Supported file types:
+              PDF, images, and other
+              document formats.
+              Recommended maximum
+              file size:{" "}
+              <strong>
+                5 MB
+              </strong>{" "}
+              per file for optimal
+              performance.
+            </p>
+          </>
+        ) : (
+          <div
+            style={{
+              padding: "12px 14px",
+              border: "1px solid #bfdbfe",
+              borderRadius: "8px",
+              background: "#eff6ff",
+              color: "#1e40af",
+              fontSize: "13px",
+              lineHeight: 1.5,
+            }}
+          >
+            <strong>Premium Plus feature</strong>
+            <br />
+            Invoice and receipt uploads are available only with Premium Plus.
+            Premium Plus is coming soon.
+          </div>
+        )}
 
 
         <br />

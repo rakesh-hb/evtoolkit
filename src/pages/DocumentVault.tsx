@@ -21,7 +21,9 @@ import { getCurrentUserId } from "../services/authHelper";
 import {
   getCurrentPlan,
   canAddDocument,
+  canUseFileUploads,
   FREE_LIMITS,
+  type SubscriptionPlan,
 } from "../services/subscriptionService";
 
 import {
@@ -93,6 +95,12 @@ export default function DocumentVault({
     currentUserId,
     setCurrentUserId,
   ] = useState<string | null>(null);
+
+  const [subscriptionPlan, setSubscriptionPlan] =
+    useState<SubscriptionPlan>("free");
+
+  const [subscriptionPlanLoading, setSubscriptionPlanLoading] =
+    useState(true);
 
   const [form, setForm] =
     useState<DocumentRecord>(
@@ -224,6 +232,10 @@ export default function DocumentVault({
           userId
         );
 
+        const plan = await getCurrentPlan();
+        setSubscriptionPlan(plan);
+        setSubscriptionPlanLoading(false);
+
         await Promise.all([
           loadDocuments(),
           loadCustomVehicles(),
@@ -237,6 +249,8 @@ export default function DocumentVault({
           "Failed to initialize document vault:",
           err
         );
+
+        setSubscriptionPlanLoading(false);
 
         alert(
           "Failed to initialize Document Vault."
@@ -908,8 +922,6 @@ export default function DocumentVault({
         );
 
       } else {
-        const plan = await getCurrentPlan();
-
         const ownDocumentCount =
           currentUserId === null
             ? records.length
@@ -921,11 +933,11 @@ export default function DocumentVault({
         if (
           !canAddDocument(
             ownDocumentCount,
-            plan
+            subscriptionPlan
           )
         ) {
           alert(
-            `The Free plan is limited to ${FREE_LIMITS.documents} documents. Upgrade to Premium for ₹49 one-time to add more documents.`
+            `The Free plan is limited to ${FREE_LIMITS.documents} documents. Upgrade to Premium for ₹69 one-time to add more documents.`
           );
 
           return;
@@ -994,6 +1006,21 @@ export default function DocumentVault({
 
   return (
     <>
+      {subscriptionPlanLoading ? (
+        <div
+          style={{
+            minHeight: "220px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#6b7280",
+            fontSize: "14px",
+          }}
+        >
+          Loading Document Vault...
+        </div>
+      ) : (
+      <>
       <div
         style={{
           position: "relative",
@@ -1025,6 +1052,8 @@ export default function DocumentVault({
       </div>
 
 
+      {subscriptionPlan === "premium_plus" ? (
+      <>
       {/* =====================================================
           ADD / EDIT DOCUMENT
           ===================================================== */}
@@ -1455,44 +1484,63 @@ export default function DocumentVault({
           Attachment
         </label>
 
+        {canUseFileUploads(subscriptionPlan) ? (
+          <>
+            <ReceiptUploader
+              value={form.file}
+              fileName={form.attachment_name}
+              onChange={(file) => {
+                setForm({
+                  ...form,
+                  file,
+                });
+                handleAutosaveBlur();
+              }}
+              onFileNameChange={(attachment_name) => {
+                setForm({
+                  ...form,
+                  attachment_name,
+                });
+                handleAutosaveBlur();
+              }}
+            />
 
-        <ReceiptUploader
-          value={form.file}
-          fileName={form.attachment_name}
-          onChange={(file) => {
-            setForm({
-              ...form,
-              file,
-            });
-            handleAutosaveBlur();
-          }}
-          onFileNameChange={(attachment_name) => {
-            setForm({
-              ...form,
-              attachment_name,
-            });
-            handleAutosaveBlur();
-          }}
-        />
-
-
-        <p
-          style={{
-            fontSize: 12,
-            color: "#666",
-            marginTop: 8,
-          }}
-        >
-          You can upload PDF,
-          images, Word, Excel and
-          other document formats.
-          Recommended maximum
-          file size:{" "}
-          <strong>
-            5 MB
-          </strong>
-          .
-        </p>
+            <p
+              style={{
+                fontSize: 12,
+                color: "#666",
+                marginTop: 8,
+              }}
+            >
+              You can upload PDF,
+              images, Word, Excel and
+              other document formats.
+              Recommended maximum
+              file size:{" "}
+              <strong>
+                5 MB
+              </strong>
+              .
+            </p>
+          </>
+        ) : (
+          <div
+            style={{
+              marginTop: "8px",
+              padding: "12px 14px",
+              border: "1px solid #93c5fd",
+              borderRadius: "8px",
+              background: "#eff6ff",
+              color: "#1d4ed8",
+              fontSize: "13px",
+            }}
+          >
+            <strong>Premium Plus feature</strong>
+            <div style={{ marginTop: "4px" }}>
+              Document uploads are available only with Premium Plus. Premium Plus is coming soon.
+            </div>
+          </div>
+        )}
 
 
         <br />
@@ -1869,6 +1917,43 @@ export default function DocumentVault({
         </div>
 
       </div>
+      </>
+      ) : (
+        <div
+          className="card"
+          style={{
+            border: "1px solid #2563eb",
+            background: "#eff6ff",
+            textAlign: "center",
+            padding: "32px 20px",
+          }}
+        >
+          <h3
+            style={{
+              color: "#1d4ed8",
+              marginBottom: "10px",
+            }}
+          >
+            Premium Plus — Coming Soon
+          </h3>
+
+          <p
+            style={{
+              color: "#1e40af",
+              margin: 0,
+              lineHeight: 1.6,
+            }}
+          >
+            Document Vault will be available for
+            <strong> Premium Plus </strong>
+            users. Premium Plus is coming soon and
+            will include secure document file uploads
+            and additional cloud features.
+          </p>
+        </div>
+      )}
+      </>
+      )}
     </>
   );
 }
