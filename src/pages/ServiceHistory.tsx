@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -16,6 +17,12 @@ import {
 } from "../services/serviceHistoryService";
 
 import { getCurrentUserId } from "../services/authHelper";
+
+import {
+  getFormDraft,
+  saveFormDraft,
+  deleteFormDraft,
+} from "../services/formDraftService";
 
 import {
   getCustomVehicles,
@@ -119,6 +126,25 @@ export default function ServiceHistory() {
 
 
   /* ============================================================
+     AUTOSAVE
+     ============================================================ */
+
+  const [draftStatus, setDraftStatus] =
+    useState<"idle" | "loading" | "saving" | "saved" | "error">("idle");
+
+  const autosaveTimerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const draftReadyRef = useRef(false);
+  const skipAutosaveRef = useRef(true);
+
+  const getDraftKey = () =>
+    editingId !== null
+      ? `service-history:${editingId}`
+      : "service-history:new";
+
+
+  /* ============================================================
      DATE
      ============================================================ */
 
@@ -165,6 +191,8 @@ export default function ServiceHistory() {
         loadCustomVehicles(),
         loadCustomServiceTypes(),
       ]);
+
+      await restoreDraft("service-history:new");
 
     } catch (err: any) {
       console.error(
@@ -264,6 +292,67 @@ export default function ServiceHistory() {
   useEffect(() => {
     void initialize();
   }, []);
+
+
+  async function restoreDraft(draftKey: string) {
+    try {
+      setDraftStatus("loading");
+      draftReadyRef.current = false;
+      skipAutosaveRef.current = true;
+
+      const draft = await getFormDraft<ServiceRecord>(draftKey);
+
+      if (draft?.draft_data) {
+        setForm((current) => ({
+          ...current,
+          ...draft.draft_data,
+          attachment: "",
+        }));
+        setDraftStatus("saved");
+      } else {
+        setDraftStatus("idle");
+      }
+    } catch (error) {
+      console.error("Failed to restore service history draft:", error);
+      setDraftStatus("error");
+    } finally {
+      draftReadyRef.current = true;
+      window.setTimeout(() => { skipAutosaveRef.current = false; }, 0);
+    }
+  }
+
+  useEffect(() => {
+    if (!draftReadyRef.current || skipAutosaveRef.current) return;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    setDraftStatus("saving");
+    autosaveTimerRef.current = setTimeout(() => {
+      void saveFormDraft(getDraftKey(), { ...form, attachment: "" })
+        .then(() => setDraftStatus("saved"))
+        .catch((error) => {
+          console.error("Failed to autosave service history draft:", error);
+          setDraftStatus("error");
+        });
+    }, 1000);
+    return () => {
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    };
+  }, [form, editingId]);
+
+  useEffect(() => {
+    if (editingId !== null) void restoreDraft(`service-history:${editingId}`);
+  }, [editingId]);
+
+  function handleAutosaveBlur() {
+    if (!draftReadyRef.current || skipAutosaveRef.current) return;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    setDraftStatus("saving");
+    void saveFormDraft(getDraftKey(), { ...form, attachment: "" })
+      .then(() => setDraftStatus("saved"))
+      .catch((error) => {
+        console.error("Failed to autosave service history draft:", error);
+        setDraftStatus("error");
+      });
+  }
 
 
   /* ============================================================
@@ -616,6 +705,14 @@ export default function ServiceHistory() {
       return;
     }
 
+    const draftKey = getDraftKey();
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    skipAutosaveRef.current = true;
+    draftReadyRef.current = false;
+    void deleteFormDraft(draftKey).catch((error) =>
+      console.error("Failed to delete service history draft:", error)
+    );
+
     setEditingId(null);
     setForm({ ...emptyRecord });
     setShowVehicleForm(false);
@@ -623,6 +720,12 @@ export default function ServiceHistory() {
     setVehicleModel("");
     setShowServiceTypeForm(false);
     setServiceTypeName("");
+    setDraftStatus("idle");
+
+    window.setTimeout(() => {
+      draftReadyRef.current = true;
+      skipAutosaveRef.current = false;
+    }, 0);
   }
 
 
@@ -700,8 +803,13 @@ export default function ServiceHistory() {
       }
 
 
-      await loadRecords();
+      const savedDraftKey = getDraftKey();
+      await deleteFormDraft(savedDraftKey);
 
+      skipAutosaveRef.current = true;
+      draftReadyRef.current = false;
+
+      await loadRecords();
 
       setEditingId(
         null
@@ -710,6 +818,13 @@ export default function ServiceHistory() {
       setForm(
         emptyRecord
       );
+
+      setDraftStatus("idle");
+
+      window.setTimeout(() => {
+        draftReadyRef.current = true;
+        skipAutosaveRef.current = false;
+      }, 0);
 
     } catch (
       error: any
@@ -804,6 +919,9 @@ export default function ServiceHistory() {
     }
 
 
+    skipAutosaveRef.current = true;
+    draftReadyRef.current = false;
+
     setEditingId(
       record.id
     );
@@ -871,6 +989,7 @@ export default function ServiceHistory() {
                 form.date
               }
               max={today}
+              onBlur={handleAutosaveBlur}
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -922,6 +1041,7 @@ export default function ServiceHistory() {
                 value={
                   form.vehicle
                 }
+                onBlur={handleAutosaveBlur}
                 onChange={(e) =>
                   setForm({
                     ...form,
@@ -1283,6 +1403,7 @@ export default function ServiceHistory() {
               value={
                 form.serviceCenter
               }
+              onBlur={handleAutosaveBlur}
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -1310,6 +1431,7 @@ export default function ServiceHistory() {
               value={
                 form.amount === 0 ? "" : form.amount
               }
+              onBlur={handleAutosaveBlur}
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -1339,6 +1461,7 @@ export default function ServiceHistory() {
           value={
             form.notes
           }
+          onBlur={handleAutosaveBlur}
           onChange={(e) =>
             setForm({
               ...form,
@@ -1364,18 +1487,20 @@ export default function ServiceHistory() {
         <ReceiptUploader
           value={form.attachment}
           fileName={form.attachment_name}
-          onChange={(attachment) =>
+          onChange={(attachment) => {
             setForm({
               ...form,
               attachment,
-            })
-          }
-          onFileNameChange={(attachment_name) =>
+            });
+            handleAutosaveBlur();
+          }}
+          onFileNameChange={(attachment_name) => {
             setForm({
               ...form,
               attachment_name,
-            })
-          }
+            });
+            handleAutosaveBlur();
+          }}
         />
 
 
@@ -1405,16 +1530,38 @@ export default function ServiceHistory() {
         <br />
 
 
-        <button
-          className="saveButton"
-          onClick={() =>
-            void handleSave()
-          }
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            marginTop: "4px",
+          }}
         >
-          {editingId !== null
-            ? "Update Service"
-            : "Add Service Record"}
-        </button>
+          <button
+            className="saveButton"
+            onClick={() =>
+              void handleSave()
+            }
+          >
+            {editingId !== null
+              ? "Update Service"
+              : "Add Service Record"}
+          </button>
+
+          {draftStatus === "loading" && (
+            <span style={{ fontSize: "13px", color: "#6b7280" }}>Loading draft...</span>
+          )}
+          {draftStatus === "saving" && (
+            <span style={{ fontSize: "13px", color: "#d97706" }}>Saving...</span>
+          )}
+          {draftStatus === "saved" && (
+            <span style={{ fontSize: "13px", color: "#16a34a", fontWeight: 600 }}>✓ Saved</span>
+          )}
+          {draftStatus === "error" && (
+            <span style={{ fontSize: "13px", color: "#dc2626" }}>Draft save failed</span>
+          )}
+        </div>
 
         <div
           style={{

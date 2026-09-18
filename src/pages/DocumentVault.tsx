@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -16,6 +17,12 @@ import {
 } from "../services/documentVaultService";
 
 import { getCurrentUserId } from "../services/authHelper";
+
+import {
+  getFormDraft,
+  saveFormDraft,
+  deleteFormDraft,
+} from "../services/formDraftService";
 
 import {
   getCustomVehicles,
@@ -83,6 +90,29 @@ export default function DocumentVault() {
     editingId,
     setEditingId,
   ] = useState<number | null>(null);
+
+
+  /* =========================================================
+     AUTOSAVE
+     ========================================================= */
+
+  const [draftStatus, setDraftStatus] =
+    useState<"idle" | "loading" | "saving" | "saved" | "error">("idle");
+
+  const autosaveTimerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const skipAutosaveRef =
+    useRef(true);
+
+  const draftLoadedRef =
+    useRef(false);
+
+  const getDraftKey = () =>
+    editingId !== null
+      ? `document-vault:${editingId}`
+      : "document-vault:new";
+
 
   const [search, setSearch] =
     useState("");
@@ -187,6 +217,8 @@ export default function DocumentVault() {
           loadCustomCategories(),
         ]);
 
+
+        await restoreDraft("document-vault:new");
       } catch (err) {
         console.error(
           "Failed to initialize document vault:",
@@ -554,6 +586,98 @@ export default function DocumentVault() {
   }
 
 
+
+  async function restoreDraft(draftKey: string) {
+    try {
+      setDraftStatus("loading");
+      skipAutosaveRef.current = true;
+      draftLoadedRef.current = false;
+
+      const draft =
+        await getFormDraft<DocumentRecord>(draftKey);
+
+      if (draft?.draft_data) {
+        setForm((current) => ({
+          ...current,
+          ...draft.draft_data,
+          file: "",
+        }));
+        setDraftStatus("saved");
+      } else {
+        setDraftStatus("idle");
+      }
+    } catch (err) {
+      console.error("Failed to restore document draft:", err);
+      setDraftStatus("error");
+    } finally {
+      draftLoadedRef.current = true;
+      window.setTimeout(() => {
+        skipAutosaveRef.current = false;
+      }, 0);
+    }
+  }
+
+  useEffect(() => {
+    if (!draftLoadedRef.current || skipAutosaveRef.current) return;
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    setDraftStatus("saving");
+
+    autosaveTimerRef.current = setTimeout(() => {
+      void saveFormDraft(
+        getDraftKey(),
+        {
+          ...form,
+          file: "",
+        }
+      )
+        .then(() => setDraftStatus("saved"))
+        .catch((err) => {
+          console.error("Failed to autosave document draft:", err);
+          setDraftStatus("error");
+        });
+    }, 1000);
+
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+      }
+    };
+  }, [form, editingId]);
+
+  useEffect(() => {
+    if (editingId !== null) {
+      void restoreDraft(`document-vault:${editingId}`);
+    }
+  }, [editingId]);
+
+  function handleAutosaveBlur() {
+    if (!draftLoadedRef.current || skipAutosaveRef.current) return;
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    setDraftStatus("saving");
+
+    void saveFormDraft(
+      getDraftKey(),
+      {
+        ...form,
+        file: "",
+      }
+    )
+      .then(() => setDraftStatus("saved"))
+      .catch((err) => {
+        console.error("Failed to autosave document draft:", err);
+        setDraftStatus("error");
+      });
+  }
+
+
   /* =========================================================
      SEARCH
      ========================================================= */
@@ -608,6 +732,9 @@ export default function DocumentVault() {
 
       return;
     }
+
+    skipAutosaveRef.current = true;
+    draftLoadedRef.current = false;
 
     setEditingId(
       record.id
@@ -682,6 +809,22 @@ export default function DocumentVault() {
       return;
     }
 
+    const draftKey =
+      editingId !== null
+        ? `document-vault:${editingId}`
+        : "document-vault:new";
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    skipAutosaveRef.current = true;
+    draftLoadedRef.current = false;
+
+    void deleteFormDraft(draftKey).catch((err) => {
+      console.error("Failed to delete document draft:", err);
+    });
+
     setEditingId(null);
     setForm({ ...emptyRecord });
     setShowVehicleForm(false);
@@ -689,6 +832,12 @@ export default function DocumentVault() {
     setVehicleModel("");
     setShowCategoryForm(false);
     setCategoryName("");
+    setDraftStatus("idle");
+
+    window.setTimeout(() => {
+      draftLoadedRef.current = true;
+      skipAutosaveRef.current = false;
+    }, 0);
   }
 
 
@@ -762,6 +911,16 @@ export default function DocumentVault() {
         );
       }
 
+      const savedDraftKey =
+        editingId !== null
+          ? `document-vault:${editingId}`
+          : "document-vault:new";
+
+      await deleteFormDraft(savedDraftKey);
+
+      skipAutosaveRef.current = true;
+      draftLoadedRef.current = false;
+
       await loadDocuments();
 
       setEditingId(
@@ -771,6 +930,13 @@ export default function DocumentVault() {
       setForm(
         emptyRecord
       );
+
+      setDraftStatus("idle");
+
+      window.setTimeout(() => {
+        draftLoadedRef.current = true;
+        skipAutosaveRef.current = false;
+      }, 0);
 
     } catch (error) {
       console.error(
@@ -843,6 +1009,7 @@ export default function DocumentVault() {
                 value={
                   form.vehicle
                 }
+                onBlur={handleAutosaveBlur}
                 onChange={(e) =>
                   setForm({
                     ...form,
@@ -1014,6 +1181,7 @@ export default function DocumentVault() {
                 value={
                   form.category
                 }
+                onBlur={handleAutosaveBlur}
                 onChange={(e) =>
                   setForm({
                     ...form,
@@ -1151,7 +1319,8 @@ export default function DocumentVault() {
               value={
                 form.title
               }
-              onChange={(e) =>
+              onBlur={handleAutosaveBlur}
+                onChange={(e) =>
                 setForm({
                   ...form,
                   title:
@@ -1216,6 +1385,7 @@ export default function DocumentVault() {
           value={
             form.notes
           }
+          onBlur={handleAutosaveBlur}
           onChange={(e) =>
             setForm({
               ...form,
@@ -1237,18 +1407,20 @@ export default function DocumentVault() {
         <ReceiptUploader
           value={form.file}
           fileName={form.attachment_name}
-          onChange={(file) =>
+          onChange={(file) => {
             setForm({
               ...form,
               file,
-            })
-          }
-          onFileNameChange={(attachment_name) =>
+            });
+            handleAutosaveBlur();
+          }}
+          onFileNameChange={(attachment_name) => {
             setForm({
               ...form,
               attachment_name,
-            })
-          }
+            });
+            handleAutosaveBlur();
+          }}
         />
 
 
@@ -1273,6 +1445,40 @@ export default function DocumentVault() {
 
         <br />
 
+
+        <div
+          style={{
+            minHeight: "20px",
+            marginBottom: "8px",
+            fontSize: "13px",
+          }}
+        >
+          {draftStatus === "loading" && (
+            <span style={{ color: "#6b7280" }}>
+              Loading draft...
+            </span>
+          )}
+          {draftStatus === "saving" && (
+            <span style={{ color: "#d97706" }}>
+              Saving...
+            </span>
+          )}
+          {draftStatus === "saved" && (
+            <span
+              style={{
+                color: "#16a34a",
+                fontWeight: 600,
+              }}
+            >
+              ✓ Saved
+            </span>
+          )}
+          {draftStatus === "error" && (
+            <span style={{ color: "#dc2626" }}>
+              Draft save failed
+            </span>
+          )}
+        </div>
 
         <button
           className="saveButton"

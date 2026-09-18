@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -16,6 +17,12 @@ import {
 } from "../services/tyreService";
 
 import { getCurrentUserId } from "../services/authHelper";
+
+import {
+  getFormDraft,
+  saveFormDraft,
+  deleteFormDraft,
+} from "../services/formDraftService";
 
 
 type TyreRecordWithAttachmentName = TyreRecord & {
@@ -73,6 +80,27 @@ export default function TyreHistory() {
   const [editingId, setEditingId] =
     useState<number | null>(null);
 
+  /* =========================================================
+     AUTOSAVE
+     ========================================================= */
+
+  const [draftStatus, setDraftStatus] =
+    useState<"idle" | "loading" | "saving" | "saved" | "error">("idle");
+
+  const autosaveTimerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const skipAutosaveRef =
+    useRef(true);
+
+  const draftLoadedRef =
+    useRef(false);
+
+  const getDraftKey = () =>
+    editingId !== null
+      ? `tyre:${editingId}`
+      : "tyre:new";
+
 
   function getTodayLocalDate() {
     const today =
@@ -115,6 +143,8 @@ export default function TyreHistory() {
 
         await loadTyres();
 
+        await restoreDraft("tyre:new");
+
       } catch (err) {
         console.error(
           "Failed to initialize tyre history:",
@@ -129,6 +159,118 @@ export default function TyreHistory() {
 
     void initialize();
   }, []);
+
+  async function restoreDraft(draftKey: string) {
+    try {
+      setDraftStatus("loading");
+      skipAutosaveRef.current = true;
+      draftLoadedRef.current = false;
+
+      const draft =
+        await getFormDraft<TyreRecordWithAttachmentName>(draftKey);
+
+      if (draft?.draft_data) {
+        setForm((current) => ({
+          ...current,
+          ...draft.draft_data,
+          receipt: "",
+        }));
+        setDraftStatus("saved");
+      } else {
+        setDraftStatus("idle");
+      }
+    } catch (err) {
+      console.error(
+        "Failed to restore tyre draft:",
+        err
+      );
+      setDraftStatus("error");
+    } finally {
+      draftLoadedRef.current = true;
+
+      window.setTimeout(() => {
+        skipAutosaveRef.current = false;
+      }, 0);
+    }
+  }
+
+  useEffect(() => {
+    if (!draftLoadedRef.current || skipAutosaveRef.current) {
+      return;
+    }
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    setDraftStatus("saving");
+
+    autosaveTimerRef.current = setTimeout(() => {
+      void saveFormDraft(
+        getDraftKey(),
+        {
+          ...form,
+          receipt: "",
+        }
+      )
+        .then(() => {
+          setDraftStatus("saved");
+        })
+        .catch((err) => {
+          console.error(
+            "Failed to autosave tyre draft:",
+            err
+          );
+          setDraftStatus("error");
+        });
+    }, 1000);
+
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+      }
+    };
+  }, [form, editingId]);
+
+  useEffect(() => {
+    if (editingId !== null) {
+      void restoreDraft(`tyre:${editingId}`);
+    }
+  }, [editingId]);
+
+  function handleAutosaveBlur() {
+    if (
+      !draftLoadedRef.current ||
+      skipAutosaveRef.current
+    ) {
+      return;
+    }
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    setDraftStatus("saving");
+
+    void saveFormDraft(
+      getDraftKey(),
+      {
+        ...form,
+        receipt: "",
+      }
+    )
+      .then(() => {
+        setDraftStatus("saved");
+      })
+      .catch((err) => {
+        console.error(
+          "Failed to autosave tyre draft:",
+          err
+        );
+        setDraftStatus("error");
+      });
+  }
+
 
 
   async function loadTyres() {
@@ -269,6 +411,9 @@ export default function TyreHistory() {
     }
 
 
+    skipAutosaveRef.current = true;
+    draftLoadedRef.current = false;
+
     setEditingId(
       record.id
     );
@@ -353,8 +498,33 @@ export default function TyreHistory() {
       return;
     }
 
+    const draftKey =
+      editingId !== null
+        ? `tyre:${editingId}`
+        : "tyre:new";
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    skipAutosaveRef.current = true;
+    draftLoadedRef.current = false;
+
+    void deleteFormDraft(draftKey).catch((err) => {
+      console.error(
+        "Failed to delete tyre draft:",
+        err
+      );
+    });
+
     setEditingId(null);
     setForm({ ...emptyRecord });
+    setDraftStatus("idle");
+
+    window.setTimeout(() => {
+      draftLoadedRef.current = true;
+      skipAutosaveRef.current = false;
+    }, 0);
   }
 
 
@@ -455,6 +625,16 @@ export default function TyreHistory() {
       }
 
 
+      const savedDraftKey =
+        editingId !== null
+          ? `tyre:${editingId}`
+          : "tyre:new";
+
+      await deleteFormDraft(savedDraftKey);
+
+      skipAutosaveRef.current = true;
+      draftLoadedRef.current = false;
+
       await loadTyres();
 
 
@@ -466,6 +646,13 @@ export default function TyreHistory() {
       setForm(
         emptyRecord
       );
+
+      setDraftStatus("idle");
+
+      window.setTimeout(() => {
+        draftLoadedRef.current = true;
+        skipAutosaveRef.current = false;
+      }, 0);
 
 
       alert(
@@ -529,6 +716,7 @@ export default function TyreHistory() {
               value={
                 form.brand
               }
+              onBlur={handleAutosaveBlur}
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -551,6 +739,7 @@ export default function TyreHistory() {
               value={
                 form.model
               }
+              onBlur={handleAutosaveBlur}
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -573,6 +762,7 @@ export default function TyreHistory() {
               value={
                 form.size
               }
+              onBlur={handleAutosaveBlur}
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -595,6 +785,7 @@ export default function TyreHistory() {
               value={
                 form.purchaseDate
               }
+              onBlur={handleAutosaveBlur}
               max={today}
               onChange={(e) =>
                 setForm({
@@ -617,6 +808,7 @@ export default function TyreHistory() {
               value={
                 form.installDate
               }
+              onBlur={handleAutosaveBlur}
               max={today}
               onChange={(e) =>
                 setForm({
@@ -639,6 +831,7 @@ export default function TyreHistory() {
               value={
                 form.odometer === 0 ? "" : form.odometer
               }
+              onBlur={handleAutosaveBlur}
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -662,6 +855,7 @@ export default function TyreHistory() {
               value={
                 form.dealer
               }
+              onBlur={handleAutosaveBlur}
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -684,6 +878,7 @@ export default function TyreHistory() {
               value={
                 form.cost === 0 ? "" : form.cost
               }
+              onBlur={handleAutosaveBlur}
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -707,6 +902,7 @@ export default function TyreHistory() {
               value={
                 form.warrantyMonths === 0 ? "" : form.warrantyMonths
               }
+              onBlur={handleAutosaveBlur}
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -748,6 +944,7 @@ export default function TyreHistory() {
           value={
             form.notes
           }
+          onBlur={handleAutosaveBlur}
           onChange={(e) =>
             setForm({
               ...form,
@@ -769,18 +966,20 @@ export default function TyreHistory() {
         <ReceiptUploader
           value={form.receipt}
           fileName={form.attachment_name}
-          onChange={(receipt) =>
+          onChange={(receipt) => {
             setForm({
               ...form,
               receipt,
-            })
-          }
-          onFileNameChange={(attachment_name) =>
+            });
+            handleAutosaveBlur();
+          }}
+          onFileNameChange={(attachment_name) => {
             setForm({
               ...form,
               attachment_name,
-            })
-          }
+            });
+            handleAutosaveBlur();
+          }}
         />
 
 
@@ -809,6 +1008,43 @@ export default function TyreHistory() {
 
         <br />
 
+
+        <div
+          style={{
+            minHeight: "20px",
+            marginBottom: "8px",
+            fontSize: "13px",
+          }}
+        >
+          {draftStatus === "loading" && (
+            <span style={{ color: "#6b7280" }}>
+              Loading draft...
+            </span>
+          )}
+
+          {draftStatus === "saving" && (
+            <span style={{ color: "#d97706" }}>
+              Saving...
+            </span>
+          )}
+
+          {draftStatus === "saved" && (
+            <span
+              style={{
+                color: "#16a34a",
+                fontWeight: 600,
+              }}
+            >
+              ✓ Saved
+            </span>
+          )}
+
+          {draftStatus === "error" && (
+            <span style={{ color: "#dc2626" }}>
+              Draft save failed
+            </span>
+          )}
+        </div>
 
         <button
           className="primaryButton"

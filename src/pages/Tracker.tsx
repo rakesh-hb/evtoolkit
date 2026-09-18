@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   getChargingSessions,
@@ -12,6 +12,11 @@ import {
 } from "../services/chargingService";
 
 import { getCurrentUserId } from "../services/authHelper";
+import {
+  getFormDraft,
+  saveFormDraft,
+  deleteFormDraft,
+} from "../services/formDraftService";
 
 import { vehicles } from "../data/vehicles";
 import ReceiptUploader from "../components/ReceiptUploader";
@@ -95,6 +100,16 @@ export const chargingStations: ChargingStationOption[] = [
 ];
 
 
+interface ChargingDraft {
+  vehicle: string;
+  charger: string;
+  energy: string;
+  cost: string;
+  station: string;
+  date: string;
+}
+
+
 function Tracker() {
   const defaultVehicle =
     vehicles.find(
@@ -105,7 +120,6 @@ function Tracker() {
   const [vehicle, setVehicle] = useState(
     `${defaultVehicle.brand} ${defaultVehicle.model}`
   );
-
 
   const [sessions, setSessions] =
     useState<ChargingSession[]>([]);
@@ -172,6 +186,270 @@ function Tracker() {
 
 
   /*
+   * =========================================================
+   * FORM AUTOSAVE
+   * =========================================================
+   *
+   * Drafts are stored in Supabase through formDraftService.
+   *
+   * The invoice/file content is intentionally NOT stored in
+   * the draft because it can be large. The final charging
+   * session still stores the invoice normally.
+   */
+  const [draftStatus, setDraftStatus] =
+    useState<"idle" | "saving" | "saved" | "error">("idle");
+
+  const autosaveTimerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const skipAutosaveRef =
+    useRef(false);
+
+  const draftLoadedRef =
+    useRef(false);
+
+
+  function getDraftKey() {
+    return editingId !== null
+      ? `charging-session:${editingId}`
+      : "charging-session:new";
+  }
+
+
+  function getDraftData(): ChargingDraft {
+    return {
+      vehicle,
+      charger,
+      energy,
+      cost,
+      station,
+      date,
+    };
+  }
+
+
+  async function restoreDraft(
+    draftKey: string
+  ) {
+    try {
+      const draft =
+        await getFormDraft<ChargingDraft>(
+          draftKey
+        );
+
+      if (!draft?.draft_data) {
+        return false;
+      }
+
+      const data =
+        draft.draft_data;
+
+      skipAutosaveRef.current = true;
+
+      setVehicle(
+        data.vehicle ??
+          `${defaultVehicle.brand} ${defaultVehicle.model}`
+      );
+
+      setCharger(
+        data.charger ?? "DC Fast"
+      );
+
+      setEnergy(
+        data.energy ?? ""
+      );
+
+      setCost(
+        data.cost ?? ""
+      );
+
+      setStation(
+        data.station ?? ""
+      );
+
+      setDate(
+        data.date ?? ""
+      );
+
+      setDraftStatus("saved");
+
+      return true;
+    } catch (error) {
+      console.error(
+        "Failed to restore charging session draft:",
+        error
+      );
+
+      setDraftStatus("error");
+      return false;
+    }
+  }
+
+
+  /*
+   * Initial load:
+   * - load current user
+   * - load charging sessions
+   * - load custom charging stations
+   * - restore an unfinished NEW charging session draft
+   */
+  useEffect(() => {
+    async function initialize() {
+      try {
+        const userId =
+          await getCurrentUserId();
+
+        setCurrentUserId(userId);
+
+        await loadSessions();
+        await loadStations();
+
+        await restoreDraft(
+          "charging-session:new"
+        );
+
+        draftLoadedRef.current = true;
+      } catch (error) {
+        console.error(
+          "Failed to initialize Charge Tracker:",
+          error
+        );
+
+        alert(
+          "Failed to initialize Charge Tracker."
+        );
+      }
+    }
+
+    void initialize();
+
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(
+          autosaveTimerRef.current
+        );
+      }
+    };
+  }, []);
+
+
+  /*
+   * Restore a draft when entering edit mode.
+   */
+  useEffect(() => {
+    if (
+      !draftLoadedRef.current ||
+      editingId === null
+    ) {
+      return;
+    }
+
+    void restoreDraft(
+      `charging-session:${editingId}`
+    );
+  }, [editingId]);
+
+
+  /*
+   * Debounced autosave.
+   *
+   * Every form change waits 1 second before writing
+   * the current draft to Supabase.
+   */
+  useEffect(() => {
+    if (!draftLoadedRef.current) {
+      return;
+    }
+
+    if (skipAutosaveRef.current) {
+      skipAutosaveRef.current = false;
+      return;
+    }
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(
+        autosaveTimerRef.current
+      );
+    }
+
+    autosaveTimerRef.current =
+      setTimeout(() => {
+        void autosaveDraft();
+      }, 1000);
+
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(
+          autosaveTimerRef.current
+        );
+      }
+    };
+  }, [
+    vehicle,
+    charger,
+    energy,
+    cost,
+    station,
+    date,
+    editingId,
+  ]);
+
+
+  async function autosaveDraft() {
+    try {
+      setDraftStatus("saving");
+
+      await saveFormDraft(
+        getDraftKey(),
+        getDraftData()
+      );
+
+      setDraftStatus("saved");
+    } catch (error) {
+      console.error(
+        "Failed to autosave charging session:",
+        error
+      );
+
+      setDraftStatus("error");
+    }
+  }
+
+
+  function handleAutosaveBlur() {
+    /*
+     * The normal 1-second debounce handles persistence.
+     * Blur also restarts the debounce so leaving a field
+     * does not wait for a previous timer.
+     */
+    if (autosaveTimerRef.current) {
+      clearTimeout(
+        autosaveTimerRef.current
+      );
+    }
+
+    autosaveTimerRef.current =
+      setTimeout(() => {
+        void autosaveDraft();
+      }, 1000);
+  }
+
+
+  async function deleteCurrentDraft() {
+    try {
+      await deleteFormDraft(
+        getDraftKey()
+      );
+    } catch (error) {
+      console.error(
+        "Failed to delete charging session draft:",
+        error
+      );
+    }
+  }
+
+
+  /*
    * Return today's date using the user's local timezone.
    *
    * We intentionally do not use toISOString()
@@ -199,44 +477,12 @@ function Tracker() {
     getTodayLocalDate();
 
 
-  /*
-   * Load current authenticated user
-   * and application data.
-   */
-  useEffect(() => {
-    async function initialize() {
-      try {
-        const userId =
-          await getCurrentUserId();
-
-        setCurrentUserId(userId);
-
-        await loadSessions();
-        await loadStations();
-
-      } catch (error) {
-        console.error(
-          "Failed to initialize Charge Tracker:",
-          error
-        );
-
-        alert(
-          "Failed to initialize Charge Tracker."
-        );
-      }
-    }
-
-    void initialize();
-  }, []);
-
-
   async function loadSessions() {
     try {
       const data =
         await getChargingSessions();
 
       setSessions(data);
-
     } catch (error) {
       console.error(
         "Failed to load charging sessions:",
@@ -256,7 +502,6 @@ function Tracker() {
         await getChargingStations();
 
       setCustomStations(data);
-
     } catch (error) {
       console.error(
         "Failed to load charging stations:",
@@ -278,7 +523,6 @@ function Tracker() {
       return;
     }
 
-
     try {
       setSavingStation(true);
 
@@ -288,7 +532,6 @@ function Tracker() {
           newStationCategory
         );
 
-
       setCustomStations(
         (current) => [
           ...current,
@@ -296,21 +539,17 @@ function Tracker() {
         ]
       );
 
-
       setStation(
         newStation.name
       );
-
 
       setNewStationName("");
       setNewStationCategory("Other");
       setShowAddStation(false);
 
-
       alert(
         "Charging station added successfully."
       );
-
     } catch (error: any) {
       console.error(error);
 
@@ -323,14 +562,12 @@ function Tracker() {
         alert(
           "This charging station already exists."
         );
-
       } else {
         alert(
           error?.message ||
             "Failed to add charging station."
         );
       }
-
     } finally {
       setSavingStation(false);
     }
@@ -364,6 +601,9 @@ function Tracker() {
     }
 
 
+    const wasEditing =
+      editingId !== null;
+
     try {
       const session = {
         vehicle,
@@ -381,7 +621,6 @@ function Tracker() {
           editingId,
           session
         );
-
       } else {
         await addChargingSession(
           session
@@ -392,8 +631,18 @@ function Tracker() {
       await loadSessions();
 
 
+      /*
+       * Delete the exact draft that was just committed.
+       */
+      await deleteFormDraft(
+        wasEditing
+          ? `charging-session:${editingId}`
+          : "charging-session:new"
+      );
+
+
       alert(
-        editingId !== null
+        wasEditing
           ? "Charging session updated successfully."
           : "Charging session added successfully."
       );
@@ -406,7 +655,7 @@ function Tracker() {
 
       alert(
         error?.message ||
-          (editingId !== null
+          (wasEditing
             ? "Failed to update session."
             : "Failed to save session.")
       );
@@ -422,22 +671,27 @@ function Tracker() {
         "Are you sure you want to delete this charging session?\n\nThis action cannot be undone."
       );
 
-
     if (!confirmed) {
       return;
     }
 
-
     try {
-      await deleteChargingSession(id);
+      await deleteChargingSession(
+        id
+      );
 
       await loadSessions();
 
+      /*
+       * A deleted record can no longer have an edit draft.
+       */
+      await deleteFormDraft(
+        `charging-session:${id}`
+      );
 
       alert(
         "Charging session deleted successfully."
       );
-
     } catch (error) {
       console.error(error);
 
@@ -449,6 +703,14 @@ function Tracker() {
 
 
   function resetFormWithoutConfirmation() {
+    if (autosaveTimerRef.current) {
+      clearTimeout(
+        autosaveTimerRef.current
+      );
+    }
+
+    skipAutosaveRef.current = true;
+
     setEditingId(null);
 
     setVehicle(
@@ -462,23 +724,31 @@ function Tracker() {
     setDate("");
     setInvoice("");
 
+    setDraftStatus("idle");
+
     setInvoiceResetKey(
       (key) => key + 1
     );
   }
 
 
-  function resetForm() {
+  async function resetForm() {
     const confirmed =
       window.confirm(
         "⚠️ Reset all entered values?\n\nAll unsaved information will be cleared."
       );
 
-
     if (!confirmed) {
       return;
     }
 
+    if (autosaveTimerRef.current) {
+      clearTimeout(
+        autosaveTimerRef.current
+      );
+    }
+
+    await deleteCurrentDraft();
 
     resetFormWithoutConfirmation();
   }
@@ -497,10 +767,6 @@ function Tracker() {
         </p>
       </div>
 
-
-      {/* ======================================================
-          NEW / EDIT SESSION
-          ====================================================== */}
 
       <div className="card">
         <h3>
@@ -523,6 +789,9 @@ function Tracker() {
             setVehicle(
               e.target.value
             )
+          }
+          onBlur={
+            handleAutosaveBlur
           }
         >
           {vehicles.map((v) => (
@@ -562,6 +831,9 @@ function Tracker() {
               e.target.value
             )
           }
+          onBlur={
+            handleAutosaveBlur
+          }
         >
           <option>
             Home AC
@@ -590,6 +862,9 @@ function Tracker() {
               e.target.value
             )
           }
+          onBlur={
+            handleAutosaveBlur
+          }
         />
 
 
@@ -611,6 +886,9 @@ function Tracker() {
               setStation(
                 e.target.value
               )
+            }
+            onBlur={
+              handleAutosaveBlur
             }
             style={{
               flex: 1,
@@ -833,6 +1111,9 @@ function Tracker() {
               e.target.value
             )
           }
+          onBlur={
+            handleAutosaveBlur
+          }
         />
 
 
@@ -848,6 +1129,9 @@ function Tracker() {
             setDate(
               e.target.value
             )
+          }
+          onBlur={
+            handleAutosaveBlur
           }
         />
 
@@ -915,19 +1199,39 @@ function Tracker() {
 
           <button
             className="dangerButton"
-            onClick={
-              resetForm
+            onClick={() =>
+              void resetForm()
             }
           >
             🔄 Reset Form
           </button>
         </div>
+
+
+        {draftStatus !== "idle" && (
+          <div
+            style={{
+              marginTop: "10px",
+              textAlign: "right",
+              fontSize: "13px",
+              color:
+                draftStatus === "error"
+                  ? "#dc2626"
+                  : "#6b7280",
+            }}
+          >
+            {draftStatus === "saving" &&
+              "Saving…"}
+
+            {draftStatus === "saved" &&
+              "✓ Saved"}
+
+            {draftStatus === "error" &&
+              "⚠ Draft save failed"}
+          </div>
+        )}
       </div>
 
-
-      {/* ======================================================
-          FAMILY CHARGING SESSIONS
-          ====================================================== */}
 
       <div className="card">
         <h3>
@@ -972,8 +1276,6 @@ function Tracker() {
                   ) => {
 
                     /*
-                     * OWNERSHIP CHECK
-                     *
                      * Only the creator of the
                      * record gets Edit/Delete.
                      *
@@ -1072,16 +1374,6 @@ function Tracker() {
                               <button
                                 className="editButton"
                                 onClick={() => {
-
-                                  /*
-                                   * Extra UI-side ownership
-                                   * protection.
-                                   *
-                                   * Even though this button
-                                   * is only rendered for the
-                                   * owner, we check again
-                                   * before entering edit mode.
-                                   */
 
                                   if (
                                     session.user_id !==

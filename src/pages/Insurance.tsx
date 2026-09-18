@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -16,6 +17,12 @@ import {
 } from "../services/insuranceService";
 
 import { getCurrentUserId } from "../services/authHelper";
+
+import {
+  getFormDraft,
+  saveFormDraft,
+  deleteFormDraft,
+} from "../services/formDraftService";
 
 import {
   getCustomVehicles,
@@ -216,6 +223,28 @@ export default function Insurance() {
     setAddingVehicle,
   ] = useState(false);
 
+  /*
+   * =========================================================
+   * AUTOSAVE
+   * =========================================================
+   */
+
+  const [draftStatus, setDraftStatus] =
+    useState<"idle" | "loading" | "saving" | "saved" | "error">("idle");
+
+  const autosaveTimerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const skipAutosaveRef =
+    useRef(true);
+
+  const draftLoadedRef =
+    useRef(false);
+
+  const getDraftKey = () =>
+    editingId !== null
+      ? `insurance:${editingId}`
+      : "insurance:new";
 
   /*
    * =========================================================
@@ -268,6 +297,8 @@ export default function Insurance() {
           loadCustomVehicles(),
         ]);
 
+        await restoreDraft("insurance:new");
+
       } catch (err) {
         console.error(
           "Failed to initialize insurance:",
@@ -282,6 +313,95 @@ export default function Insurance() {
 
     void initialize();
   }, []);
+
+  async function restoreDraft(draftKey: string) {
+    try {
+      setDraftStatus("loading");
+      skipAutosaveRef.current = true;
+      draftLoadedRef.current = false;
+
+      const draft =
+        await getFormDraft<InsuranceRecord>(draftKey);
+
+      if (draft?.draft_data) {
+        setForm((current) => ({
+          ...current,
+          ...draft.draft_data,
+        }));
+        setDraftStatus("saved");
+      } else {
+        setDraftStatus("idle");
+      }
+    } catch (err) {
+      console.error(
+        "Failed to restore insurance draft:",
+        err
+      );
+      setDraftStatus("error");
+    } finally {
+      draftLoadedRef.current = true;
+
+      window.setTimeout(() => {
+        skipAutosaveRef.current = false;
+      }, 0);
+    }
+  }
+
+  /*
+   * Autosave the current form after one second of inactivity.
+   * The actual attachment data is intentionally excluded from
+   * drafts because receipts can be large. The filename is kept.
+   */
+  useEffect(() => {
+    if (!draftLoadedRef.current || skipAutosaveRef.current) {
+      return;
+    }
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    setDraftStatus("saving");
+
+    autosaveTimerRef.current = setTimeout(() => {
+      const draftData: InsuranceRecord = {
+        ...form,
+        attachment: "",
+      };
+
+      void saveFormDraft(
+        getDraftKey(),
+        draftData
+      )
+        .then(() => {
+          setDraftStatus("saved");
+        })
+        .catch((err) => {
+          console.error(
+            "Failed to autosave insurance draft:",
+            err
+          );
+          setDraftStatus("error");
+        });
+    }, 1000);
+
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+      }
+    };
+  }, [form, editingId]);
+
+  /*
+   * Restore the draft belonging to the record being edited.
+   */
+  useEffect(() => {
+    if (editingId === null) {
+      return;
+    }
+
+    void restoreDraft(`insurance:${editingId}`);
+  }, [editingId]);
 
 
   async function loadPolicies() {
@@ -586,6 +706,9 @@ export default function Insurance() {
       return;
     }
 
+    skipAutosaveRef.current = true;
+    draftLoadedRef.current = false;
+
     setEditingId(
       record.id
     );
@@ -703,11 +826,78 @@ export default function Insurance() {
       return;
     }
 
+    const draftKey =
+      editingId !== null
+        ? `insurance:${editingId}`
+        : "insurance:new";
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    skipAutosaveRef.current = true;
+    draftLoadedRef.current = false;
+
+    void deleteFormDraft(draftKey).catch((err) => {
+      console.error(
+        "Failed to delete insurance draft:",
+        err
+      );
+    });
+
     setEditingId(null);
     setForm({ ...emptyPolicy });
     setSelectedAddon("");
     setShowAddVehicle(false);
     setNewVehicle({ ...emptyVehicleForm });
+    setDraftStatus("idle");
+
+    window.setTimeout(() => {
+      draftLoadedRef.current = true;
+      skipAutosaveRef.current = false;
+    }, 0);
+  }
+
+
+  /*
+   * =========================================================
+   * AUTOSAVE ON BLUR
+   * =========================================================
+   */
+
+  function handleAutosaveBlur() {
+    if (
+      !draftLoadedRef.current ||
+      skipAutosaveRef.current
+    ) {
+      return;
+    }
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    const draftData: InsuranceRecord = {
+      ...form,
+      attachment: "",
+    };
+
+    setDraftStatus("saving");
+
+    void saveFormDraft(
+      getDraftKey(),
+      draftData
+    )
+      .then(() => {
+        setDraftStatus("saved");
+      })
+      .catch((err) => {
+        console.error(
+          "Failed to autosave insurance draft:",
+          err
+        );
+        setDraftStatus("error");
+      });
   }
 
 
@@ -797,6 +987,18 @@ export default function Insurance() {
         );
       }
 
+      const savedDraftKey =
+        editingId !== null
+          ? `insurance:${editingId}`
+          : "insurance:new";
+
+      await deleteFormDraft(
+        savedDraftKey
+      );
+
+      skipAutosaveRef.current = true;
+      draftLoadedRef.current = false;
+
       await loadPolicies();
 
       setEditingId(
@@ -806,6 +1008,15 @@ export default function Insurance() {
       setForm(
         emptyPolicy
       );
+
+      setSelectedAddon("");
+
+      setDraftStatus("idle");
+
+      window.setTimeout(() => {
+        draftLoadedRef.current = true;
+        skipAutosaveRef.current = false;
+      }, 0);
 
     } catch (err) {
       console.error(err);
@@ -874,6 +1085,7 @@ export default function Insurance() {
                 value={
                   form.vehicle
                 }
+                onBlur={handleAutosaveBlur}
                 onChange={(e) =>
                   setForm({
                     ...form,
@@ -1091,6 +1303,7 @@ export default function Insurance() {
               value={
                 form.company
               }
+              onBlur={handleAutosaveBlur}
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -1113,6 +1326,7 @@ export default function Insurance() {
               value={
                 form.policy_number
               }
+              onBlur={handleAutosaveBlur}
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -1134,6 +1348,7 @@ export default function Insurance() {
               value={
                 form.policy_type
               }
+              onBlur={handleAutosaveBlur}
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -1172,6 +1387,7 @@ export default function Insurance() {
                 form.start_date
               }
               max={today}
+              onBlur={handleAutosaveBlur}
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -1208,6 +1424,7 @@ export default function Insurance() {
               value={
                 form.expiry_date
               }
+              onBlur={handleAutosaveBlur}
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -1243,6 +1460,7 @@ export default function Insurance() {
               value={
                 form.premium === 0 ? "" : form.premium
               }
+              onBlur={handleAutosaveBlur}
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -1266,6 +1484,7 @@ export default function Insurance() {
               value={
                 form.idv === 0 ? "" : form.idv
               }
+              onBlur={handleAutosaveBlur}
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -1381,6 +1600,7 @@ export default function Insurance() {
               value={
                 form.agent
               }
+              onBlur={handleAutosaveBlur}
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -1403,6 +1623,7 @@ export default function Insurance() {
               value={
                 form.contact_number
               }
+              onBlur={handleAutosaveBlur}
               onChange={(e) =>
                 setForm({
                   ...form,
@@ -1426,6 +1647,7 @@ export default function Insurance() {
           value={
             form.notes
           }
+          onBlur={handleAutosaveBlur}
           onChange={(e) =>
             setForm({
               ...form,
@@ -1446,18 +1668,20 @@ export default function Insurance() {
         <ReceiptUploader
           value={form.attachment}
           fileName={form.attachment_name}
-          onChange={(attachment) =>
+          onChange={(attachment) => {
             setForm({
               ...form,
               attachment,
-            })
-          }
-          onFileNameChange={(attachment_name) =>
+            });
+            handleAutosaveBlur();
+          }}
+          onFileNameChange={(attachment_name) => {
             setForm({
               ...form,
               attachment_name,
-            })
-          }
+            });
+            handleAutosaveBlur();
+          }}
         />
 
 
@@ -1486,16 +1710,70 @@ export default function Insurance() {
         <br />
 
 
-        <button
-          className="saveButton"
-          onClick={() =>
-            void handleSave()
-          }
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            marginTop: "4px",
+          }}
         >
-          {editingId !== null
-            ? "Update Policy"
-            : "Add Insurance Policy"}
-        </button>
+          <button
+            className="saveButton"
+            onClick={() =>
+              void handleSave()
+            }
+          >
+            {editingId !== null
+              ? "Update Policy"
+              : "Add Insurance Policy"}
+          </button>
+
+          {draftStatus === "loading" && (
+            <span
+              style={{
+                fontSize: "13px",
+                color: "#6b7280",
+              }}
+            >
+              Loading draft...
+            </span>
+          )}
+
+          {draftStatus === "saving" && (
+            <span
+              style={{
+                fontSize: "13px",
+                color: "#d97706",
+              }}
+            >
+              Saving...
+            </span>
+          )}
+
+          {draftStatus === "saved" && (
+            <span
+              style={{
+                fontSize: "13px",
+                color: "#16a34a",
+                fontWeight: 600,
+              }}
+            >
+              ✓ Saved
+            </span>
+          )}
+
+          {draftStatus === "error" && (
+            <span
+              style={{
+                fontSize: "13px",
+                color: "#dc2626",
+              }}
+            >
+              Draft save failed
+            </span>
+          )}
+        </div>
 
         <div
           style={{

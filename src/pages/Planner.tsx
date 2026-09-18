@@ -1,8 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { vehicles } from "../data/vehicles";
 import { chargers } from "../data/chargers";
 import { STATES } from "../data/states";
 import { supabase } from "../lib/supabase";
+import {
+  getFormDraft,
+  saveFormDraft,
+  deleteFormDraft,
+} from "../services/formDraftService";
 
 /*
  * These are representative estimated domestic electricity
@@ -112,12 +117,6 @@ interface CustomCharger {
   power: number;
 }
 
-const CUSTOM_VEHICLES_KEY =
-  "evtoolkit_custom_vehicles";
-
-const CUSTOM_CHARGERS_KEY =
-  "evtoolkit_custom_chargers";
-
 const emptyVehicleForm = {
   brand: "",
   model: "",
@@ -138,6 +137,177 @@ const emptyChargerForm = {
 function Planner() {
   /*
    * =========================================================
+   * FORM AUTOSAVE
+   * =========================================================
+   *
+   * Planner form drafts are stored in Supabase.
+   * No user-created form data is stored in localStorage.
+   */
+  const [draftStatus, setDraftStatus] =
+    useState<"idle" | "saving" | "saved" | "error">("idle");
+
+  const autosaveTimerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const skipAutosaveRef =
+    useRef(false);
+
+  const draftLoadedRef =
+    useRef(false);
+
+  /*
+   * The Planner has no record/editing ID, so it uses
+   * one persistent unfinished-form draft per user.
+   */
+  const plannerDraftKey = "planner:new";
+
+  function getPlannerDraftData() {
+    return {
+      selectedBrand,
+      vehicleId,
+      chargerId,
+      chargingLocation,
+      state,
+      homeRate,
+      publicRate,
+      currentSOC,
+      targetSOC,
+    };
+  }
+
+  async function restorePlannerDraft() {
+    try {
+      const draft =
+        await getFormDraft<ReturnType<typeof getPlannerDraftData>>(
+          plannerDraftKey
+        );
+
+      if (!draft?.draft_data) {
+        return false;
+      }
+
+      const data = draft.draft_data;
+
+      skipAutosaveRef.current = true;
+
+      if (typeof data.selectedBrand === "string") {
+        setSelectedBrand(data.selectedBrand);
+      }
+
+      if (typeof data.vehicleId === "number") {
+        setVehicleId(data.vehicleId);
+      }
+
+      if (typeof data.chargerId === "string") {
+        setChargerId(data.chargerId);
+      }
+
+      if (
+        data.chargingLocation === "Home" ||
+        data.chargingLocation === "Public"
+      ) {
+        setChargingLocation(data.chargingLocation);
+      }
+
+      if (typeof data.state === "string") {
+        setState(data.state);
+      }
+
+      if (typeof data.homeRate === "number") {
+        setHomeRate(data.homeRate);
+      }
+
+      if (typeof data.publicRate === "number") {
+        setPublicRate(data.publicRate);
+      }
+
+      if (typeof data.currentSOC === "number") {
+        setCurrentSOC(data.currentSOC);
+      }
+
+      if (typeof data.targetSOC === "number") {
+        setTargetSOC(data.targetSOC);
+      }
+
+      setDraftStatus("saved");
+      return true;
+    } catch (error) {
+      console.error(
+        "Failed to restore Planner draft:",
+        error
+      );
+
+      setDraftStatus("error");
+      return false;
+    }
+  }
+
+  async function autosavePlannerDraft() {
+    try {
+      setDraftStatus("saving");
+
+      await saveFormDraft(
+        plannerDraftKey,
+        getPlannerDraftData()
+      );
+
+      setDraftStatus("saved");
+    } catch (error) {
+      console.error(
+        "Failed to autosave Planner draft:",
+        error
+      );
+
+      setDraftStatus("error");
+    }
+  }
+
+  function handlePlannerAutosaveBlur() {
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    autosaveTimerRef.current =
+      setTimeout(() => {
+        void autosavePlannerDraft();
+      }, 1000);
+  }
+
+  async function resetPlannerForm() {
+    const confirmed =
+      window.confirm(
+        "⚠️ Reset all entered values?\n\nAll unsaved Planner information will be cleared."
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    await deleteFormDraft(plannerDraftKey);
+
+    skipAutosaveRef.current = true;
+
+    setSelectedBrand("Tata");
+    setVehicleId(defaultVehicle?.id ?? 0);
+    setChargerId(defaultCharger?.id ?? "");
+    setChargingLocation("Home");
+    setState("Karnataka");
+    setHomeRate(
+      DEFAULT_HOME_RATES["Karnataka"] ?? 5
+    );
+    setPublicRate(15);
+    setCurrentSOC(20);
+    setTargetSOC(80);
+
+    setDraftStatus("idle");
+  }
+
+  /*
+   * =========================================================
    * CUSTOM VEHICLES / CHARGERS
    * =========================================================
    *
@@ -145,9 +315,9 @@ function Planner() {
    * src/data/*.ts. User-created records are stored in
    * Supabase and are therefore available across devices.
    *
-   * Existing localStorage records are migrated once when
-   * the Planner loads. The local copy is removed only after
-   * the migration has completed successfully.
+   * No user-created Planner data is stored in localStorage.
+   * Custom vehicles and chargers are loaded directly from
+   * Supabase.
    */
 
   const [customVehicles, setCustomVehicles] =
@@ -313,276 +483,10 @@ function Planner() {
           })
         );
 
-      /*
-       * =====================================================
-       * ONE-TIME LOCALSTORAGE MIGRATION
-       * =====================================================
-       */
-
-      let migratedVehicles =
-        loadedVehicles;
-
-      let migratedChargers =
-        loadedChargers;
-
-      let vehicleMigrationSucceeded =
-        true;
-
-      let chargerMigrationSucceeded =
-        true;
-
-      try {
-        const savedVehiclesRaw =
-          localStorage.getItem(
-            CUSTOM_VEHICLES_KEY
-          );
-
-        if (savedVehiclesRaw) {
-          const savedVehicles =
-            JSON.parse(
-              savedVehiclesRaw
-            ) as CustomVehicle[];
-
-          const existingKeys =
-            new Set(
-              loadedVehicles.map(
-                (v) =>
-                  `${v.brand.trim().toLowerCase()}|${v.model.trim().toLowerCase()}`
-              )
-            );
-
-          const vehiclesToInsert =
-            savedVehicles.filter(
-              (v) => {
-                const key =
-                  `${v.brand.trim().toLowerCase()}|${v.model.trim().toLowerCase()}`;
-
-                if (
-                  existingKeys.has(
-                    key
-                  )
-                ) {
-                  return false;
-                }
-
-                existingKeys.add(key);
-                return true;
-              }
-            );
-
-          if (
-            vehiclesToInsert.length >
-            0
-          ) {
-            const { data, error } =
-              await supabase
-                .from(
-                  "custom_vehicles"
-                )
-                .insert(
-                  vehiclesToInsert.map(
-                    (v) => ({
-                      user_id:
-                        user.id,
-                      brand: v.brand,
-                      model: v.model,
-                      battery:
-                        Number(
-                          v.battery ??
-                            0
-                        ),
-                      range_km:
-                        Number(
-                          v.range ??
-                            0
-                        ),
-                      efficiency:
-                        Number(
-                          v.efficiency ??
-                            0
-                        ),
-                      ac_power:
-                        Number(
-                          v.acPower ??
-                            0
-                        ),
-                      dc_power:
-                        Number(
-                          v.dcPower ??
-                            0
-                        ),
-                      fast_charge_10_to_80:
-                        Number(
-                          v.fastCharge10to80 ??
-                            0
-                        ),
-                    })
-                  )
-                )
-                .select("*");
-
-            if (error) {
-              console.error(
-                "Custom vehicle migration failed:",
-                error
-              );
-              vehicleMigrationSucceeded =
-                false;
-            } else if (data) {
-              migratedVehicles = [
-                ...loadedVehicles,
-                ...data.map(
-                  mapVehicle
-                ),
-              ];
-            }
-          }
-
-          if (
-            vehicleMigrationSucceeded
-          ) {
-            localStorage.removeItem(
-              CUSTOM_VEHICLES_KEY
-            );
-          }
-        }
-      } catch (error) {
-        console.error(
-          "Custom vehicle localStorage migration failed:",
-          error
-        );
-        vehicleMigrationSucceeded =
-          false;
-      }
-
-      try {
-        const savedChargersRaw =
-          localStorage.getItem(
-            CUSTOM_CHARGERS_KEY
-          );
-
-        if (savedChargersRaw) {
-          const savedChargers =
-            JSON.parse(
-              savedChargersRaw
-            ) as CustomCharger[];
-
-          const existingKeys =
-            new Set(
-              loadedChargers.map(
-                (c) =>
-                  `${c.name.trim().toLowerCase()}|${c.type}|${c.power}`
-              )
-            );
-
-          const chargersToInsert =
-            savedChargers.filter(
-              (c) => {
-                const key =
-                  `${c.name.trim().toLowerCase()}|${c.type}|${c.power}`;
-
-                if (
-                  existingKeys.has(
-                    key
-                  )
-                ) {
-                  return false;
-                }
-
-                existingKeys.add(key);
-                return true;
-              }
-            );
-
-          if (
-            chargersToInsert.length >
-            0
-          ) {
-            const { data, error } =
-              await supabase
-                .from(
-                  "custom_chargers"
-                )
-                .insert(
-                  chargersToInsert.map(
-                    (c) => ({
-                      user_id:
-                        user.id,
-                      name: c.name,
-                      type: c.type,
-                      power:
-                        Number(
-                          c.power
-                        ),
-                    })
-                  )
-                )
-                .select("*");
-
-            if (error) {
-              console.error(
-                "Custom charger migration failed:",
-                error
-              );
-              chargerMigrationSucceeded =
-                false;
-            } else if (data) {
-              migratedChargers = [
-                ...loadedChargers,
-                ...data.map(
-                  (row): CustomCharger => ({
-                    id: String(
-                      row.id
-                    ),
-                    name: row.name,
-                    type:
-                      row.type ===
-                      "DC"
-                        ? "DC"
-                        : "AC",
-                    power: Number(
-                      row.power
-                    ),
-                  })
-                ),
-              ];
-            }
-          }
-
-          if (
-            chargerMigrationSucceeded
-          ) {
-            localStorage.removeItem(
-              CUSTOM_CHARGERS_KEY
-            );
-          }
-        }
-      } catch (error) {
-        console.error(
-          "Custom charger localStorage migration failed:",
-          error
-        );
-        chargerMigrationSucceeded =
-          false;
-      }
-
       if (!cancelled) {
-        setCustomVehicles(
-          migratedVehicles
-        );
-        setCustomChargers(
-          migratedChargers
-        );
+        setCustomVehicles(loadedVehicles);
+        setCustomChargers(loadedChargers);
         setCustomDataLoading(false);
-
-        if (
-          !vehicleMigrationSucceeded ||
-          !chargerMigrationSucceeded
-        ) {
-          setCustomDataError(
-            "Some existing custom Planner data could not be migrated. It has been kept locally and will be retried."
-          );
-        }
       }
     }
 
@@ -757,6 +661,82 @@ function Planner() {
       setTargetSOC(currentSOC);
     }
   }, [currentSOC, targetSOC]);
+
+  /*
+   * =========================================================
+   * PLANNER DRAFT RESTORE + AUTOSAVE
+   * =========================================================
+   */
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function initializePlannerDraft() {
+      try {
+        await restorePlannerDraft();
+
+        if (!cancelled) {
+          draftLoadedRef.current = true;
+        }
+      } catch (error) {
+        console.error(
+          "Failed to initialize Planner draft:",
+          error
+        );
+
+        if (!cancelled) {
+          draftLoadedRef.current = true;
+          setDraftStatus("error");
+        }
+      }
+    }
+
+    void initializePlannerDraft();
+
+    return () => {
+      cancelled = true;
+
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!draftLoadedRef.current) {
+      return;
+    }
+
+    if (skipAutosaveRef.current) {
+      skipAutosaveRef.current = false;
+      return;
+    }
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    autosaveTimerRef.current =
+      setTimeout(() => {
+        void autosavePlannerDraft();
+      }, 1000);
+
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+      }
+    };
+  }, [
+    selectedBrand,
+    vehicleId,
+    chargerId,
+    chargingLocation,
+    state,
+    homeRate,
+    publicRate,
+    currentSOC,
+    targetSOC,
+  ]);
 
   /*
    * =========================================================
@@ -1454,6 +1434,7 @@ if (fastChargeTime > 0) {
               e.target.value
             )
           }
+          onBlur={handlePlannerAutosaveBlur}
         >
           {brands.map((brand) => (
             <option
@@ -1476,6 +1457,7 @@ if (fastChargeTime > 0) {
               Number(e.target.value)
             )
           }
+          onBlur={handlePlannerAutosaveBlur}
         >
           {brandVehicles.map(
             (v) => (
@@ -1755,6 +1737,7 @@ if (fastChargeTime > 0) {
                 | "Public"
             )
           }
+          onBlur={handlePlannerAutosaveBlur}
         >
           <option value="Home">
             🏠 Home
@@ -1776,6 +1759,7 @@ if (fastChargeTime > 0) {
               e.target.value
             )
           }
+          onBlur={handlePlannerAutosaveBlur}
         >
           {allChargers.map(
             (c) => (
@@ -1937,6 +1921,7 @@ if (fastChargeTime > 0) {
                   e.target.value
                 )
               }
+              onBlur={handlePlannerAutosaveBlur}
             >
               {STATES.map(
                 (item) => (
@@ -1965,6 +1950,7 @@ if (fastChargeTime > 0) {
                   Number(e.target.value)
                 )
               }
+              onBlur={handlePlannerAutosaveBlur}
             />
 
             <p
@@ -2002,6 +1988,7 @@ if (fastChargeTime > 0) {
                   Number(e.target.value)
                 )
               }
+              onBlur={handlePlannerAutosaveBlur}
             />
 
             <p
@@ -2031,6 +2018,7 @@ if (fastChargeTime > 0) {
               Number(e.target.value)
             )
           }
+          onBlur={handlePlannerAutosaveBlur}
         />
 
         <p>
@@ -2051,11 +2039,52 @@ if (fastChargeTime > 0) {
               Number(e.target.value)
             )
           }
+          onBlur={handlePlannerAutosaveBlur}
         />
 
         <p>
           {targetSOC}%
         </p>
+
+        <div
+          className="buttonGroup"
+          style={{
+            marginTop: 16,
+          }}
+        >
+          <button
+            type="button"
+            className="dangerButton"
+            onClick={() =>
+              void resetPlannerForm()
+            }
+          >
+            🔄 Reset Planner
+          </button>
+        </div>
+
+        {draftStatus !== "idle" && (
+          <div
+            style={{
+              marginTop: "10px",
+              textAlign: "right",
+              fontSize: "13px",
+              color:
+                draftStatus === "error"
+                  ? "#dc2626"
+                  : "#6b7280",
+            }}
+          >
+            {draftStatus === "saving" &&
+              "Saving…"}
+
+            {draftStatus === "saved" &&
+              "✓ Saved"}
+
+            {draftStatus === "error" &&
+              "⚠ Draft save failed"}
+          </div>
+        )}
 
       </div>
 
