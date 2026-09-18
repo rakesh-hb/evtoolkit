@@ -59,17 +59,7 @@ const emptyRecord: ServiceRecord = {
 };
 
 
-const builtInServiceTypes = [
-  "Regular Service",
-  "Battery Check",
-  "Brake Service",
-  "Coolant Change",
-  "Software Update",
-  "Tyre Rotation",
-  "Wheel Alignment",
-  "General Inspection",
-  "Other",
-];
+
 
 
 interface ServiceHistoryProps {
@@ -463,6 +453,63 @@ export default function ServiceHistory({
     : [];
 
   /* ============================================================
+     ADD CUSTOM VEHICLE
+     ============================================================ */
+
+  async function handleAddVehicle() {
+    const brand = vehicleBrand.trim();
+    const model = vehicleModel.trim();
+
+    if (!brand || !model) {
+      alert("Please enter the vehicle brand and model.");
+      return;
+    }
+
+    const vehicleName = `${brand} ${model}`;
+    const duplicate = allVehicles.some(
+      (vehicle) =>
+        vehicle.value.trim().toLowerCase() ===
+        vehicleName.trim().toLowerCase()
+    );
+
+    if (duplicate) {
+      alert("This vehicle already exists.");
+      return;
+    }
+
+    try {
+      setSavingVehicle(true);
+
+      const created = await addCustomVehicle({ brand, model });
+
+      setCustomVehicles((previous) => [...previous, created]);
+
+      const createdVehicle = `${created.brand} ${created.model}`;
+
+      setForm((previous) => ({
+        ...previous,
+        vehicle: createdVehicle,
+      }));
+
+      setVehicleBrand("");
+      setVehicleModel("");
+      setShowVehicleForm(false);
+
+      alert("Vehicle added successfully.");
+    } catch (error) {
+      console.error("Failed to add vehicle:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to add vehicle."
+      );
+    } finally {
+      setSavingVehicle(false);
+    }
+  }
+
+
+  /* ============================================================
      SERVICES PERFORMED
      ============================================================ */
 
@@ -637,16 +684,6 @@ export default function ServiceHistory({
       case 3: return `${count}rd`;
       default: return `${count}th`;
     }
-  }
-
-  function getServiceRecordDisplayType(record: ServiceRecord) {
-    const existingCategory = getServiceCategoryFromRecord(record.serviceType);
-
-    if (existingCategory) {
-      return record.serviceType;
-    }
-
-    return record.serviceType;
   }
 
   function getNextServiceLabel(category: "Free Service" | "Paid Service") {

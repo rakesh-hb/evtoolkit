@@ -70,7 +70,7 @@ interface SettingsProps {
 
 function Settings({ onNavigate }: SettingsProps) {
 
-  const [backupSchedule, setBackupSchedule] =
+  const [, setBackupSchedule] =
     useState<BackupSchedule | null>(null);
 
   const [backupFrequency, setBackupFrequency] =
