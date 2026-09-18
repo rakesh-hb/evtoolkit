@@ -1,9 +1,40 @@
-export default function About() {
+import UserDetails from "../components/UserDetails";
+
+interface AboutProps {
+  onNavigate?: (page: string) => void;
+}
+
+export default function About({
+  onNavigate,
+}: AboutProps) {
   return (
     <>
-      <div className="welcome">
-        <h2>⚡ About EV Toolkit</h2>
-        <p>Your personal EV ownership companion.</p>
+      <div
+        className="welcome"
+        style={{
+          position: "relative",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: "20px",
+            width: "100%",
+          }}
+        >
+          <div>
+            <h2>⚡ About EV Toolkit</h2>
+            <p>Your personal EV ownership companion.</p>
+          </div>
+
+          <UserDetails
+            onClick={() => {
+              onNavigate?.("profile");
+            }}
+          />
+        </div>
       </div>
 
       <div className="card">

@@ -5,6 +5,7 @@ import {
 } from "react";
 
 import { supabase } from "../lib/supabase";
+import UserDetails from "../components/UserDetails";
 
 import {
   createBackup,
@@ -44,7 +45,11 @@ interface InvitableUser {
 }
 
 
-function Settings() {
+interface SettingsProps {
+  onNavigate?: (page: string) => void;
+}
+
+function Settings({ onNavigate }: SettingsProps) {
   const [currency, setCurrency] =
     useState("INR (₹)");
 
@@ -740,6 +745,22 @@ function Settings() {
 
   return (
     <>
+      <div
+        style={{
+          position: "relative",
+          minHeight: 52,
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "flex-end",
+        }}
+      >
+        <UserDetails
+          onClick={() => {
+            onNavigate?.("profile");
+          }}
+        />
+      </div>
+
       <div className="welcome">
 
         <h2>

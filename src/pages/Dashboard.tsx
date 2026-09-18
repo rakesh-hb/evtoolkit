@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import UserDetails from "../components/UserDetails";
+
+
+interface DashboardProps {
+  onNavigate?: (page: string) => void;
+}
+
 
 interface Session {
   id: number;
@@ -12,16 +19,21 @@ interface Session {
   user_id: string;
 }
 
-function Dashboard() {
+
+function Dashboard({
+  onNavigate,
+}: DashboardProps) {
   const [sessions, setSessions] =
     useState<Session[]>([]);
 
   const [loading, setLoading] =
     useState(true);
 
+
   useEffect(() => {
     void loadSessions();
   }, []);
+
 
   async function loadSessions() {
     setLoading(true);
@@ -149,6 +161,27 @@ function Dashboard() {
 
   return (
     <>
+      {/* ======================================================
+          HEADER / USER DETAILS
+          ====================================================== */}
+
+      <div
+        style={{
+          position: "relative",
+          minHeight: 52,
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "flex-end",
+        }}
+      >
+        <UserDetails
+          onClick={() => {
+            onNavigate?.("profile");
+          }}
+        />
+      </div>
+
+
       <div className="welcome">
 
         <h2>
@@ -167,44 +200,446 @@ function Dashboard() {
           FAMILY-WIDE STATS
           ====================================================== */}
 
-      <div className="statsGrid">
+      <div
+        className="statsGrid"
+        style={{
+          gap: "14px",
+        }}
+      >
 
-        <div className="statCard">
+        {/* ==================================================
+            TOTAL COST
+            ================================================== */}
 
-          <h3>
-            Total Cost
-          </h3>
+        <div
+          className="statCard"
+          style={{
+            background:
+              "linear-gradient(145deg, rgba(120,53,15,0.34), rgba(15,23,42,0.96))",
+            border:
+              "1px solid rgba(245,158,11,0.48)",
+            borderRadius:
+              "16px",
+            boxShadow:
+              "0 8px 24px rgba(245,158,11,0.22)",
+            minHeight:
+              "138px",
+            minWidth:
+              0,
+            padding:
+              "16px 10px",
+            overflow:
+              "hidden",
+          }}
+        >
 
-          <h1>
-            ₹
-            {totalCost.toLocaleString()}
+          <div
+            style={{
+              display:
+                "flex",
+              alignItems:
+                "center",
+              justifyContent:
+                "center",
+              gap:
+                "7px",
+              marginBottom:
+                "9px",
+              minWidth:
+                0,
+            }}
+          >
+
+            <div
+              style={{
+                width:
+                  "34px",
+                height:
+                  "34px",
+                borderRadius:
+                  "50%",
+                display:
+                  "flex",
+                alignItems:
+                  "center",
+                justifyContent:
+                  "center",
+                background:
+                  "linear-gradient(145deg, #f59e0b, #d97706)",
+                color:
+                  "#ffffff",
+                fontSize:
+                  "18px",
+                fontWeight:
+                  800,
+                boxShadow:
+                  "0 0 18px rgba(245,158,11,0.22)",
+                flexShrink:
+                  0,
+              }}
+            >
+              ₹
+            </div>
+
+
+            <h3
+              style={{
+                margin:
+                  0,
+                color:
+                  "#f8fafc",
+                fontFamily:
+                  '"Inter", "Segoe UI", Arial, sans-serif',
+                fontSize:
+                  "12px",
+                fontWeight:
+                  750,
+                lineHeight:
+                  1.15,
+                textAlign:
+                  "center",
+                whiteSpace:
+                  "normal",
+                overflowWrap:
+                  "anywhere",
+                minWidth:
+                  0,
+                flex:
+                  "1 1 auto",
+              }}
+            >
+              Total Cost
+            </h3>
+
+          </div>
+
+
+          <h1
+            style={{
+              margin:
+                0,
+              color:
+                "#fbbf24",
+              fontFamily:
+                '"Inter", "Segoe UI", Arial, sans-serif',
+              fontSize:
+                "23px",
+              lineHeight:
+                1.05,
+              fontWeight:
+                800,
+              letterSpacing:
+                "-0.035em",
+              textAlign:
+                "center",
+              maxWidth:
+                "100%",
+              overflowWrap:
+                "anywhere",
+              textShadow:
+                "0 0 18px rgba(245,158,11,0.22)",
+              whiteSpace:
+                "nowrap",
+            }}
+          >
+            ₹{totalCost.toLocaleString(
+              undefined,
+              {
+                minimumFractionDigits:
+                  2,
+                maximumFractionDigits:
+                  2,
+              }
+            )}
           </h1>
 
         </div>
 
 
-        <div className="statCard">
+        {/* ==================================================
+            TOTAL ENERGY
+            ================================================== */}
 
-          <h3>
-            Energy
-          </h3>
+        <div
+          className="statCard"
+          style={{
+            background:
+              "linear-gradient(145deg, rgba(6,95,70,0.34), rgba(15,23,42,0.96))",
+            border:
+              "1px solid rgba(34,197,94,0.48)",
+            borderRadius:
+              "16px",
+            boxShadow:
+              "0 8px 24px rgba(34,197,94,0.22)",
+            minHeight:
+              "138px",
+            minWidth:
+              0,
+            padding:
+              "16px 10px",
+            overflow:
+              "hidden",
+          }}
+        >
 
-          <h1>
-            {totalEnergy.toFixed(1)}
-            {" "}
-            kWh
+          <div
+            style={{
+              display:
+                "flex",
+              alignItems:
+                "center",
+              justifyContent:
+                "center",
+              gap:
+                "7px",
+              marginBottom:
+                "9px",
+              minWidth:
+                0,
+            }}
+          >
+
+            <div
+              style={{
+                width:
+                  "34px",
+                height:
+                  "34px",
+                borderRadius:
+                  "50%",
+                display:
+                  "flex",
+                alignItems:
+                  "center",
+                justifyContent:
+                  "center",
+                background:
+                  "linear-gradient(145deg, #22c55e, #16a34a)",
+                color:
+                  "#ffffff",
+                fontSize:
+                  "22px",
+                fontWeight:
+                  800,
+                boxShadow:
+                  "0 0 18px rgba(34,197,94,0.22)",
+                flexShrink:
+                  0,
+              }}
+            >
+              ϟ
+            </div>
+
+
+            <h3
+              style={{
+                margin:
+                  0,
+                color:
+                  "#f8fafc",
+                fontFamily:
+                  '"Inter", "Segoe UI", Arial, sans-serif',
+                fontSize:
+                  "12px",
+                fontWeight:
+                  750,
+                lineHeight:
+                  1.15,
+                textAlign:
+                  "center",
+                whiteSpace:
+                  "normal",
+                overflowWrap:
+                  "anywhere",
+                minWidth:
+                  0,
+                flex:
+                  "1 1 auto",
+              }}
+            >
+              Total Energy
+            </h3>
+
+          </div>
+
+
+          <h1
+            style={{
+              margin:
+                0,
+              color:
+                "#4ade80",
+              fontFamily:
+                '"Inter", "Segoe UI", Arial, sans-serif',
+              fontSize:
+                "27px",
+              lineHeight:
+                1.05,
+              fontWeight:
+                800,
+              letterSpacing:
+                "-0.03em",
+              textAlign:
+                "center",
+              maxWidth:
+                "100%",
+              overflowWrap:
+                "anywhere",
+              textShadow:
+                "0 0 18px rgba(34,197,94,0.22)",
+              whiteSpace:
+                "nowrap",
+            }}
+          >
+            {totalEnergy.toFixed(1)}{" "}
+            <span
+              style={{
+                fontSize:
+                  "0.68em",
+                whiteSpace:
+                  "nowrap",
+              }}
+            >
+              kWh
+            </span>
           </h1>
 
         </div>
 
 
-        <div className="statCard">
+        {/* ==================================================
+            TOTAL SESSIONS
+            ================================================== */}
 
-          <h3>
-            Sessions
-          </h3>
+        <div
+          className="statCard"
+          style={{
+            background:
+              "linear-gradient(145deg, rgba(30,64,175,0.30), rgba(15,23,42,0.96))",
+            border:
+              "1px solid rgba(59,130,246,0.48)",
+            borderRadius:
+              "16px",
+            boxShadow:
+              "0 8px 24px rgba(59,130,246,0.22)",
+            minHeight:
+              "138px",
+            minWidth:
+              0,
+            padding:
+              "16px 10px",
+            overflow:
+              "hidden",
+          }}
+        >
 
-          <h1>
+          <div
+            style={{
+              display:
+                "flex",
+              alignItems:
+                "center",
+              justifyContent:
+                "center",
+              gap:
+                "7px",
+              marginBottom:
+                "9px",
+              minWidth:
+                0,
+            }}
+          >
+
+            <div
+              style={{
+                width:
+                  "34px",
+                height:
+                  "34px",
+                borderRadius:
+                  "50%",
+                display:
+                  "flex",
+                alignItems:
+                  "center",
+                justifyContent:
+                  "center",
+                background:
+                  "linear-gradient(145deg, #3b82f6, #2563eb)",
+                color:
+                  "#ffffff",
+                fontSize:
+                  "20px",
+                fontWeight:
+                  800,
+                boxShadow:
+                  "0 0 18px rgba(59,130,246,0.22)",
+                flexShrink:
+                  0,
+              }}
+            >
+              ▦
+            </div>
+
+
+            <h3
+              style={{
+                margin:
+                  0,
+                color:
+                  "#f8fafc",
+                fontFamily:
+                  '"Inter", "Segoe UI", Arial, sans-serif',
+                fontSize:
+                  "12px",
+                fontWeight:
+                  750,
+                lineHeight:
+                  1.15,
+                textAlign:
+                  "center",
+                whiteSpace:
+                  "normal",
+                overflowWrap:
+                  "anywhere",
+                minWidth:
+                  0,
+                flex:
+                  "1 1 auto",
+              }}
+            >
+              Total Sessions
+            </h3>
+
+          </div>
+
+
+          <h1
+            style={{
+              margin:
+                0,
+              color:
+                "#38bdf8",
+              fontFamily:
+                '"Inter", "Segoe UI", Arial, sans-serif',
+              fontSize:
+                "32px",
+              lineHeight:
+                1.05,
+              fontWeight:
+                800,
+              letterSpacing:
+                "-0.03em",
+              textAlign:
+                "center",
+              maxWidth:
+                "100%",
+              overflowWrap:
+                "anywhere",
+              textShadow:
+                "0 0 18px rgba(59,130,246,0.22)",
+            }}
+          >
             {totalSessions}
           </h1>
 
@@ -439,5 +874,6 @@ function Dashboard() {
     </>
   );
 }
+
 
 export default Dashboard;

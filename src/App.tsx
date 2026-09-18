@@ -265,6 +265,23 @@ function App() {
 
   /*
    * ============================================================
+   * CENTRAL PAGE NAVIGATION
+   * ============================================================
+   *
+   * All pages that need to navigate to another page should
+   * use this callback.
+   */
+
+  function navigateTo(
+    selectedPage: string
+  ) {
+    setPage(selectedPage);
+    setDrawerOpen(false);
+  }
+
+
+  /*
+   * ============================================================
    * PAGE ROUTING
    * ============================================================
    */
@@ -275,61 +292,85 @@ function App() {
 
       case "dashboard":
         return (
-          <Dashboard />
+          <Dashboard
+            onNavigate={navigateTo}
+          />
         );
 
 
       case "planner":
         return (
-          <Planner />
+          <Planner
+            onNavigate={navigateTo}
+          />
         );
 
 
       case "tracker":
         return (
-          <Tracker />
+          <Tracker
+            onNavigate={navigateTo}
+          />
         );
 
 
       case "analytics":
         return (
-          <Analytics />
+          <Analytics
+            onNavigate={
+              navigateTo
+            }
+          />
         );
 
 
       case "service":
         return (
-          <ServiceHistory />
+          <ServiceHistory
+            onNavigate={navigateTo}
+          />
         );
 
 
       case "tyres":
         return (
-          <TyreHistory />
+          <TyreHistory
+            onNavigate={navigateTo}
+          />
         );
 
 
       case "insurance":
         return (
-          <Insurance />
+          <Insurance
+            onNavigate={navigateTo}
+          />
         );
 
 
       case "documents":
         return (
-          <DocumentVault />
+          <DocumentVault
+            onNavigate={navigateTo}
+          />
         );
 
 
       case "settings":
         return (
-          <Settings />
+          <Settings
+            onNavigate={navigateTo}
+          />
         );
 
 
       case "about":
         return (
-          <About />
+          <About
+            onNavigate={
+              navigateTo
+            }
+          />
         );
 
 
@@ -341,7 +382,9 @@ function App() {
 
       default:
         return (
-          <Dashboard />
+          <Dashboard
+            onNavigate={navigateTo}
+          />
         );
     }
   }
@@ -374,12 +417,8 @@ function App() {
           selectedPage
         ) => {
 
-          setPage(
+          navigateTo(
             selectedPage
-          );
-
-          setDrawerOpen(
-            false
           );
 
         }}
@@ -410,7 +449,7 @@ function App() {
           }
 
           onClick={() =>
-            setPage(
+            navigateTo(
               "dashboard"
             )
           }
@@ -434,7 +473,7 @@ function App() {
           }
 
           onClick={() =>
-            setPage(
+            navigateTo(
               "planner"
             )
           }
@@ -458,7 +497,7 @@ function App() {
           }
 
           onClick={() =>
-            setPage(
+            navigateTo(
               "tracker"
             )
           }
@@ -482,7 +521,7 @@ function App() {
           }
 
           onClick={() =>
-            setPage(
+            navigateTo(
               "analytics"
             )
           }

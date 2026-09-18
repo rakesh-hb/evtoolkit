@@ -10,6 +10,8 @@ import {
   updateProfile,
 } from "../services/authService";
 
+import UserDetails from "../components/UserDetails";
+
 export default function UserProfile() {
   const [firstName, setFirstName] =
     useState("");
@@ -227,6 +229,18 @@ export default function UserProfile() {
 
   return (
     <>
+      <div
+        style={{
+          position: "relative",
+          minHeight: 52,
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "flex-end",
+        }}
+      >
+        <UserDetails />
+      </div>
+
       <div className="welcome">
         <h2>👤 User Profile</h2>
 

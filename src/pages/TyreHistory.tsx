@@ -8,6 +8,7 @@ import {
 import type { TyreRecord } from "../types/tyre";
 
 import ReceiptUploader from "../components/ReceiptUploader";
+import UserDetails from "../components/UserDetails";
 
 import {
   getTyres,
@@ -58,7 +59,11 @@ const emptyRecord: TyreRecordWithAttachmentName = {
 };
 
 
-export default function TyreHistory() {
+interface TyreHistoryProps {
+  onNavigate?: (page: string) => void;
+}
+
+export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
   const [records, setRecords] =
     useState<TyreRecordWithAttachmentName[]>([]);
 
@@ -679,6 +684,22 @@ export default function TyreHistory() {
 
   return (
     <>
+      <div
+        style={{
+          position: "relative",
+          minHeight: 52,
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "flex-end",
+        }}
+      >
+        <UserDetails
+          onClick={() => {
+            onNavigate?.("profile");
+          }}
+        />
+      </div>
+
       <div className="welcome">
         <h2>
           🛞 Tyre History

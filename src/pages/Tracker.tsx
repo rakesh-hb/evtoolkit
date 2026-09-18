@@ -20,6 +20,7 @@ import {
 
 import { vehicles } from "../data/vehicles";
 import ReceiptUploader from "../components/ReceiptUploader";
+import UserDetails from "../components/UserDetails";
 
 
 export interface ChargingStationOption {
@@ -110,7 +111,11 @@ interface ChargingDraft {
 }
 
 
-function Tracker() {
+interface TrackerProps {
+  onNavigate?: (page: string) => void;
+}
+
+function Tracker({ onNavigate }: TrackerProps) {
   const defaultVehicle =
     vehicles.find(
       (v) => v.model === "Curvv EV 55"
@@ -756,6 +761,22 @@ function Tracker() {
 
   return (
     <>
+      <div
+        style={{
+          position: "relative",
+          minHeight: 52,
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "flex-end",
+        }}
+      >
+        <UserDetails
+          onClick={() => {
+            onNavigate?.("profile");
+          }}
+        />
+      </div>
+
       <div className="welcome">
         <h2>
           📝 Charge Tracker

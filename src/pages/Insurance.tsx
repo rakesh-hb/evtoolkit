@@ -33,6 +33,7 @@ import {
 import { vehicles } from "../data/vehicles";
 
 import ReceiptUploader from "../components/ReceiptUploader";
+import UserDetails from "../components/UserDetails";
 
 
 const emptyPolicy: InsuranceRecord = {
@@ -170,7 +171,13 @@ const INSURANCE_ADDONS = [
 ];
 
 
-export default function Insurance() {
+interface InsuranceProps {
+  onNavigate?: (page: string) => void;
+}
+
+export default function Insurance({
+  onNavigate,
+}: InsuranceProps) {
   const [records, setRecords] =
     useState<InsuranceRecord[]>([]);
 
@@ -1036,6 +1043,22 @@ export default function Insurance() {
 
   return (
     <>
+      <div
+        style={{
+          position: "relative",
+          minHeight: 52,
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "flex-end",
+        }}
+      >
+        <UserDetails
+          onClick={() => {
+            onNavigate?.("profile");
+          }}
+        />
+      </div>
+
       <div className="welcome">
         <h2>
           🛡 Insurance

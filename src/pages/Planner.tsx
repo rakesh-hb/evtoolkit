@@ -3,6 +3,7 @@ import { vehicles } from "../data/vehicles";
 import { chargers } from "../data/chargers";
 import { STATES } from "../data/states";
 import { supabase } from "../lib/supabase";
+import UserDetails from "../components/UserDetails";
 import {
   getFormDraft,
   saveFormDraft,
@@ -134,7 +135,13 @@ const emptyChargerForm = {
   power: "",
 };
 
-function Planner() {
+interface PlannerProps {
+  onNavigate?: (page: string) => void;
+}
+
+function Planner({
+  onNavigate,
+}: PlannerProps) {
   /*
    * =========================================================
    * FORM AUTOSAVE
@@ -1372,6 +1379,22 @@ if (fastChargeTime > 0) {
 
   return (
     <>
+      <div
+        style={{
+          position: "relative",
+          minHeight: 52,
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "flex-end",
+        }}
+      >
+        <UserDetails
+          onClick={() => {
+            onNavigate?.("profile");
+          }}
+        />
+      </div>
+
       <div className="welcome">
         <h2>
           ⚡ Charge Planner

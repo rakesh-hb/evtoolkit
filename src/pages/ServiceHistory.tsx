@@ -39,6 +39,7 @@ import {
 import { vehicles } from "../data/vehicles";
 
 import ReceiptUploader from "../components/ReceiptUploader";
+import UserDetails from "../components/UserDetails";
 
 
 const emptyRecord: ServiceRecord = {
@@ -69,7 +70,13 @@ const builtInServiceTypes = [
 ];
 
 
-export default function ServiceHistory() {
+interface ServiceHistoryProps {
+  onNavigate?: (page: string) => void;
+}
+
+export default function ServiceHistory({
+  onNavigate,
+}: ServiceHistoryProps) {
   const [records, setRecords] =
     useState<ServiceRecord[]>([]);
 
@@ -944,6 +951,22 @@ export default function ServiceHistory() {
 
   return (
     <>
+      <div
+        style={{
+          position: "relative",
+          minHeight: 52,
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "flex-end",
+        }}
+      >
+        <UserDetails
+          onClick={() => {
+            onNavigate?.("profile");
+          }}
+        />
+      </div>
+
       <div className="welcome">
 
         <h2>
