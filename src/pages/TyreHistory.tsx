@@ -20,6 +20,12 @@ import {
 import { getCurrentUserId } from "../services/authHelper";
 
 import {
+  getCurrentPlan,
+  canAddTyreHistory,
+  FREE_LIMITS,
+} from "../services/subscriptionService";
+
+import {
   getFormDraft,
   saveFormDraft,
   deleteFormDraft,
@@ -619,6 +625,35 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
         });
 
       } else {
+        /*
+         * Enforce the Free-plan tyre history limit.
+         * Only records owned by the current user count.
+         * Premium users have no numeric limit.
+         */
+
+        const plan = await getCurrentPlan();
+
+        const ownTyreCount =
+          currentUserId === null
+            ? records.length
+            : records.filter(
+                (record) =>
+                  record.user_id === currentUserId
+              ).length;
+
+        if (
+          !canAddTyreHistory(
+            ownTyreCount,
+            plan
+          )
+        ) {
+          alert(
+            `The Free plan is limited to ${FREE_LIMITS.tyreHistory} tyre history records. Upgrade to Premium for ₹49 one-time to add more tyre history records.`
+          );
+
+          return;
+        }
+
         /*
          * addTyre() assigns the current
          * authenticated user's user_id.

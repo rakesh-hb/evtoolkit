@@ -8,6 +8,11 @@ import { supabase } from "../lib/supabase";
 import UserDetails from "../components/UserDetails";
 
 import {
+  getCurrentPlan,
+  canUseAutoBackup,
+} from "../services/subscriptionService";
+
+import {
   createBackup,
   restoreBackup,
 } from "../services/backupService";
@@ -45,6 +50,19 @@ interface InvitableUser {
 }
 
 
+interface BackupSchedule {
+  id: string;
+  user_id: string;
+  enabled: boolean;
+  frequency: "daily" | "weekly" | "monthly";
+  run_time: string;
+  weekday: number | null;
+  day_of_month: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+
 interface SettingsProps {
   onNavigate?: (page: string) => void;
 }
@@ -58,6 +76,31 @@ function Settings({ onNavigate }: SettingsProps) {
 
   const [distanceUnit, setDistanceUnit] =
     useState("km");
+
+
+  const [backupSchedule, setBackupSchedule] =
+    useState<BackupSchedule | null>(null);
+
+  const [backupFrequency, setBackupFrequency] =
+    useState<"daily" | "weekly" | "monthly">("daily");
+
+  const [backupTime, setBackupTime] =
+    useState("09:00");
+
+  const [backupWeekday, setBackupWeekday] =
+    useState("1");
+
+  const [backupDayOfMonth, setBackupDayOfMonth] =
+    useState("1");
+
+  const [backupEnabled, setBackupEnabled] =
+    useState(false);
+
+  const [loadingBackupSchedule, setLoadingBackupSchedule] =
+    useState(true);
+
+  const [savingBackupSchedule, setSavingBackupSchedule] =
+    useState(false);
 
 
   const [currentUserId, setCurrentUserId] =
@@ -99,6 +142,11 @@ function Settings({ onNavigate }: SettingsProps) {
 
   const fileInputRef =
     useRef<HTMLInputElement>(null);
+
+
+  const [lastBackupAt, setLastBackupAt] =
+    useState<string | null>(null);
+
 
 
   /*
@@ -145,6 +193,11 @@ function Settings({ onNavigate }: SettingsProps) {
       setCurrentUserEmail(
         user.email ?? ""
       );
+
+
+      await loadLastBackup(user.id);
+
+      await loadBackupSchedule();
 
 
       /*
@@ -230,6 +283,198 @@ function Settings({ onNavigate }: SettingsProps) {
 
     } finally {
       setLoadingFamily(false);
+    }
+  }
+
+
+  /*
+   * ============================================================
+   * AUTO BACKUP SCHEDULE
+   * ============================================================
+   */
+
+  async function loadLastBackup(
+    userId: string
+  ) {
+    try {
+      const {
+        data,
+        error,
+      } = await supabase
+        .from("backup_registry")
+        .select("created_at")
+        .eq("user_id", userId)
+        .order("created_at", {
+          ascending: false,
+        })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        throw error;
+      }
+
+      setLastBackupAt(
+        data?.created_at ?? null
+      );
+    } catch (error) {
+      console.error(
+        "Last backup load error:",
+        error
+      );
+    }
+  }
+
+
+  async function loadBackupSchedule() {
+    setLoadingBackupSchedule(true);
+
+    try {
+      const {
+        data: userData,
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError) {
+        throw userError;
+      }
+
+      const user = userData.user;
+
+      if (!user?.id) {
+        throw new Error("Authentication required.");
+      }
+
+      const {
+        data,
+        error,
+      } = await supabase
+        .from("backup_schedules")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (error) {
+        throw error;
+      }
+
+      const schedule =
+        data as BackupSchedule | null;
+
+      setBackupSchedule(schedule);
+      setBackupEnabled(schedule?.enabled ?? false);
+      setBackupFrequency(
+        schedule?.frequency ?? "daily"
+      );
+      setBackupTime(
+        schedule?.run_time?.slice(0, 5) ?? "09:00"
+      );
+      setBackupWeekday(
+        String(schedule?.weekday ?? 1)
+      );
+      setBackupDayOfMonth(
+        String(schedule?.day_of_month ?? 1)
+      );
+    } catch (error) {
+      console.error(
+        "Auto backup schedule load error:",
+        error
+      );
+    } finally {
+      setLoadingBackupSchedule(false);
+    }
+  }
+
+
+  async function handleSaveBackupSchedule() {
+    if (!currentUserId) {
+      alert("Authentication required.");
+      return;
+    }
+
+    const plan = await getCurrentPlan();
+
+    if (!canUseAutoBackup(plan)) {
+      alert(
+        "Automatic Backup is a Premium feature. Upgrade to Premium for ₹49 one-time to use automatic backups."
+      );
+      return;
+    }
+
+    if (
+      backupFrequency === "weekly" &&
+      !backupWeekday
+    ) {
+      alert("Please select a weekday.");
+      return;
+    }
+
+    if (
+      backupFrequency === "monthly" &&
+      !backupDayOfMonth
+    ) {
+      alert("Please select a day of the month.");
+      return;
+    }
+
+    setSavingBackupSchedule(true);
+
+    try {
+      const payload = {
+        user_id: currentUserId,
+        enabled: backupEnabled,
+        frequency: backupFrequency,
+        run_time: backupTime,
+        weekday:
+          backupFrequency === "weekly"
+            ? Number(backupWeekday)
+            : null,
+        day_of_month:
+          backupFrequency === "monthly"
+            ? Number(backupDayOfMonth)
+            : null,
+      };
+
+      const {
+        data,
+        error,
+      } = await supabase
+        .from("backup_schedules")
+        .upsert(
+          payload,
+          {
+            onConflict: "user_id",
+          }
+        )
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      setBackupSchedule(
+        data as BackupSchedule
+      );
+
+      alert(
+        backupEnabled
+          ? "Automatic backup schedule saved successfully."
+          : "Automatic backup has been disabled."
+      );
+    } catch (error) {
+      console.error(
+        "Auto backup schedule save error:",
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to save automatic backup schedule."
+      );
+    } finally {
+      setSavingBackupSchedule(false);
     }
   }
 
@@ -706,6 +951,28 @@ function Settings({ onNavigate }: SettingsProps) {
    * BACKUP / RESTORE
    * ============================================================
    */
+
+  async function handleCreateBackup() {
+    try {
+      await createBackup();
+
+      if (currentUserId) {
+        await loadLastBackup(currentUserId);
+      }
+    } catch (error) {
+      console.error(
+        "Backup creation error:",
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Unable to create backup."
+      );
+    }
+  }
+
 
   async function handleRestore(
     file: File
@@ -1576,6 +1843,37 @@ function Settings({ onNavigate }: SettingsProps) {
 
         <div
           style={{
+            marginTop: "16px",
+            padding: "12px 14px",
+            border: "1px solid #e5e7eb",
+            borderRadius: "8px",
+            maxWidth: "520px",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "13px",
+              color: "#6b7280",
+            }}
+          >
+            Last Backup
+          </div>
+
+          <div
+            style={{
+              marginTop: "4px",
+              fontWeight: 600,
+            }}
+          >
+            {lastBackupAt
+              ? new Date(lastBackupAt).toLocaleString()
+              : "No backup created yet"}
+          </div>
+        </div>
+
+
+        <div
+          style={{
             display: "flex",
             gap: "12px",
             marginTop: "20px",
@@ -1587,7 +1885,7 @@ function Settings({ onNavigate }: SettingsProps) {
           <button
             className="primaryButton"
             onClick={() =>
-              void createBackup()
+              void handleCreateBackup()
             }
           >
             📥 Create Backup
@@ -1649,45 +1947,277 @@ function Settings({ onNavigate }: SettingsProps) {
 
 
       {/* ======================================================
-          GST INFORMATION
+          AUTOMATIC BACKUP
           ====================================================== */}
 
       <div className="card">
 
         <h3>
-          GST Information
+          🔄 Automatic Backup
         </h3>
 
-
-        <p
-          style={{
-            marginTop: 12,
-          }}
-        >
-          • Home AC Charging : No GST
-        </p>
-
-
         <p
           style={{
             marginTop: 8,
+            lineHeight: 1.5,
           }}
         >
-          • Public AC Charging : As per
-          operator pricing
+          Automatically create a backup
+          according to a daily, weekly,
+          or monthly schedule.
         </p>
 
+        {loadingBackupSchedule ? (
 
-        <p
-          style={{
-            marginTop: 8,
-          }}
-        >
-          • DC Fast Charging : 18% GST
-          applied
-        </p>
+          <p
+            style={{
+              marginTop: 16,
+            }}
+          >
+            Loading backup schedule...
+          </p>
+
+        ) : (
+
+          <>
+
+            <div
+              style={{
+                marginTop: 20,
+                display: "flex",
+                flexDirection: "column",
+                gap: 14,
+                maxWidth: 520,
+              }}
+            >
+
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  cursor: "pointer",
+                }}
+              >
+
+                <input
+                  type="checkbox"
+                  checked={backupEnabled}
+                  disabled={savingBackupSchedule}
+                  onChange={(e) =>
+                    setBackupEnabled(
+                      e.target.checked
+                    )
+                  }
+                  style={{
+                    width: 18,
+                    height: 18,
+                  }}
+                />
+
+                <span>
+                  Enable Automatic Backup
+                </span>
+
+              </label>
+
+              {backupEnabled && (
+                <>
+                  <div>
+
+                    <label>
+                      Backup Frequency
+                    </label>
+
+                    <select
+                      value={backupFrequency}
+                      disabled={savingBackupSchedule}
+                      onChange={(e) =>
+                        setBackupFrequency(
+                          e.target.value as
+                            | "daily"
+                            | "weekly"
+                            | "monthly"
+                        )
+                      }
+                    >
+
+                      <option value="daily">
+                        Daily
+                      </option>
+
+                      <option value="weekly">
+                        Weekly
+                      </option>
+
+                      <option value="monthly">
+                        Monthly
+                      </option>
+
+                    </select>
+
+                  </div>
+
+                  <div>
+
+                    <label>
+                      Backup Time
+                    </label>
+
+                    <input
+                      type="time"
+                      value={backupTime}
+                      disabled={savingBackupSchedule}
+                      onChange={(e) =>
+                        setBackupTime(
+                          e.target.value
+                        )
+                      }
+                    />
+
+                  </div>
+
+                  {backupFrequency === "weekly" && (
+
+                    <div>
+
+                      <label>
+                        Weekday
+                      </label>
+
+                      <select
+                        value={backupWeekday}
+                        disabled={savingBackupSchedule}
+                        onChange={(e) =>
+                          setBackupWeekday(
+                            e.target.value
+                          )
+                        }
+                      >
+
+                        <option value="1">
+                          Monday
+                        </option>
+
+                        <option value="2">
+                          Tuesday
+                        </option>
+
+                        <option value="3">
+                          Wednesday
+                        </option>
+
+                        <option value="4">
+                          Thursday
+                        </option>
+
+                        <option value="5">
+                          Friday
+                        </option>
+
+                        <option value="6">
+                          Saturday
+                        </option>
+
+                        <option value="7">
+                          Sunday
+                        </option>
+
+                      </select>
+
+                    </div>
+
+                  )}
+
+                  {backupFrequency === "monthly" && (
+
+                    <div>
+
+                      <label>
+                        Day of Month
+                      </label>
+
+                      <select
+                        value={backupDayOfMonth}
+                        disabled={savingBackupSchedule}
+                        onChange={(e) =>
+                          setBackupDayOfMonth(
+                            e.target.value
+                          )
+                        }
+                      >
+
+                        {Array.from(
+                          { length: 28 },
+                          (_, index) => (
+                            <option
+                              key={index + 1}
+                              value={index + 1}
+                            >
+                              {index + 1}
+                            </option>
+                          )
+                        )}
+
+                      </select>
+
+                      <p
+                        style={{
+                          fontSize: 12,
+                          color: "#6b7280",
+                          marginTop: 6,
+                        }}
+                      >
+                        Select up to day 28 so
+                        the schedule is valid for
+                        every month.
+                      </p>
+
+                    </div>
+
+                  )}
+
+                  <button
+                    className="primaryButton"
+                    disabled={savingBackupSchedule}
+                    onClick={() =>
+                      void handleSaveBackupSchedule()
+                    }
+                    style={{
+                      marginTop: 4,
+                      alignSelf: "flex-start",
+                    }}
+                  >
+                    {savingBackupSchedule
+                      ? "Saving..."
+                      : "Save Backup Schedule"}
+                  </button>
+
+                </>
+              )}
+
+            </div>
+
+            <p
+              style={{
+                fontSize: 12,
+                color: "#6b7280",
+                marginTop: 14,
+                lineHeight: 1.5,
+              }}
+            >
+              Automatic Backup is included
+              with Premium for ₹49 one-time.
+              Free users can still create
+              and restore backups manually.
+            </p>
+
+          </>
+
+        )}
 
       </div>
+
     </>
   );
 }

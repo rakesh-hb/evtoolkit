@@ -67,6 +67,49 @@ export async function createBackup() {
 
     URL.revokeObjectURL(url);
 
+    // Record the successful backup in Supabase so the
+    // Settings page can show the correct Last Backup time.
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError) {
+      console.error(
+        "Could not get current user for backup registry:",
+        userError
+      );
+    } else if (user) {
+      const hashBuffer =
+        await crypto.subtle.digest(
+          "SHA-256",
+          new TextEncoder().encode(json)
+        );
+
+      const backupHash = Array.from(
+        new Uint8Array(hashBuffer)
+      )
+        .map((byte) =>
+          byte.toString(16).padStart(2, "0")
+        )
+        .join("");
+
+      const { error: registryError } =
+        await supabase
+          .from("backup_registry")
+          .insert({
+            user_id: user.id,
+            backup_hash: backupHash,
+          });
+
+      if (registryError) {
+        console.error(
+          "Backup registry update error:",
+          registryError
+        );
+      }
+    }
+
     alert(
       "Backup created successfully."
     );

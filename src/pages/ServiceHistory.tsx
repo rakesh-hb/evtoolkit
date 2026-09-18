@@ -19,6 +19,12 @@ import {
 import { getCurrentUserId } from "../services/authHelper";
 
 import {
+  getCurrentPlan,
+  canAddServiceHistory,
+  FREE_LIMITS,
+} from "../services/subscriptionService";
+
+import {
   getFormDraft,
   saveFormDraft,
   deleteFormDraft,
@@ -793,6 +799,35 @@ export default function ServiceHistory({
         );
 
       } else {
+        /*
+         * Enforce the Free-plan service history limit.
+         * Only records owned by the current user count.
+         * Premium users have no numeric limit.
+         */
+
+        const plan = await getCurrentPlan();
+
+        const ownServiceCount =
+          currentUserId === null
+            ? records.length
+            : records.filter(
+                (record) =>
+                  record.user_id === currentUserId
+              ).length;
+
+        if (
+          !canAddServiceHistory(
+            ownServiceCount,
+            plan
+          )
+        ) {
+          alert(
+            `The Free plan is limited to ${FREE_LIMITS.serviceHistory} service history records. Upgrade to Premium for ₹49 one-time to add more service history records.`
+          );
+
+          return;
+        }
+
         const {
           id,
           ...newRecord

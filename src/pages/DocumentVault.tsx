@@ -19,6 +19,12 @@ import {
 import { getCurrentUserId } from "../services/authHelper";
 
 import {
+  getCurrentPlan,
+  canAddDocument,
+  FREE_LIMITS,
+} from "../services/subscriptionService";
+
+import {
   getFormDraft,
   saveFormDraft,
   deleteFormDraft,
@@ -902,6 +908,29 @@ export default function DocumentVault({
         );
 
       } else {
+        const plan = await getCurrentPlan();
+
+        const ownDocumentCount =
+          currentUserId === null
+            ? records.length
+            : records.filter(
+                (record) =>
+                  record.user_id === currentUserId
+              ).length;
+
+        if (
+          !canAddDocument(
+            ownDocumentCount,
+            plan
+          )
+        ) {
+          alert(
+            `The Free plan is limited to ${FREE_LIMITS.documents} documents. Upgrade to Premium for ₹49 one-time to add more documents.`
+          );
+
+          return;
+        }
+
         const {
           id,
           user_id,

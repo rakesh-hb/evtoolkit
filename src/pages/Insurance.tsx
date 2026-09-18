@@ -19,6 +19,12 @@ import {
 import { getCurrentUserId } from "../services/authHelper";
 
 import {
+  getCurrentPlan,
+  canAddInsurance,
+  FREE_LIMITS,
+} from "../services/subscriptionService";
+
+import {
   getFormDraft,
   saveFormDraft,
   deleteFormDraft,
@@ -976,6 +982,29 @@ export default function Insurance({
         );
 
       } else {
+        const plan = await getCurrentPlan();
+
+        const ownInsuranceCount =
+          currentUserId === null
+            ? records.length
+            : records.filter(
+                (record) =>
+                  record.user_id === currentUserId
+              ).length;
+
+        if (
+          !canAddInsurance(
+            ownInsuranceCount,
+            plan
+          )
+        ) {
+          alert(
+            `The Free plan is limited to ${FREE_LIMITS.insurance} insurance policy. Upgrade to Premium for ₹49 one-time to add more insurance policies.`
+          );
+
+          return;
+        }
+
         const {
           id,
           user_id,

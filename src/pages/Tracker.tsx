@@ -21,6 +21,11 @@ import {
 import { vehicles } from "../data/vehicles";
 import ReceiptUploader from "../components/ReceiptUploader";
 import UserDetails from "../components/UserDetails";
+import {
+  getCurrentPlan,
+  canAddChargingSession,
+  FREE_LIMITS,
+} from "../services/subscriptionService";
 
 
 export interface ChargingStationOption {
@@ -610,6 +615,40 @@ function Tracker({ onNavigate }: TrackerProps) {
       editingId !== null;
 
     try {
+      /*
+       * Free users are limited to 20 of their own
+       * charging sessions. Editing an existing session
+       * does not consume another session slot.
+       *
+       * Premium users have no charging-session limit.
+       */
+      if (!wasEditing) {
+        const plan =
+          await getCurrentPlan();
+
+        const ownSessionCount =
+          currentUserId === null
+            ? sessions.length
+            : sessions.filter(
+                (item) =>
+                  item.user_id ===
+                  currentUserId
+              ).length;
+
+        if (
+          !canAddChargingSession(
+            ownSessionCount,
+            plan
+          )
+        ) {
+          alert(
+            `The Free plan is limited to ${FREE_LIMITS.chargingSessions} charging sessions. Upgrade to Premium for ₹49 one-time to add more charging sessions.`
+          );
+
+          return;
+        }
+      }
+
       const session = {
         vehicle,
         charger,

@@ -8,6 +8,8 @@ interface LoginProps {
   onForgotPassword: () => void;
 }
 
+type RegistrationPlan = "free" | "premium";
+
 export default function Login({
   onForgotPassword,
 }: LoginProps) {
@@ -32,6 +34,9 @@ export default function Login({
   const [confirmPassword, setConfirmPassword] =
     useState("");
 
+  const [selectedPlan, setSelectedPlan] =
+    useState<RegistrationPlan>("free");
+
   const [loading, setLoading] =
     useState(false);
 
@@ -42,6 +47,7 @@ export default function Login({
     setEmail("");
     setPassword("");
     setConfirmPassword("");
+    setSelectedPlan("free");
   }
 
   function switchMode(
@@ -140,17 +146,22 @@ export default function Login({
       );
 
       /*
-       * If email confirmation is enabled,
-       * Supabase returns a user but no active session.
+       * Plan selection is currently informational only.
+       * Premium access is NOT granted by selecting Premium.
+       * It will be activated only after the future ₹49
+       * payment is successfully verified.
        */
       if (result.session) {
         alert(
-          "Account created successfully."
+          selectedPlan === "premium"
+            ? "Account created successfully.\n\nPremium is selected. Complete the ₹49 one-time payment to activate Premium features."
+            : "Account created successfully."
         );
       } else {
         alert(
-          "Account created successfully.\n\n" +
-            "Please check your email to confirm your account before signing in."
+          selectedPlan === "premium"
+            ? "Account created successfully.\n\nPlease check your email to confirm your account. After confirmation, complete the ₹49 one-time payment to activate Premium features."
+            : "Account created successfully.\n\nPlease check your email to confirm your account before signing in."
         );
       }
 
@@ -255,6 +266,190 @@ export default function Login({
                 )
               }
             />
+
+            <div
+              style={{
+                marginTop: 20,
+                marginBottom: 20,
+              }}
+            >
+              <h3
+                style={{
+                  margin: "0 0 6px",
+                  fontSize: 18,
+                }}
+              >
+                Choose Your Plan
+              </h3>
+
+              <p
+                style={{
+                  margin: "0 0 14px",
+                  color: "#6b7280",
+                  fontSize: 13,
+                  lineHeight: 1.5,
+                }}
+              >
+                Choose the plan that fits your EV
+                ownership needs. You can start with
+                Free and upgrade to Premium later.
+              </p>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "repeat(2, minmax(0, 1fr))",
+                  gap: 12,
+                }}
+              >
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() =>
+                    setSelectedPlan("free")
+                  }
+                  style={{
+                    textAlign: "left",
+                    padding: 14,
+                    border:
+                      selectedPlan === "free"
+                        ? "2px solid #2563eb"
+                        : "1px solid #d1d5db",
+                    borderRadius: 12,
+                    background:
+                      selectedPlan === "free"
+                        ? "#86efac"
+                        : "#ffffff",
+                    cursor: loading
+                      ? "not-allowed"
+                      : "pointer",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      fontSize: 16,
+                    }}
+                  >
+                    Free
+                  </div>
+
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      fontSize: 20,
+                      marginTop: 4,
+                    }}
+                  >
+                    ₹0
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "#6b7280",
+                      marginTop: 8,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    • 20 charging sessions
+                    <br />
+                    • 1 insurance
+                    <br />
+                    • 3 documents
+                    <br />
+                    • 2 tyre history records
+                    <br />
+                    • 3 service history records
+                    <br />
+                    • Basic application features
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() =>
+                    setSelectedPlan("premium")
+                  }
+                  style={{
+                    textAlign: "left",
+                    padding: 14,
+                    border:
+                      selectedPlan === "premium"
+                        ? "2px solid #2563eb"
+                        : "1px solid #d1d5db",
+                    borderRadius: 12,
+                    background:
+                      selectedPlan === "premium"
+                        ? "#fca5a5"
+                        : "#ffffff",
+                    cursor: loading
+                      ? "not-allowed"
+                      : "pointer",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      fontSize: 16,
+                    }}
+                  >
+                    Premium
+                  </div>
+
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      fontSize: 20,
+                      marginTop: 4,
+                    }}
+                  >
+                    ₹49
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "#6b7280",
+                      marginTop: 8,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    One-time payment
+                    <br />
+                    • Family members
+                    <br />
+                    • Automatic backup
+                    <br />
+                    • More records & documents
+                    <br />
+                    • Unlimited charging sessions
+                    <br />
+                    • Full Analytics
+                    <br />
+                    • Analytics PDF export
+                  </div>
+                </button>
+              </div>
+
+              <div
+                style={{
+                  marginTop: 10,
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  background: "#f9fafb",
+                  color: "#6b7280",
+                  fontSize: 12,
+                  lineHeight: 1.5,
+                }}
+              >
+                {selectedPlan === "premium"
+                  ? "Premium access is activated only after the ₹49 payment is successfully verified."
+                  : "Free access is available without payment. You can upgrade later."}
+              </div>
+            </div>
           </>
         )}
 
