@@ -315,9 +315,25 @@ input[type="date"] {
   width: 100%;
   min-width: 0;
   max-width: 100%;
+  min-inline-size: 0;
+  inline-size: 100%;
   box-sizing: border-box;
   display: block;
-  min-inline-size: 0;
+  flex: 1 1 auto;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* Prevent the native WebKit date value from imposing its own width. */
+input[type="date"]::-webkit-date-and-time-value {
+  min-width: 0;
+  width: 100%;
+  text-align: left;
+}
+
+input[type="date"]::-webkit-datetime-edit {
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* ==========================================
