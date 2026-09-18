@@ -64,6 +64,36 @@ interface BackupSchedule {
 }
 
 
+interface RazorpayCheckoutOptions {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
+  prefill?: {
+    email?: string;
+  };
+  handler: (response: {
+    razorpay_order_id: string;
+    razorpay_payment_id: string;
+    razorpay_signature: string;
+  }) => void | Promise<void>;
+  modal?: {
+    ondismiss?: () => void;
+  };
+}
+
+interface RazorpayCheckoutInstance {
+  open: () => void;
+}
+
+interface RazorpayWindow extends Window {
+  Razorpay?: new (
+    options: RazorpayCheckoutOptions
+  ) => RazorpayCheckoutInstance;
+}
+
 interface SettingsProps {
   onNavigate?: (page: string) => void;
 }
@@ -106,6 +136,12 @@ function Settings({ onNavigate }: SettingsProps) {
 
   const [loadingSubscriptionPlan, setLoadingSubscriptionPlan] =
     useState(true);
+
+  const [creatingPremiumOrder, setCreatingPremiumOrder] =
+    useState(false);
+
+  const [verifyingPremiumPayment, setVerifyingPremiumPayment] =
+    useState(false);
 
 
   const [familyMembers, setFamilyMembers] =
@@ -477,6 +513,297 @@ function Settings({ onNavigate }: SettingsProps) {
       );
     } finally {
       setSavingBackupSchedule(false);
+    }
+  }
+
+
+  /*
+   * ============================================================
+   * PREMIUM PAYMENT
+   * ============================================================
+   *
+   * Creates a Razorpay order through the Supabase Edge Function,
+   * opens Razorpay Checkout in Test Mode, and sends the successful
+   * Checkout response to the verification Edge Function.
+   *
+   * Premium is activated only by the server-side verification
+   * function after Razorpay confirms the captured payment.
+   */
+
+  async function loadRazorpayCheckout() {
+    const razorpayWindow =
+      window as RazorpayWindow;
+
+    if (razorpayWindow.Razorpay) {
+      return razorpayWindow.Razorpay;
+    }
+
+    const existingScript =
+      document.querySelector<HTMLScriptElement>(
+        'script[src="https://checkout.razorpay.com/v1/checkout.js"]'
+      );
+
+    if (existingScript) {
+      await new Promise<void>((resolve, reject) => {
+        if (
+          (window as RazorpayWindow).Razorpay
+        ) {
+          resolve();
+          return;
+        }
+
+        existingScript.addEventListener(
+          "load",
+          () => resolve(),
+          { once: true }
+        );
+
+        existingScript.addEventListener(
+          "error",
+          () =>
+            reject(
+              new Error(
+                "Unable to load Razorpay Checkout."
+              )
+            ),
+          { once: true }
+        );
+      });
+    } else {
+      await new Promise<void>((resolve, reject) => {
+        const script =
+          document.createElement("script");
+
+        script.src =
+          "https://checkout.razorpay.com/v1/checkout.js";
+
+        script.async = true;
+
+        script.onload = () =>
+          resolve();
+
+        script.onerror = () =>
+          reject(
+            new Error(
+              "Unable to load Razorpay Checkout."
+            )
+          );
+
+        document.body.appendChild(
+          script
+        );
+      });
+    }
+
+    const loadedRazorpay =
+      (window as RazorpayWindow).Razorpay;
+
+    if (!loadedRazorpay) {
+      throw new Error(
+        "Razorpay Checkout loaded, but the Razorpay object is unavailable."
+      );
+    }
+
+    return loadedRazorpay;
+  }
+
+
+  async function handleCreatePremiumOrder() {
+    if (
+      creatingPremiumOrder ||
+      verifyingPremiumPayment
+    ) {
+      return;
+    }
+
+    if (
+      subscriptionPlan === "premium" ||
+      subscriptionPlan === "premium_plus"
+    ) {
+      alert(
+        "This account already has an active Premium plan."
+      );
+      return;
+    }
+
+    setCreatingPremiumOrder(true);
+
+    try {
+      const Razorpay =
+        await loadRazorpayCheckout();
+
+      const {
+        data,
+        error,
+      } = await supabase.functions.invoke(
+        "create-premium-order",
+        {
+          body: {},
+        }
+      );
+
+      if (error) {
+        console.error(
+          "Premium order function error:",
+          error
+        );
+
+        throw new Error(
+          error.message ||
+            "Unable to create Premium payment order."
+        );
+      }
+
+      if (
+        !data?.success ||
+        !data?.order_id ||
+        !data?.key_id
+      ) {
+        throw new Error(
+          data?.error ||
+            "Razorpay order was not created."
+        );
+      }
+
+      const orderId =
+        String(data.order_id);
+
+      const paymentAmount =
+        Number(data.amount ?? 6900);
+
+      const currency =
+        String(data.currency ?? "INR");
+
+      setCreatingPremiumOrder(false);
+      setVerifyingPremiumPayment(true);
+
+      const checkoutOptions: RazorpayCheckoutOptions = {
+        key: String(data.key_id),
+        amount: paymentAmount,
+        currency,
+        name: "EV Toolkit",
+        description: "EV Toolkit Premium",
+        order_id: orderId,
+        prefill: {
+          email:
+            currentUserEmail || undefined,
+        },
+        handler: async (response) => {
+          try {
+            const {
+              razorpay_order_id,
+              razorpay_payment_id,
+              razorpay_signature,
+            } = response;
+
+            if (
+              razorpay_order_id !==
+              orderId
+            ) {
+              throw new Error(
+                "Razorpay returned an unexpected order ID."
+              );
+            }
+
+            const {
+              data: verificationData,
+              error: verificationError,
+            } =
+              await supabase.functions.invoke(
+                "verify-premium-payment",
+                {
+                  body: {
+                    razorpay_order_id,
+                    razorpay_payment_id,
+                    razorpay_signature,
+                  },
+                }
+              );
+
+            if (verificationError) {
+              console.error(
+                "Premium payment verification function error:",
+                verificationError
+              );
+
+              throw new Error(
+                verificationError.message ||
+                  "Payment verification failed."
+              );
+            }
+
+            if (
+              !verificationData?.success ||
+              verificationData?.plan !==
+                "premium"
+            ) {
+              throw new Error(
+                verificationData?.error ||
+                  "Payment could not be verified."
+              );
+            }
+
+            const refreshedPlan =
+              await getCurrentPlan();
+
+            setSubscriptionPlan(
+              refreshedPlan
+            );
+
+            alert(
+              "Premium payment verified successfully.\n\nYour Premium plan is now active."
+            );
+          } catch (error) {
+            console.error(
+              "Premium payment verification error:",
+              error
+            );
+
+            alert(
+              error instanceof Error
+                ? error.message
+                : "Payment was received, but verification could not be completed. Please contact support before trying again."
+            );
+          } finally {
+            setVerifyingPremiumPayment(
+              false
+            );
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setVerifyingPremiumPayment(
+              false
+            );
+          },
+        },
+      };
+
+      const checkout =
+        new Razorpay(
+          checkoutOptions
+        );
+
+      checkout.open();
+    } catch (error) {
+      console.error(
+        "Premium payment start error:",
+        error
+      );
+
+      setVerifyingPremiumPayment(
+        false
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Unable to start Premium payment."
+      );
+    } finally {
+      setCreatingPremiumOrder(
+        false
+      );
     }
   }
 
@@ -1040,6 +1367,104 @@ function Settings({ onNavigate }: SettingsProps) {
           Customize your EV Toolkit
           preferences.
         </p>
+
+      </div>
+
+
+      {/* ======================================================
+          SUBSCRIPTION
+          ====================================================== */}
+
+      <div className="card">
+
+        <h3>
+          ⭐ Subscription
+        </h3>
+
+        {loadingSubscriptionPlan ? (
+
+          <p style={{ marginTop: 12 }}>
+            Loading subscription...
+          </p>
+
+        ) : subscriptionPlan === "free" ? (
+
+          <>
+            <p
+              style={{
+                marginTop: 8,
+                lineHeight: 1.5,
+              }}
+            >
+              You are currently using the Free plan.
+              Premium is a ₹69 one-time payment and unlocks
+              additional EV Toolkit features.
+            </p>
+
+            <button
+              className="primaryButton"
+              disabled={
+                creatingPremiumOrder ||
+                verifyingPremiumPayment
+              }
+              onClick={() =>
+                void handleCreatePremiumOrder()
+              }
+              style={{
+                marginTop: "16px",
+              }}
+            >
+              {creatingPremiumOrder
+                ? "Creating Payment Order..."
+                : verifyingPremiumPayment
+                  ? "Verifying Payment..."
+                  : "Upgrade to Premium — ₹69"}
+            </button>
+
+            <p
+              style={{
+                fontSize: "12px",
+                color: "#6b7280",
+                marginTop: "10px",
+                lineHeight: 1.5,
+              }}
+            >
+              Razorpay Test Mode is currently being used.
+              Premium access is granted only after successful
+              payment verification.
+            </p>
+          </>
+
+        ) : (
+
+          <div
+            style={{
+              marginTop: "12px",
+              padding: "14px 16px",
+              border: "1px solid #fecaca",
+              borderRadius: "8px",
+              background: "#fef2f2",
+              color: "#991b1b",
+              maxWidth: "520px",
+            }}
+          >
+            <div style={{ fontWeight: 700 }}>
+              {subscriptionPlan === "premium_plus"
+                ? "Premium Plus"
+                : "Premium"}
+            </div>
+
+            <div
+              style={{
+                fontSize: "13px",
+                marginTop: "5px",
+              }}
+            >
+              Your plan is currently active.
+            </div>
+          </div>
+
+        )}
 
       </div>
 
