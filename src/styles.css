@@ -304,6 +304,22 @@ body {
   overflow-wrap: anywhere;
 }
 
+
+
+/* ==========================================
+   Date Input Width Fix
+   Keeps native date controls inside mobile form fields.
+========================================== */
+
+input[type="date"] {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: block;
+  min-inline-size: 0;
+}
+
 /* ==========================================
    Forms
 ========================================== */
