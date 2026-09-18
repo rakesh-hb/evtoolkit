@@ -312,14 +312,19 @@ body {
 ========================================== */
 
 input[type="date"] {
-  width: 100%;
+  width: 100% !important;
   min-width: 0;
   max-width: 100%;
   min-inline-size: 0;
-  inline-size: 100%;
+  inline-size: 100% !important;
+  height: 48px;
+  min-height: 48px;
   box-sizing: border-box;
   display: block;
   flex: 1 1 auto;
+  padding: 10px 14px;
+  font-size: 16px;
+  line-height: normal;
   -webkit-appearance: none;
   appearance: none;
 }
