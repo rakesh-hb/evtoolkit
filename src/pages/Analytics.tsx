@@ -1,6 +1,17 @@
-import { useEffect, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useState,
+} from "react";
 import { supabase } from "../lib/supabase";
-import ReportToolbar from "../components/reports/ReportToolbar";
+
+const ReportToolbar = lazy(
+  () =>
+    import(
+      "../components/reports/ReportToolbar"
+    )
+);
 
 import {
   ResponsiveContainer,
@@ -590,16 +601,28 @@ function Analytics() {
 
 
         <div
-          style={{
-            marginTop: "16px",
-          }}
-        >
-          <ReportToolbar
-            reportData={
-              reportData
-            }
-          />
-        </div>
+  style={{
+    marginTop: "16px",
+  }}
+>
+  <Suspense
+    fallback={
+      <div
+        style={{
+          padding: "12px",
+        }}
+      >
+        Loading report tools...
+      </div>
+    }
+  >
+    <ReportToolbar
+      reportData={
+        reportData
+      }
+    />
+  </Suspense>
+</div>
 
       </div>
 

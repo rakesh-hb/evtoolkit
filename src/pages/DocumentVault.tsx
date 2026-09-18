@@ -17,6 +17,18 @@ import {
 
 import { getCurrentUserId } from "../services/authHelper";
 
+import {
+  getCustomVehicles,
+  addCustomVehicle,
+  type CustomVehicleRecord,
+} from "../services/customVehicleService";
+
+import {
+  getDocumentCategories,
+  addDocumentCategory,
+  type DocumentCategory,
+} from "../services/documentCategoryService";
+
 import { vehicles } from "../data/vehicles";
 
 import ReceiptUploader from "../components/ReceiptUploader";
@@ -36,35 +48,93 @@ const emptyRecord: DocumentRecord = {
 };
 
 
+const builtInCategories = [
+  "Registration Certificate (RC)",
+  "Insurance",
+  "Driving Licence",
+  "Purchase Invoice",
+  "Warranty",
+  "Service Record",
+  "Tyre Invoice",
+  "Charging",
+  "FASTag",
+  "Loan",
+  "Pollution Certificate",
+  "Other",
+];
+
+
 export default function DocumentVault() {
   const [records, setRecords] =
     useState<DocumentRecord[]>([]);
 
-
   const [
     currentUserId,
     setCurrentUserId,
-  ] = useState<string | null>(
-    null
-  );
-
+  ] = useState<string | null>(null);
 
   const [form, setForm] =
     useState<DocumentRecord>(
       emptyRecord
     );
 
-
   const [
     editingId,
     setEditingId,
-  ] = useState<number | null>(
-    null
-  );
-
+  ] = useState<number | null>(null);
 
   const [search, setSearch] =
     useState("");
+
+  /* =========================================================
+     CUSTOM VEHICLES
+     ========================================================= */
+
+  const [
+    customVehicles,
+    setCustomVehicles,
+  ] = useState<CustomVehicleRecord[]>([]);
+
+  const [
+    showVehicleForm,
+    setShowVehicleForm,
+  ] = useState(false);
+
+  const [vehicleBrand, setVehicleBrand] =
+    useState("");
+
+  const [vehicleModel, setVehicleModel] =
+    useState("");
+
+  const [
+    savingVehicle,
+    setSavingVehicle,
+  ] = useState(false);
+
+
+  /* =========================================================
+     CUSTOM CATEGORIES
+     ========================================================= */
+
+  const [
+    customCategories,
+    setCustomCategories,
+  ] = useState<DocumentCategory[]>([]);
+
+  const [
+    showCategoryForm,
+    setShowCategoryForm,
+  ] = useState(false);
+
+  const [
+    categoryName,
+    setCategoryName,
+  ] = useState("");
+
+  const [
+    savingCategory,
+    setSavingCategory,
+  ] = useState(false);
 
 
   /* =========================================================
@@ -97,7 +167,7 @@ export default function DocumentVault() {
 
 
   /* =========================================================
-     LOAD CURRENT USER + DOCUMENTS
+     LOAD CURRENT USER + DOCUMENTS + VEHICLES + CATEGORIES
      ========================================================= */
 
   useEffect(() => {
@@ -110,7 +180,11 @@ export default function DocumentVault() {
           userId
         );
 
-        await loadDocuments();
+        await Promise.all([
+          loadDocuments(),
+          loadCustomVehicles(),
+          loadCustomCategories(),
+        ]);
 
       } catch (err) {
         console.error(
@@ -145,6 +219,335 @@ export default function DocumentVault() {
 
       alert(
         "Failed to load documents."
+      );
+    }
+  }
+
+
+  async function loadCustomVehicles() {
+    try {
+      const data =
+        await getCustomVehicles();
+
+      setCustomVehicles(
+        data
+      );
+
+    } catch (err) {
+      console.error(
+        "Failed to load custom vehicles:",
+        err
+      );
+
+      alert(
+        "Failed to load custom vehicles."
+      );
+    }
+  }
+
+
+  async function loadCustomCategories() {
+    try {
+      const data =
+        await getDocumentCategories();
+
+      setCustomCategories(
+        data
+      );
+
+    } catch (err) {
+      console.error(
+        "Failed to load custom categories:",
+        err
+      );
+
+      alert(
+        "Failed to load document categories."
+      );
+    }
+  }
+
+
+  /* =========================================================
+     VEHICLE LIST
+     ========================================================= */
+
+  const allVehicles = useMemo(() => {
+    const builtInVehicles =
+      vehicles.map(
+        (vehicle) => ({
+          value:
+            `${vehicle.brand} ${vehicle.model}`,
+          label:
+            `${vehicle.brand} ${vehicle.model}`,
+        })
+      );
+
+    const custom =
+      customVehicles.map(
+        (vehicle) => ({
+          value:
+            `${vehicle.brand} ${vehicle.model}`,
+          label:
+            `${vehicle.brand} ${vehicle.model}`,
+        })
+      );
+
+    const combined = [
+      ...builtInVehicles,
+      ...custom,
+    ];
+
+    const seen =
+      new Set<string>();
+
+    return combined.filter(
+      (vehicle) => {
+        const key =
+          vehicle.value
+            .trim()
+            .toLowerCase();
+
+        if (seen.has(key)) {
+          return false;
+        }
+
+        seen.add(key);
+
+        return true;
+      }
+    );
+  }, [
+    customVehicles,
+  ]);
+
+
+  /* =========================================================
+     CATEGORY LIST
+     ========================================================= */
+
+  const allCategories =
+    useMemo(() => {
+      const combined = [
+        ...builtInCategories,
+        ...customCategories.map(
+          (category) =>
+            category.name
+        ),
+      ];
+
+      const seen =
+        new Set<string>();
+
+      return combined.filter(
+        (category) => {
+          const key =
+            category
+              .trim()
+              .toLowerCase();
+
+          if (seen.has(key)) {
+            return false;
+          }
+
+          seen.add(key);
+
+          return true;
+        }
+      );
+    }, [
+      customCategories,
+    ]);
+
+
+  /* =========================================================
+     ADD CUSTOM VEHICLE
+     ========================================================= */
+
+  async function handleAddVehicle() {
+    const brand =
+      vehicleBrand.trim();
+
+    const model =
+      vehicleModel.trim();
+
+    if (!brand || !model) {
+      alert(
+        "Please enter the vehicle brand and model."
+      );
+
+      return;
+    }
+
+    const duplicate =
+      allVehicles.some(
+        (vehicle) =>
+          vehicle.value
+            .trim()
+            .toLowerCase() ===
+          `${brand} ${model}`
+            .trim()
+            .toLowerCase()
+      );
+
+    if (duplicate) {
+      alert(
+        "This vehicle already exists."
+      );
+
+      return;
+    }
+
+    try {
+      setSavingVehicle(
+        true
+      );
+
+      const created =
+        await addCustomVehicle({
+          brand,
+          model,
+        });
+
+      setCustomVehicles(
+        (previous) => [
+          ...previous,
+          created,
+        ]
+      );
+
+      const vehicleName =
+        `${created.brand} ${created.model}`;
+
+      setForm(
+        (previous) => ({
+          ...previous,
+          vehicle:
+            vehicleName,
+        })
+      );
+
+      setVehicleBrand(
+        ""
+      );
+
+      setVehicleModel(
+        ""
+      );
+
+      setShowVehicleForm(
+        false
+      );
+
+      alert(
+        "Vehicle added successfully."
+      );
+
+    } catch (error) {
+      console.error(
+        "Failed to add vehicle:",
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to add vehicle."
+      );
+
+    } finally {
+      setSavingVehicle(
+        false
+      );
+    }
+  }
+
+
+  /* =========================================================
+     ADD CUSTOM CATEGORY
+     ========================================================= */
+
+  async function handleAddCategory() {
+    const name =
+      categoryName.trim();
+
+    if (!name) {
+      alert(
+        "Please enter a category name."
+      );
+
+      return;
+    }
+
+    const duplicate =
+      allCategories.some(
+        (category) =>
+          category
+            .trim()
+            .toLowerCase() ===
+          name.toLowerCase()
+      );
+
+    if (duplicate) {
+      alert(
+        "This category already exists."
+      );
+
+      return;
+    }
+
+    try {
+      setSavingCategory(
+        true
+      );
+
+      const created =
+        await addDocumentCategory(
+          name
+        );
+
+      setCustomCategories(
+        (previous) => [
+          ...previous,
+          created,
+        ]
+      );
+
+      setForm(
+        (previous) => ({
+          ...previous,
+          category:
+            created.name,
+        })
+      );
+
+      setCategoryName(
+        ""
+      );
+
+      setShowCategoryForm(
+        false
+      );
+
+      alert(
+        "Category created successfully."
+      );
+
+    } catch (error) {
+      console.error(
+        "Failed to create category:",
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to create category."
+      );
+
+    } finally {
+      setSavingCategory(
+        false
       );
     }
   }
@@ -194,11 +597,6 @@ export default function DocumentVault() {
   function handleEdit(
     record: DocumentRecord
   ) {
-    /*
-     * Family members can view another
-     * user's document, but cannot edit it.
-     */
-
     if (
       record.user_id !==
       currentUserId
@@ -210,16 +608,13 @@ export default function DocumentVault() {
       return;
     }
 
-
     setEditingId(
       record.id
     );
 
-
     setForm(
       record
     );
-
 
     window.scrollTo({
       top: 0,
@@ -235,12 +630,6 @@ export default function DocumentVault() {
   async function handleDelete(
     record: DocumentRecord
   ) {
-    /*
-     * UI-side ownership check.
-     *
-     * RLS remains the actual security boundary.
-     */
-
     if (
       record.user_id !==
       currentUserId
@@ -252,7 +641,6 @@ export default function DocumentVault() {
       return;
     }
 
-
     if (
       !window.confirm(
         "Delete this document?"
@@ -261,15 +649,12 @@ export default function DocumentVault() {
       return;
     }
 
-
     try {
       await deleteDocument(
         record.id
       );
 
-
       await loadDocuments();
-
 
       alert(
         "Document deleted successfully."
@@ -305,7 +690,6 @@ export default function DocumentVault() {
       return;
     }
 
-
     if (
       form.documentDate >
       today
@@ -317,15 +701,10 @@ export default function DocumentVault() {
       return;
     }
 
-
     try {
       if (
         editingId !== null
       ) {
-        /*
-         * Extra ownership check before UPDATE.
-         */
-
         if (
           form.user_id !==
           currentUserId
@@ -337,23 +716,16 @@ export default function DocumentVault() {
           return;
         }
 
-
         await updateDocument({
           ...form,
           id: editingId,
         });
-
 
         alert(
           "Document updated successfully."
         );
 
       } else {
-        /*
-         * New document belongs to the
-         * currently authenticated user.
-         */
-
         const {
           id,
           user_id,
@@ -361,25 +733,20 @@ export default function DocumentVault() {
           ...newDocument
         } = form;
 
-
         await addDocument(
           newDocument
         );
-
 
         alert(
           "Document added successfully."
         );
       }
 
-
       await loadDocuments();
-
 
       setEditingId(
         null
       );
-
 
       setForm(
         emptyRecord
@@ -435,117 +802,324 @@ export default function DocumentVault() {
 
         <div className="formGrid">
 
+          {/* =================================================
+              VEHICLE
+              ================================================= */}
+
           <div>
             <label>
               Vehicle
             </label>
 
-            <select
-              value={
-                form.vehicle
-              }
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  vehicle:
-                    e.target.value,
-                })
-              }
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                alignItems: "center",
+              }}
             >
 
-              <option value="">
-                Select Vehicle
-              </option>
+              <select
+                value={
+                  form.vehicle
+                }
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    vehicle:
+                      e.target.value,
+                  })
+                }
+                style={{
+                  flex: 1,
+                }}
+              >
 
-              {vehicles.map(
-                (vehicle) => (
-                  <option
-                    key={`${vehicle.country}-${vehicle.id}`}
-                    value={`${vehicle.brand} ${vehicle.model}`}
+                <option value="">
+                  Select Vehicle
+                </option>
+
+                {allVehicles.map(
+                  (vehicle) => (
+                    <option
+                      key={
+                        vehicle.value
+                      }
+                      value={
+                        vehicle.value
+                      }
+                    >
+                      {
+                        vehicle.label
+                      }
+                    </option>
+                  )
+                )}
+
+              </select>
+
+
+              <button
+                type="button"
+                className="saveButton"
+                onClick={() =>
+                  setShowVehicleForm(
+                    (value) =>
+                      !value
+                  )
+                }
+              >
+                ＋ Add Vehicle
+              </button>
+
+            </div>
+
+
+            {showVehicleForm && (
+              <div
+                style={{
+                  marginTop: "10px",
+                  padding: "12px",
+                  border:
+                    "1px solid #e5e7eb",
+                  borderRadius: "8px",
+                }}
+              >
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "1fr 1fr",
+                    gap: "8px",
+                  }}
+                >
+
+                  <input
+                    type="text"
+                    placeholder="Brand"
+                    value={
+                      vehicleBrand
+                    }
+                    onChange={(e) =>
+                      setVehicleBrand(
+                        e.target.value
+                      )
+                    }
+                  />
+
+                  <input
+                    type="text"
+                    placeholder="Model"
+                    value={
+                      vehicleModel
+                    }
+                    onChange={(e) =>
+                      setVehicleModel(
+                        e.target.value
+                      )
+                    }
+                  />
+
+                </div>
+
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    marginTop: "10px",
+                  }}
+                >
+
+                  <button
+                    type="button"
+                    className="saveButton"
+                    disabled={
+                      savingVehicle
+                    }
+                    onClick={() =>
+                      void handleAddVehicle()
+                    }
                   >
-                    {vehicle.brand}{" "}
-                    {vehicle.model}
-                  </option>
-                )
-              )}
+                    {savingVehicle
+                      ? "Saving..."
+                      : "Save Vehicle"}
+                  </button>
 
-            </select>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowVehicleForm(
+                        false
+                      );
+                      setVehicleBrand(
+                        ""
+                      );
+                      setVehicleModel(
+                        ""
+                      );
+                    }}
+                  >
+                    Cancel
+                  </button>
+
+                </div>
+
+              </div>
+            )}
+
           </div>
 
+
+          {/* =================================================
+              CATEGORY
+              ================================================= */}
 
           <div>
             <label>
               Category
             </label>
 
-            <select
-              value={
-                form.category
-              }
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  category:
-                    e.target.value,
-                })
-              }
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                alignItems: "center",
+              }}
             >
 
-              <option value="">
-                Select Category
-              </option>
+              <select
+                value={
+                  form.category
+                }
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    category:
+                      e.target.value,
+                  })
+                }
+                style={{
+                  flex: 1,
+                }}
+              >
 
-              <option>
-                Registration Certificate (RC)
-              </option>
+                <option value="">
+                  Select Category
+                </option>
 
-              <option>
-                Insurance
-              </option>
+                {allCategories.map(
+                  (category) => (
+                    <option
+                      key={
+                        category
+                      }
+                      value={
+                        category
+                      }
+                    >
+                      {
+                        category
+                      }
+                    </option>
+                  )
+                )}
 
-              <option>
-                Driving Licence
-              </option>
+              </select>
 
-              <option>
-                Purchase Invoice
-              </option>
 
-              <option>
-                Warranty
-              </option>
+              <button
+                type="button"
+                className="saveButton"
+                onClick={() =>
+                  setShowCategoryForm(
+                    (value) =>
+                      !value
+                  )
+                }
+              >
+                ＋ Create Category
+              </button>
 
-              <option>
-                Service Record
-              </option>
+            </div>
 
-              <option>
-                Tyre Invoice
-              </option>
 
-              <option>
-                Charging
-              </option>
+            {showCategoryForm && (
+              <div
+                style={{
+                  marginTop: "10px",
+                  padding: "12px",
+                  border:
+                    "1px solid #e5e7eb",
+                  borderRadius: "8px",
+                }}
+              >
 
-              <option>
-                FASTag
-              </option>
+                <input
+                  type="text"
+                  placeholder="Category name"
+                  value={
+                    categoryName
+                  }
+                  onChange={(e) =>
+                    setCategoryName(
+                      e.target.value
+                    )
+                  }
+                />
 
-              <option>
-                Loan
-              </option>
 
-              <option>
-                Pollution Certificate
-              </option>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    marginTop: "10px",
+                  }}
+                >
 
-              <option>
-                Other
-              </option>
+                  <button
+                    type="button"
+                    className="saveButton"
+                    disabled={
+                      savingCategory
+                    }
+                    onClick={() =>
+                      void handleAddCategory()
+                    }
+                  >
+                    {savingCategory
+                      ? "Saving..."
+                      : "Save Category"}
+                  </button>
 
-            </select>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCategoryForm(
+                        false
+                      );
+                      setCategoryName(
+                        ""
+                      );
+                    }}
+                  >
+                    Cancel
+                  </button>
+
+                </div>
+
+              </div>
+            )}
+
           </div>
 
+
+          {/* =================================================
+              TITLE
+              ================================================= */}
 
           <div>
             <label>
@@ -568,6 +1142,10 @@ export default function DocumentVault() {
             />
           </div>
 
+
+          {/* =================================================
+              DATE
+              ================================================= */}
 
           <div>
             <label>
@@ -830,12 +1408,6 @@ export default function DocumentVault() {
                     record,
                     index
                   ) => {
-
-                    /*
-                     * Family records are visible,
-                     * but only the owner can modify
-                     * them.
-                     */
 
                     const isOwner =
                       currentUserId !==

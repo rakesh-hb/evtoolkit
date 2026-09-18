@@ -1,4 +1,6 @@
 import {
+  lazy,
+  Suspense,
   useEffect,
   useRef,
   useState,
@@ -12,18 +14,94 @@ import { useAuth } from "./context/AuthContext";
 
 import SideDrawer from "./components/SideDrawer";
 
-import Dashboard from "./pages/Dashboard";
-import Planner from "./pages/Planner";
-import Tracker from "./pages/Tracker";
-import Analytics from "./pages/Analytics";
-import Settings from "./pages/Settings";
 
-import ServiceHistory from "./pages/ServiceHistory";
-import TyreHistory from "./pages/TyreHistory";
-import Insurance from "./pages/Insurance";
-import DocumentVault from "./pages/DocumentVault";
-import About from "./pages/About";
-import UserProfile from "./pages/UserProfile";
+/*
+ * ============================================================
+ * LAZY-LOADED APPLICATION PAGES
+ * ============================================================
+ *
+ * These pages are loaded only when the user opens them.
+ *
+ * This reduces the size of the initial JavaScript bundle.
+ */
+
+const Dashboard =
+  lazy(() =>
+    import("./pages/Dashboard")
+  );
+
+const Planner =
+  lazy(() =>
+    import("./pages/Planner")
+  );
+
+const Tracker =
+  lazy(() =>
+    import("./pages/Tracker")
+  );
+
+const Analytics =
+  lazy(() =>
+    import("./pages/Analytics")
+  );
+
+const Settings =
+  lazy(() =>
+    import("./pages/Settings")
+  );
+
+const ServiceHistory =
+  lazy(() =>
+    import("./pages/ServiceHistory")
+  );
+
+const TyreHistory =
+  lazy(() =>
+    import("./pages/TyreHistory")
+  );
+
+const Insurance =
+  lazy(() =>
+    import("./pages/Insurance")
+  );
+
+const DocumentVault =
+  lazy(() =>
+    import("./pages/DocumentVault")
+  );
+
+const About =
+  lazy(() =>
+    import("./pages/About")
+  );
+
+const UserProfile =
+  lazy(() =>
+    import("./pages/UserProfile")
+  );
+
+
+/*
+ * ============================================================
+ * PAGE LOADING FALLBACK
+ * ============================================================
+ */
+
+function PageLoading() {
+  return (
+    <div
+      style={{
+        minHeight: "60vh",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        fontSize: 18,
+      }}
+    >
+      ⚡ Loading...
+    </div>
+  );
+}
 
 
 function App() {
@@ -61,24 +139,6 @@ function App() {
    * ============================================================
    * RESET PAGE AFTER LOGIN
    * ============================================================
-   *
-   * If the user was previously logged out
-   * and is now authenticated, always start
-   * them on Home.
-   *
-   * This prevents:
-   *
-   *   Sushma -> Analytics
-   *   Logout
-   *   Rakesh login
-   *   Analytics
-   *
-   * and instead gives:
-   *
-   *   Sushma -> Analytics
-   *   Logout
-   *   Rakesh login
-   *   Home
    */
 
   useEffect(() => {
@@ -90,14 +150,6 @@ function App() {
     const isAuthenticated =
       !!session;
 
-
-    /*
-     * Detect:
-     *
-     * unauthenticated
-     *       ↓
-     * authenticated
-     */
 
     if (
       isAuthenticated &&
@@ -154,9 +206,6 @@ function App() {
    * ============================================================
    * PASSWORD RESET
    * ============================================================
-   *
-   * Password recovery must be handled
-   * before the normal login check.
    */
 
   if (isResetPassword) {
@@ -329,13 +378,23 @@ function App() {
             selectedPage
           );
 
+          setDrawerOpen(
+            false
+          );
+
         }}
       />
 
 
       <main className="content">
 
-        {renderPage()}
+        <Suspense
+          fallback={
+            <PageLoading />
+          }
+        >
+          {renderPage()}
+        </Suspense>
 
       </main>
 

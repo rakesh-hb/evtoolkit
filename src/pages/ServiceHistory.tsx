@@ -17,6 +17,18 @@ import {
 
 import { getCurrentUserId } from "../services/authHelper";
 
+import {
+  getCustomVehicles,
+  addCustomVehicle,
+  type CustomVehicleRecord,
+} from "../services/customVehicleService";
+
+import {
+  getServiceTypes,
+  addServiceType,
+  type ServiceTypeRecord,
+} from "../services/serviceTypeService";
+
 import { vehicles } from "../data/vehicles";
 
 import ReceiptUploader from "../components/ReceiptUploader";
@@ -36,37 +48,78 @@ const emptyRecord: ServiceRecord = {
 };
 
 
+const builtInServiceTypes = [
+  "Regular Service",
+  "Battery Check",
+  "Brake Service",
+  "Coolant Change",
+  "Software Update",
+  "Tyre Rotation",
+  "Wheel Alignment",
+  "General Inspection",
+  "Other",
+];
+
+
 export default function ServiceHistory() {
   const [records, setRecords] =
     useState<ServiceRecord[]>([]);
 
-
-  /*
-   * ID of the currently authenticated
-   * Supabase user.
-   *
-   * Used by the UI only to determine
-   * whether Edit/Delete should be shown.
-   *
-   * RLS remains the real security boundary.
-   */
   const [currentUserId, setCurrentUserId] =
     useState<string | null>(null);
-
 
   const [form, setForm] =
     useState<ServiceRecord>(
       emptyRecord
     );
 
-
   const [search, setSearch] =
     useState("");
-
 
   const [editingId, setEditingId] =
     useState<number | null>(null);
 
+
+  /* ============================================================
+     CUSTOM VEHICLES
+     ============================================================ */
+
+  const [customVehicles, setCustomVehicles] =
+    useState<CustomVehicleRecord[]>([]);
+
+  const [showVehicleForm, setShowVehicleForm] =
+    useState(false);
+
+  const [vehicleBrand, setVehicleBrand] =
+    useState("");
+
+  const [vehicleModel, setVehicleModel] =
+    useState("");
+
+  const [savingVehicle, setSavingVehicle] =
+    useState(false);
+
+
+  /* ============================================================
+     CUSTOM SERVICE TYPES
+     ============================================================ */
+
+  const [customServiceTypes, setCustomServiceTypes] =
+    useState<ServiceTypeRecord[]>([]);
+
+  const [showServiceTypeForm, setShowServiceTypeForm] =
+    useState(false);
+
+  const [serviceTypeName, setServiceTypeName] =
+    useState("");
+
+  const [savingServiceType, setSavingServiceType] =
+    useState(false);
+
+
+  /* ============================================================
+     DATE
+     ============================================================ */
 
   function getTodayLocalDate() {
     const today =
@@ -93,11 +146,9 @@ export default function ServiceHistory() {
     getTodayLocalDate();
 
 
-  /*
-   * ============================================================
-   * LOAD CURRENT USER + SERVICE RECORDS
-   * ============================================================
-   */
+  /* ============================================================
+     LOAD DATA
+     ============================================================ */
 
   async function initialize() {
     try {
@@ -108,7 +159,11 @@ export default function ServiceHistory() {
         userId
       );
 
-      await loadRecords();
+      await Promise.all([
+        loadRecords(),
+        loadCustomVehicles(),
+        loadCustomServiceTypes(),
+      ]);
 
     } catch (err: any) {
       console.error(
@@ -161,16 +216,361 @@ export default function ServiceHistory() {
   }
 
 
+  async function loadCustomVehicles() {
+    try {
+      const data =
+        await getCustomVehicles();
+
+      setCustomVehicles(
+        data
+      );
+
+    } catch (err) {
+      console.error(
+        "Failed to load custom vehicles:",
+        err
+      );
+
+      alert(
+        "Failed to load custom vehicles."
+      );
+    }
+  }
+
+
+  async function loadCustomServiceTypes() {
+    try {
+      const data =
+        await getServiceTypes();
+
+      setCustomServiceTypes(
+        data
+      );
+
+    } catch (err) {
+      console.error(
+        "Failed to load custom service types:",
+        err
+      );
+
+      alert(
+        "Failed to load custom service types."
+      );
+    }
+  }
+
+
   useEffect(() => {
     void initialize();
   }, []);
 
 
-  /*
-   * ============================================================
-   * SEARCH
-   * ============================================================
-   */
+  /* ============================================================
+     VEHICLE LIST
+     ============================================================ */
+
+  const allVehicles =
+    useMemo(() => {
+      const builtInVehicles =
+        vehicles.map(
+          (vehicle) => ({
+            value:
+              `${vehicle.brand} ${vehicle.model}`,
+            label:
+              `${vehicle.brand} ${vehicle.model}`,
+          })
+        );
+
+      const custom =
+        customVehicles.map(
+          (vehicle) => ({
+            value:
+              `${vehicle.brand} ${vehicle.model}`,
+            label:
+              `${vehicle.brand} ${vehicle.model}`,
+          })
+        );
+
+      const combined = [
+        ...builtInVehicles,
+        ...custom,
+      ];
+
+      const seen =
+        new Set<string>();
+
+      return combined.filter(
+        (vehicle) => {
+          const key =
+            vehicle.value
+              .trim()
+              .toLowerCase();
+
+          if (seen.has(key)) {
+            return false;
+          }
+
+          seen.add(key);
+
+          return true;
+        }
+      );
+    }, [
+      customVehicles,
+    ]);
+
+
+  /* ============================================================
+     SERVICE TYPE LIST
+     ============================================================ */
+
+  const allServiceTypes =
+    useMemo(() => {
+      const combined = [
+        ...builtInServiceTypes,
+        ...customServiceTypes.map(
+          (serviceType) =>
+            serviceType.name
+        ),
+      ];
+
+      const seen =
+        new Set<string>();
+
+      return combined.filter(
+        (serviceType) => {
+          const key =
+            serviceType
+              .trim()
+              .toLowerCase();
+
+          if (seen.has(key)) {
+            return false;
+          }
+
+          seen.add(key);
+
+          return true;
+        }
+      );
+    }, [
+      customServiceTypes,
+    ]);
+
+
+  /* ============================================================
+     ADD CUSTOM VEHICLE
+     ============================================================ */
+
+  async function handleAddVehicle() {
+    const brand =
+      vehicleBrand.trim();
+
+    const model =
+      vehicleModel.trim();
+
+    if (!brand || !model) {
+      alert(
+        "Please enter the vehicle brand and model."
+      );
+
+      return;
+    }
+
+    const vehicleName =
+      `${brand} ${model}`;
+
+
+    const duplicate =
+      allVehicles.some(
+        (vehicle) =>
+          vehicle.value
+            .trim()
+            .toLowerCase() ===
+          vehicleName
+            .trim()
+            .toLowerCase()
+      );
+
+    if (duplicate) {
+      alert(
+        "This vehicle already exists."
+      );
+
+      return;
+    }
+
+
+    try {
+      setSavingVehicle(
+        true
+      );
+
+      const created =
+        await addCustomVehicle({
+          brand,
+          model,
+        });
+
+
+      setCustomVehicles(
+        (previous) => [
+          ...previous,
+          created,
+        ]
+      );
+
+
+      const createdVehicle =
+        `${created.brand} ${created.model}`;
+
+
+      setForm(
+        (previous) => ({
+          ...previous,
+          vehicle:
+            createdVehicle,
+        })
+      );
+
+
+      setVehicleBrand(
+        ""
+      );
+
+      setVehicleModel(
+        ""
+      );
+
+      setShowVehicleForm(
+        false
+      );
+
+
+      alert(
+        "Vehicle added successfully."
+      );
+
+    } catch (error) {
+      console.error(
+        "Failed to add vehicle:",
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to add vehicle."
+      );
+
+    } finally {
+      setSavingVehicle(
+        false
+      );
+    }
+  }
+
+
+  /* ============================================================
+     ADD CUSTOM SERVICE TYPE
+     ============================================================ */
+
+  async function handleAddServiceType() {
+    const name =
+      serviceTypeName.trim();
+
+    if (!name) {
+      alert(
+        "Please enter a service type."
+      );
+
+      return;
+    }
+
+
+    const duplicate =
+      allServiceTypes.some(
+        (serviceType) =>
+          serviceType
+            .trim()
+            .toLowerCase() ===
+          name.toLowerCase()
+      );
+
+
+    if (duplicate) {
+      alert(
+        "This service type already exists."
+      );
+
+      return;
+    }
+
+
+    try {
+      setSavingServiceType(
+        true
+      );
+
+      const created =
+        await addServiceType(
+          name
+        );
+
+
+      setCustomServiceTypes(
+        (previous) => [
+          ...previous,
+          created,
+        ]
+      );
+
+
+      setForm(
+        (previous) => ({
+          ...previous,
+          serviceType:
+            created.name,
+        })
+      );
+
+
+      setServiceTypeName(
+        ""
+      );
+
+      setShowServiceTypeForm(
+        false
+      );
+
+
+      alert(
+        "Service type added successfully."
+      );
+
+    } catch (error) {
+      console.error(
+        "Failed to add service type:",
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to add service type."
+      );
+
+    } finally {
+      setSavingServiceType(
+        false
+      );
+    }
+  }
+
+
+  /* ============================================================
+     SEARCH
+     ============================================================ */
 
   const filtered =
     useMemo(() => {
@@ -183,6 +583,9 @@ export default function ServiceHistory() {
             .toLowerCase()
             .includes(text) ||
           r.serviceCenter
+            .toLowerCase()
+            .includes(text) ||
+          r.vehicle
             .toLowerCase()
             .includes(text) ||
           (r.notes ?? "")
@@ -203,11 +606,9 @@ export default function ServiceHistory() {
     );
 
 
-  /*
-   * ============================================================
-   * SAVE / UPDATE
-   * ============================================================
-   */
+  /* ============================================================
+     SAVE / UPDATE
+     ============================================================ */
 
   async function handleSave() {
     if (
@@ -239,15 +640,23 @@ export default function ServiceHistory() {
       if (
         editingId !== null
       ) {
-        /*
-         * RLS ensures that only the
-         * owner of this record can
-         * actually update it.
-         */
+        if (
+          form.user_id !==
+          currentUserId
+        ) {
+          alert(
+            "You can only update your own service records."
+          );
+
+          return;
+        }
+
+
         await updateServiceRecord({
           ...form,
           id: editingId,
         });
+
 
         alert(
           "Service updated successfully."
@@ -259,9 +668,11 @@ export default function ServiceHistory() {
           ...newRecord
         } = form;
 
+
         await addServiceRecord(
           newRecord
         );
+
 
         alert(
           "Service record added successfully."
@@ -300,21 +711,13 @@ export default function ServiceHistory() {
   }
 
 
-  /*
-   * ============================================================
-   * DELETE
-   * ============================================================
-   */
+  /* ============================================================
+     DELETE
+     ============================================================ */
 
   async function handleDelete(
     record: ServiceRecord
   ) {
-    /*
-     * UI-side ownership check.
-     *
-     * The database RLS provides
-     * the actual security enforcement.
-     */
     if (
       record.user_id !==
       currentUserId
@@ -362,20 +765,13 @@ export default function ServiceHistory() {
   }
 
 
-  /*
-   * ============================================================
-   * START EDIT
-   * ============================================================
-   */
+  /* ============================================================
+     START EDIT
+     ============================================================ */
 
   function handleEdit(
     record: ServiceRecord
   ) {
-    /*
-     * Family members can see
-     * another user's record, but
-     * cannot edit it.
-     */
     if (
       record.user_id !==
       currentUserId
@@ -404,15 +800,14 @@ export default function ServiceHistory() {
   }
 
 
-  /*
-   * ============================================================
-   * RENDER
-   * ============================================================
-   */
+  /* ============================================================
+     RENDER
+     ============================================================ */
 
   return (
     <>
       <div className="welcome">
+
         <h2>
           🔧 Service History
         </h2>
@@ -421,6 +816,7 @@ export default function ServiceHistory() {
           Track maintenance and
           servicing of your EV.
         </p>
+
       </div>
 
 
@@ -429,6 +825,7 @@ export default function ServiceHistory() {
           ====================================================== */}
 
       <div className="card">
+
         <h3>
           {editingId !== null
             ? "Edit Service Record"
@@ -438,7 +835,12 @@ export default function ServiceHistory() {
 
         <div className="formGrid">
 
+          {/* ==================================================
+              DATE
+              ================================================== */}
+
           <div>
+
             <label>
               Date
             </label>
@@ -471,53 +873,205 @@ export default function ServiceHistory() {
               Service date cannot
               be in the future.
             </p>
+
           </div>
 
 
+          {/* ==================================================
+              VEHICLE
+              ================================================== */}
+
           <div>
+
             <label>
               Vehicle
             </label>
 
-            <select
-              value={
-                form.vehicle
-              }
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  vehicle:
-                    e.target.value,
-                })
-              }
-              disabled={
-                editingId !== null
-              }
+            <div
+              style={{
+                display:
+                  "flex",
+                gap:
+                  "8px",
+                alignItems:
+                  "center",
+              }}
             >
-              <option value="">
-                Select Vehicle
-              </option>
 
-              {vehicles.map(
-                (vehicle) => (
-                  <option
-                    key={`${vehicle.country}-${vehicle.id}`}
-                    value={`${vehicle.brand} ${vehicle.model}`}
-                  >
-                    {
-                      vehicle.brand
-                    }{" "}
-                    {
-                      vehicle.model
-                    }
-                  </option>
-                )
+              <select
+                value={
+                  form.vehicle
+                }
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    vehicle:
+                      e.target.value,
+                  })
+                }
+                disabled={
+                  editingId !== null
+                }
+                style={{
+                  flex: 1,
+                }}
+              >
+
+                <option value="">
+                  Select Vehicle
+                </option>
+
+                {allVehicles.map(
+                  (vehicle) => (
+                    <option
+                      key={
+                        vehicle.value
+                      }
+                      value={
+                        vehicle.value
+                      }
+                    >
+                      {
+                        vehicle.label
+                      }
+                    </option>
+                  )
+                )}
+
+              </select>
+
+
+              {editingId === null && (
+                <button
+                  type="button"
+                  className="saveButton"
+                  onClick={() =>
+                    setShowVehicleForm(
+                      (value) =>
+                        !value
+                    )
+                  }
+                >
+                  ＋ Add Vehicle
+                </button>
               )}
-            </select>
+
+            </div>
+
+
+            {showVehicleForm &&
+              editingId === null && (
+                <div
+                  style={{
+                    marginTop:
+                      "10px",
+                    padding:
+                      "12px",
+                    border:
+                      "1px solid #e5e7eb",
+                    borderRadius:
+                      "8px",
+                  }}
+                >
+
+                  <div
+                    style={{
+                      display:
+                        "grid",
+                      gridTemplateColumns:
+                        "1fr 1fr",
+                      gap:
+                        "8px",
+                    }}
+                  >
+
+                    <input
+                      type="text"
+                      placeholder="Brand"
+                      value={
+                        vehicleBrand
+                      }
+                      onChange={(e) =>
+                        setVehicleBrand(
+                          e.target.value
+                        )
+                      }
+                    />
+
+                    <input
+                      type="text"
+                      placeholder="Model"
+                      value={
+                        vehicleModel
+                      }
+                      onChange={(e) =>
+                        setVehicleModel(
+                          e.target.value
+                        )
+                      }
+                    />
+
+                  </div>
+
+
+                  <div
+                    style={{
+                      display:
+                        "flex",
+                      gap:
+                        "8px",
+                      marginTop:
+                        "10px",
+                    }}
+                  >
+
+                    <button
+                      type="button"
+                      className="saveButton"
+                      disabled={
+                        savingVehicle
+                      }
+                      onClick={() =>
+                        void handleAddVehicle()
+                      }
+                    >
+                      {savingVehicle
+                        ? "Saving..."
+                        : "Save Vehicle"}
+                    </button>
+
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowVehicleForm(
+                          false
+                        );
+                        setVehicleBrand(
+                          ""
+                        );
+                        setVehicleModel(
+                          ""
+                        );
+                      }}
+                    >
+                      Cancel
+                    </button>
+
+                  </div>
+
+                </div>
+              )}
+
           </div>
 
 
+          {/* ==================================================
+              ODOMETER
+              ================================================== */}
+
           <div>
+
             <label>
               Odometer (km)
             </label>
@@ -537,70 +1091,170 @@ export default function ServiceHistory() {
                 })
               }
             />
+
           </div>
 
 
+          {/* ==================================================
+              SERVICE TYPE
+              ================================================== */}
+
           <div>
+
             <label>
               Service Type
             </label>
 
-            <select
-              value={
-                form.serviceType
-              }
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  serviceType:
-                    e.target.value,
-                })
-              }
+            <div
+              style={{
+                display:
+                  "flex",
+                gap:
+                  "8px",
+                alignItems:
+                  "center",
+              }}
             >
-              <option value="">
-                Select
-              </option>
 
-              <option>
-                Regular Service
-              </option>
+              <select
+                value={
+                  form.serviceType
+                }
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    serviceType:
+                      e.target.value,
+                  })
+                }
+                style={{
+                  flex: 1,
+                }}
+              >
 
-              <option>
-                Battery Check
-              </option>
+                <option value="">
+                  Select Service Type
+                </option>
 
-              <option>
-                Brake Service
-              </option>
+                {allServiceTypes.map(
+                  (serviceType) => (
+                    <option
+                      key={
+                        serviceType
+                      }
+                      value={
+                        serviceType
+                      }
+                    >
+                      {
+                        serviceType
+                      }
+                    </option>
+                  )
+                )}
 
-              <option>
-                Coolant Change
-              </option>
+              </select>
 
-              <option>
-                Software Update
-              </option>
 
-              <option>
-                Tyre Rotation
-              </option>
+              <button
+                type="button"
+                className="saveButton"
+                onClick={() =>
+                  setShowServiceTypeForm(
+                    (value) =>
+                      !value
+                  )
+                }
+              >
+                ＋ Add Service Type
+              </button>
 
-              <option>
-                Wheel Alignment
-              </option>
+            </div>
 
-              <option>
-                General Inspection
-              </option>
 
-              <option>
-                Other
-              </option>
-            </select>
+            {showServiceTypeForm && (
+              <div
+                style={{
+                  marginTop:
+                    "10px",
+                  padding:
+                    "12px",
+                  border:
+                    "1px solid #e5e7eb",
+                  borderRadius:
+                    "8px",
+                }}
+              >
+
+                <input
+                  type="text"
+                  placeholder="Service type"
+                  value={
+                    serviceTypeName
+                  }
+                  onChange={(e) =>
+                    setServiceTypeName(
+                      e.target.value
+                    )
+                  }
+                />
+
+
+                <div
+                  style={{
+                    display:
+                      "flex",
+                    gap:
+                      "8px",
+                    marginTop:
+                      "10px",
+                  }}
+                >
+
+                  <button
+                    type="button"
+                    className="saveButton"
+                    disabled={
+                      savingServiceType
+                    }
+                    onClick={() =>
+                      void handleAddServiceType()
+                    }
+                  >
+                    {savingServiceType
+                      ? "Saving..."
+                      : "Save Service Type"}
+                  </button>
+
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowServiceTypeForm(
+                        false
+                      );
+                      setServiceTypeName(
+                        ""
+                      );
+                    }}
+                  >
+                    Cancel
+                  </button>
+
+                </div>
+
+              </div>
+            )}
+
           </div>
 
 
+          {/* ==================================================
+              SERVICE CENTRE
+              ================================================== */}
+
           <div>
+
             <label>
               Service Centre
             </label>
@@ -617,10 +1271,16 @@ export default function ServiceHistory() {
                 })
               }
             />
+
           </div>
 
 
+          {/* ==================================================
+              AMOUNT
+              ================================================== */}
+
           <div>
+
             <label>
               Amount (INR)
             </label>
@@ -640,10 +1300,15 @@ export default function ServiceHistory() {
                 })
               }
             />
+
           </div>
 
         </div>
 
+
+        {/* ====================================================
+            NOTES
+            ==================================================== */}
 
         <label>
           Notes
@@ -666,6 +1331,10 @@ export default function ServiceHistory() {
 
         <br />
 
+
+        {/* ====================================================
+            ATTACHMENT
+            ==================================================== */}
 
         <label>
           Invoice / Receipt
@@ -723,6 +1392,7 @@ export default function ServiceHistory() {
             ? "Update Service"
             : "Add Service Record"}
         </button>
+
       </div>
 
 
@@ -733,6 +1403,7 @@ export default function ServiceHistory() {
       <div className="kpiGrid">
 
         <div className="kpiCard">
+
           <h3>
             Total Services
           </h3>
@@ -742,10 +1413,12 @@ export default function ServiceHistory() {
               filtered.length
             }
           </h2>
+
         </div>
 
 
         <div className="kpiCard">
+
           <h3>
             Total Cost
           </h3>
@@ -758,6 +1431,7 @@ export default function ServiceHistory() {
               )
             }
           </h2>
+
         </div>
 
       </div>
@@ -772,7 +1446,9 @@ export default function ServiceHistory() {
         <input
           type="text"
           placeholder="Search..."
-          value={search}
+          value={
+            search
+          }
           onChange={(e) =>
             setSearch(
               e.target.value
@@ -786,9 +1462,15 @@ export default function ServiceHistory() {
           <table className="table">
 
             <thead>
+
               <tr>
+
                 <th>
                   Date
+                </th>
+
+                <th>
+                  Vehicle
                 </th>
 
                 <th>
@@ -810,7 +1492,9 @@ export default function ServiceHistory() {
                 <th>
                   Actions
                 </th>
+
               </tr>
+
             </thead>
 
 
@@ -820,10 +1504,12 @@ export default function ServiceHistory() {
               0 ? (
 
                 <tr>
-                  <td colSpan={6}>
+
+                  <td colSpan={7}>
                     No service
                     records found.
                   </td>
+
                 </tr>
 
               ) : (
@@ -831,13 +1517,6 @@ export default function ServiceHistory() {
                 filtered.map(
                   (record) => {
 
-                    /*
-                     * IMPORTANT:
-                     *
-                     * Family records are visible,
-                     * but only the creator can
-                     * edit/delete them.
-                     */
                     const isOwner =
                       currentUserId !==
                         null &&
@@ -855,6 +1534,13 @@ export default function ServiceHistory() {
                         <td>
                           {
                             record.date
+                          }
+                        </td>
+
+
+                        <td>
+                          {
+                            record.vehicle
                           }
                         </td>
 
@@ -884,6 +1570,7 @@ export default function ServiceHistory() {
 
 
                         <td>
+
                           {record.attachment ? (
 
                             <a
@@ -900,6 +1587,7 @@ export default function ServiceHistory() {
                           ) : (
                             "-"
                           )}
+
                         </td>
 
 

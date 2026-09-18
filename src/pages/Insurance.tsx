@@ -17,6 +17,12 @@ import {
 
 import { getCurrentUserId } from "../services/authHelper";
 
+import {
+  getCustomVehicles,
+  addCustomVehicle,
+  type CustomVehicleRecord,
+} from "../services/customVehicleService";
+
 import { vehicles } from "../data/vehicles";
 
 import ReceiptUploader from "../components/ReceiptUploader";
@@ -24,69 +30,78 @@ import ReceiptUploader from "../components/ReceiptUploader";
 
 const emptyPolicy: InsuranceRecord = {
   id: 0,
-
   user_id: "",
-
   vehicle: "",
-
   company: "",
-
   policy_number: "",
-
-  policy_type:
-    "Comprehensive",
-
+  policy_type: "Comprehensive",
   start_date: "",
-
   expiry_date: "",
-
   premium: 0,
-
   idv: 0,
-
   addons: "",
-
   agent: "",
-
   contact_number: "",
-
   notes: "",
-
   attachment: "",
+};
+
+
+const emptyVehicleForm = {
+  brand: "",
+  model: "",
 };
 
 
 export default function Insurance() {
   const [records, setRecords] =
-    useState<InsuranceRecord[]>(
-      []
-    );
-
+    useState<InsuranceRecord[]>([]);
 
   const [
     currentUserId,
     setCurrentUserId,
-  ] = useState<string | null>(
-    null
-  );
-
+  ] = useState<string | null>(null);
 
   const [form, setForm] =
     useState<InsuranceRecord>(
       emptyPolicy
     );
 
-
   const [
     editingId,
     setEditingId,
-  ] = useState<number | null>(
-    null
-  );
-
+  ] = useState<number | null>(null);
 
   const [search, setSearch] =
     useState("");
+
+  /*
+   * =========================================================
+   * CUSTOM VEHICLES
+   * =========================================================
+   */
+
+  const [
+    customVehicles,
+    setCustomVehicles,
+  ] = useState<CustomVehicleRecord[]>([]);
+
+  const [
+    showAddVehicle,
+    setShowAddVehicle,
+  ] = useState(false);
+
+  const [
+    newVehicle,
+    setNewVehicle,
+  ] = useState(
+    emptyVehicleForm
+  );
+
+  const [
+    addingVehicle,
+    setAddingVehicle,
+  ] = useState(false);
 
 
   /*
@@ -96,8 +111,7 @@ export default function Insurance() {
    */
 
   function getTodayLocalDate() {
-    const today =
-      new Date();
+    const today = new Date();
 
     const year =
       today.getFullYear();
@@ -122,7 +136,7 @@ export default function Insurance() {
 
   /*
    * =========================================================
-   * LOAD USER + POLICIES
+   * LOAD USER + POLICIES + CUSTOM VEHICLES
    * =========================================================
    */
 
@@ -136,7 +150,10 @@ export default function Insurance() {
           userId
         );
 
-        await loadPolicies();
+        await Promise.all([
+          loadPolicies(),
+          loadCustomVehicles(),
+        ]);
 
       } catch (err) {
         console.error(
@@ -150,7 +167,6 @@ export default function Insurance() {
       }
     }
 
-
     void initialize();
   }, []);
 
@@ -160,17 +176,163 @@ export default function Insurance() {
       const data =
         await getInsurance();
 
-      setRecords(
+      setRecords(data);
+
+    } catch (err) {
+      console.error(err);
+
+      alert(
+        "Failed to load insurance policies."
+      );
+    }
+  }
+
+
+  async function loadCustomVehicles() {
+    try {
+      const data =
+        await getCustomVehicles();
+
+      setCustomVehicles(
         data
       );
 
     } catch (err) {
       console.error(
+        "Failed to load custom vehicles:",
         err
       );
 
       alert(
-        "Failed to load insurance policies."
+        "Failed to load custom vehicles."
+      );
+    }
+  }
+
+
+  /*
+   * =========================================================
+   * VEHICLE LIST
+   * =========================================================
+   */
+
+  const vehicleOptions = useMemo(() => {
+    const builtIn = vehicles.map(
+      (vehicle) => ({
+        key: `${vehicle.country}-${vehicle.id}`,
+        value: `${vehicle.brand} ${vehicle.model}`,
+        label: `${vehicle.brand} ${vehicle.model}`,
+      })
+    );
+
+    const custom = customVehicles.map(
+      (vehicle) => ({
+        key: `custom-${vehicle.id}`,
+        value: `${vehicle.brand} ${vehicle.model}`,
+        label: `${vehicle.brand} ${vehicle.model} (Custom)`,
+      })
+    );
+
+    return [
+      ...builtIn,
+      ...custom,
+    ];
+  }, [customVehicles]);
+
+
+  /*
+   * =========================================================
+   * ADD CUSTOM VEHICLE
+   * =========================================================
+   */
+
+  async function handleAddVehicle() {
+    const brand =
+      newVehicle.brand.trim();
+
+    const model =
+      newVehicle.model.trim();
+
+    if (!brand || !model) {
+      alert(
+        "Please enter both vehicle brand and model."
+      );
+
+      return;
+    }
+
+    const duplicate =
+      vehicleOptions.some(
+        (vehicle) =>
+          vehicle.value
+            .trim()
+            .toLowerCase() ===
+          `${brand} ${model}`
+            .trim()
+            .toLowerCase()
+      );
+
+    if (duplicate) {
+      alert(
+        "This vehicle already exists."
+      );
+
+      return;
+    }
+
+    try {
+      setAddingVehicle(true);
+
+      const created =
+        await addCustomVehicle({
+          brand,
+          model,
+        });
+
+      setCustomVehicles(
+        (current) => [
+          ...current,
+          created,
+        ]
+      );
+
+      const vehicleName =
+        `${created.brand} ${created.model}`;
+
+      setForm(
+        (current) => ({
+          ...current,
+          vehicle:
+            vehicleName,
+        })
+      );
+
+      setNewVehicle(
+        emptyVehicleForm
+      );
+
+      setShowAddVehicle(
+        false
+      );
+
+      alert(
+        "Vehicle added successfully."
+      );
+
+    } catch (err: any) {
+      console.error(
+        "Failed to add custom vehicle:",
+        err
+      );
+
+      alert(
+        err?.message ||
+          "Failed to add vehicle."
+      );
+
+    } finally {
+      setAddingVehicle(
+        false
       );
     }
   }
@@ -224,7 +386,8 @@ export default function Insurance() {
   const totalPremium =
     filtered.reduce(
       (sum, r) =>
-        sum + Number(
+        sum +
+        Number(
           r.premium ?? 0
         ),
       0
@@ -269,7 +432,6 @@ export default function Insurance() {
           )
       );
 
-
     if (diff < 0) {
       return {
         text: "Expired",
@@ -277,14 +439,12 @@ export default function Insurance() {
       };
     }
 
-
     if (diff <= 30) {
       return {
         text: "Expiring Soon",
         color: "#d97706",
       };
     }
-
 
     return {
       text: "Active",
@@ -302,11 +462,6 @@ export default function Insurance() {
   function handleEdit(
     record: InsuranceRecord
   ) {
-    /*
-     * Family members can view another
-     * user's policy but cannot edit it.
-     */
-
     if (
       record.user_id !==
       currentUserId
@@ -318,16 +473,13 @@ export default function Insurance() {
       return;
     }
 
-
     setEditingId(
       record.id
     );
 
-
     setForm(
       record
     );
-
 
     window.scrollTo({
       top: 0,
@@ -345,13 +497,6 @@ export default function Insurance() {
   async function handleDelete(
     record: InsuranceRecord
   ) {
-    /*
-     * UI-side ownership check.
-     *
-     * Database RLS remains the final
-     * security boundary.
-     */
-
     if (
       record.user_id !==
       currentUserId
@@ -363,7 +508,6 @@ export default function Insurance() {
       return;
     }
 
-
     if (
       !window.confirm(
         "Delete this insurance policy?"
@@ -372,24 +516,19 @@ export default function Insurance() {
       return;
     }
 
-
     try {
       await deleteInsurance(
         record.id
       );
 
-
       await loadPolicies();
-
 
       alert(
         "Insurance policy deleted successfully."
       );
 
     } catch (err) {
-      console.error(
-        err
-      );
+      console.error(err);
 
       alert(
         "Failed to delete insurance policy."
@@ -419,12 +558,6 @@ export default function Insurance() {
       return;
     }
 
-
-    /*
-     * Policy start date cannot be
-     * future-dated.
-     */
-
     if (
       form.start_date >
       today
@@ -435,12 +568,6 @@ export default function Insurance() {
 
       return;
     }
-
-
-    /*
-     * Expiry can be in the future,
-     * but cannot precede start date.
-     */
 
     if (
       form.expiry_date <
@@ -453,19 +580,10 @@ export default function Insurance() {
       return;
     }
 
-
     try {
       if (
         editingId !== null
       ) {
-        /*
-         * Extra application-side ownership
-         * check.
-         *
-         * RLS independently enforces
-         * owner-only UPDATE.
-         */
-
         if (
           form.user_id !==
           currentUserId
@@ -477,29 +595,21 @@ export default function Insurance() {
           return;
         }
 
-
         await updateInsurance(
           editingId,
           form
         );
-
 
         alert(
           "Insurance policy updated successfully."
         );
 
       } else {
-        /*
-         * addInsurance() assigns the
-         * authenticated user's user_id.
-         */
-
         const {
           id,
           user_id,
           ...newPolicy
         } = form;
-
 
         await addInsurance(
           newPolicy as Omit<
@@ -508,29 +618,23 @@ export default function Insurance() {
           >
         );
 
-
         alert(
           "Insurance policy added successfully."
         );
       }
 
-
       await loadPolicies();
-
 
       setEditingId(
         null
       );
-
 
       setForm(
         emptyPolicy
       );
 
     } catch (err) {
-      console.error(
-        err
-      );
+      console.error(err);
 
       alert(
         "Failed to save insurance policy."
@@ -548,7 +652,6 @@ export default function Insurance() {
   return (
     <>
       <div className="welcome">
-
         <h2>
           🛡 Insurance
         </h2>
@@ -558,7 +661,6 @@ export default function Insurance() {
           renewals and policy
           documents.
         </p>
-
       </div>
 
 
@@ -577,44 +679,231 @@ export default function Insurance() {
 
         <div className="formGrid">
 
+          {/* =================================================
+              VEHICLE
+              ================================================= */}
+
           <div>
             <label>
               Vehicle
             </label>
 
-            <select
-              value={
-                form.vehicle
-              }
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  vehicle:
-                    e.target.value,
-                })
-              }
-              disabled={
-                editingId !== null
-              }
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                alignItems: "center",
+              }}
             >
 
-              <option value="">
-                Select Vehicle
-              </option>
+              <select
+                value={
+                  form.vehicle
+                }
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    vehicle:
+                      e.target.value,
+                  })
+                }
+                disabled={
+                  editingId !== null
+                }
+                style={{
+                  flex: 1,
+                }}
+              >
 
-              {vehicles.map(
-                (vehicle) => (
-                  <option
-                    key={`${vehicle.country}-${vehicle.id}`}
-                    value={`${vehicle.brand} ${vehicle.model}`}
-                  >
-                    {vehicle.brand}{" "}
-                    {vehicle.model}
-                  </option>
-                )
+                <option value="">
+                  Select Vehicle
+                </option>
+
+                {vehicleOptions.map(
+                  (vehicle) => (
+                    <option
+                      key={
+                        vehicle.key
+                      }
+                      value={
+                        vehicle.value
+                      }
+                    >
+                      {
+                        vehicle.label
+                      }
+                    </option>
+                  )
+                )}
+
+              </select>
+
+              {editingId === null && (
+                <button
+                  type="button"
+                  className="saveButton"
+                  onClick={() =>
+                    setShowAddVehicle(
+                      (current) =>
+                        !current
+                    )
+                  }
+                  style={{
+                    whiteSpace:
+                      "nowrap",
+                  }}
+                >
+                  ＋ Add Vehicle
+                </button>
               )}
 
-            </select>
+            </div>
+
+
+            {/* ===============================================
+                ADD VEHICLE FORM
+                =============================================== */}
+
+            {showAddVehicle &&
+              editingId === null && (
+
+                <div
+                  style={{
+                    marginTop:
+                      "12px",
+                    padding:
+                      "14px",
+                    border:
+                      "1px solid #e5e7eb",
+                    borderRadius:
+                      "8px",
+                    background:
+                      "#f8fafc",
+                  }}
+                >
+
+                  <strong>
+                    Add Custom Vehicle
+                  </strong>
+
+                  <div
+                    style={{
+                      display:
+                        "grid",
+                      gridTemplateColumns:
+                        "1fr 1fr",
+                      gap:
+                        "10px",
+                      marginTop:
+                        "12px",
+                    }}
+                  >
+
+                    <div>
+                      <label>
+                        Brand
+                      </label>
+
+                      <input
+                        type="text"
+                        value={
+                          newVehicle.brand
+                        }
+                        placeholder="Tata"
+                        disabled={
+                          addingVehicle
+                        }
+                        onChange={(e) =>
+                          setNewVehicle({
+                            ...newVehicle,
+                            brand:
+                              e.target
+                                .value,
+                          })
+                        }
+                      />
+                    </div>
+
+
+                    <div>
+                      <label>
+                        Model
+                      </label>
+
+                      <input
+                        type="text"
+                        value={
+                          newVehicle.model
+                        }
+                        placeholder="Curvv EV"
+                        disabled={
+                          addingVehicle
+                        }
+                        onChange={(e) =>
+                          setNewVehicle({
+                            ...newVehicle,
+                            model:
+                              e.target
+                                .value,
+                          })
+                        }
+                      />
+                    </div>
+
+                  </div>
+
+
+                  <div
+                    style={{
+                      display:
+                        "flex",
+                      gap:
+                        "8px",
+                      marginTop:
+                        "12px",
+                    }}
+                  >
+
+                    <button
+                      type="button"
+                      className="saveButton"
+                      disabled={
+                        addingVehicle
+                      }
+                      onClick={() =>
+                        void handleAddVehicle()
+                      }
+                    >
+                      {addingVehicle
+                        ? "Saving..."
+                        : "Save Vehicle"}
+                    </button>
+
+
+                    <button
+                      type="button"
+                      className="restoreButton"
+                      disabled={
+                        addingVehicle
+                      }
+                      onClick={() => {
+                        setShowAddVehicle(
+                          false
+                        );
+
+                        setNewVehicle(
+                          emptyVehicleForm
+                        );
+                      }}
+                    >
+                      Cancel
+                    </button>
+
+                  </div>
+
+                </div>
+              )}
+
           </div>
 
 
@@ -679,7 +968,6 @@ export default function Insurance() {
                 })
               }
             >
-
               <option>
                 Comprehensive
               </option>
@@ -695,7 +983,6 @@ export default function Insurance() {
               <option>
                 Zero Depreciation
               </option>
-
             </select>
           </div>
 
@@ -890,7 +1177,6 @@ export default function Insurance() {
           Notes
         </label>
 
-
         <textarea
           rows={3}
           value={
@@ -912,7 +1198,6 @@ export default function Insurance() {
         <label>
           Policy Document
         </label>
-
 
         <ReceiptUploader
           value={
@@ -1042,41 +1327,15 @@ export default function Insurance() {
 
             <thead>
               <tr>
-                <th>
-                  #
-                </th>
-
-                <th>
-                  Vehicle
-                </th>
-
-                <th>
-                  Company
-                </th>
-
-                <th>
-                  Policy No.
-                </th>
-
-                <th>
-                  Expiry
-                </th>
-
-                <th>
-                  Status
-                </th>
-
-                <th>
-                  Premium
-                </th>
-
-                <th>
-                  Document
-                </th>
-
-                <th>
-                  Actions
-                </th>
+                <th>#</th>
+                <th>Vehicle</th>
+                <th>Company</th>
+                <th>Policy No.</th>
+                <th>Expiry</th>
+                <th>Status</th>
+                <th>Premium</th>
+                <th>Document</th>
+                <th>Actions</th>
               </tr>
             </thead>
 
@@ -1106,21 +1365,11 @@ export default function Insurance() {
                         record.expiry_date
                       );
 
-
-                    /*
-                     * Ownership check.
-                     *
-                     * Family records are visible,
-                     * but only their creator can
-                     * edit/delete them.
-                     */
-
                     const isOwner =
                       currentUserId !==
                         null &&
                       record.user_id ===
                         currentUserId;
-
 
                     return (
                       <tr
@@ -1135,13 +1384,11 @@ export default function Insurance() {
                           }
                         </td>
 
-
                         <td>
                           {
                             record.vehicle
                           }
                         </td>
-
 
                         <td>
                           {
@@ -1149,20 +1396,17 @@ export default function Insurance() {
                           }
                         </td>
 
-
                         <td>
                           {
                             record.policy_number
                           }
                         </td>
 
-
                         <td>
                           {
                             record.expiry_date
                           }
                         </td>
-
 
                         <td>
 
@@ -1181,7 +1425,6 @@ export default function Insurance() {
 
                         </td>
 
-
                         <td>
                           ₹{" "}
                           {Number(
@@ -1191,7 +1434,6 @@ export default function Insurance() {
                             "en-IN"
                           )}
                         </td>
-
 
                         <td>
 
@@ -1204,8 +1446,7 @@ export default function Insurance() {
                               download={`${record.company}-Insurance`}
                               className="downloadButton"
                             >
-                              ⬇
-                              Download
+                              ⬇ Download
                             </a>
 
                           ) : (
@@ -1213,7 +1454,6 @@ export default function Insurance() {
                           )}
 
                         </td>
-
 
                         <td>
 
@@ -1231,7 +1471,6 @@ export default function Insurance() {
                               >
                                 Edit
                               </button>
-
 
                               <button
                                 className="deleteButton"
