@@ -1,18 +1,35 @@
 export interface InsuranceRecord {
   id: number;
+
   user_id: string;
+
   vehicle: string;
+
   company: string;
+
   policy_number: string;
+
   policy_type: string;
+
   start_date: string;
+
   expiry_date: string;
+
   premium: number;
+
   idv: number;
+
   addons: string;
+
   agent: string;
+
   contact_number: string;
+
   notes: string;
+
   attachment: string;
+
+  attachment_name: string;
+
   created_at?: string;
 }

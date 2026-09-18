@@ -44,6 +44,7 @@ const emptyPolicy: InsuranceRecord = {
   contact_number: "",
   notes: "",
   attachment: "",
+  attachment_name: "",
 };
 
 
@@ -51,6 +52,115 @@ const emptyVehicleForm = {
   brand: "",
   model: "",
 };
+
+
+const INSURANCE_ADDONS = [
+  // Core motor insurance add-ons
+  "Zero Depreciation / Depreciation Reimbursement",
+  "NCB Protection / NCB Protect",
+  "Return to Invoice (RTI) / Invoice Protection",
+  "Total Cover – Registration, Road Tax & Insurance",
+  "Roadside Assistance (RSA) / Emergency Assistance",
+  "Engine & Gearbox Protection / Engine Secure",
+  "Consumables Expenses Cover",
+  "Tyre Protector / Tyre Secure",
+  "Rim Protector / Alloy Wheel Protection",
+  "Key Protect / Key Replacement",
+  "Loss of Personal Belongings",
+  "Personal Belongings – Electronic Equipment",
+  "Personal Belongings – Theft",
+  "Personal Belongings – Damage",
+  "Daily Allowance Benefit",
+  "Daily Allowance Benefit Plus",
+  "Downtime Protection / Loss of Use",
+  "Garage Cash / Workshop Cash",
+  "EMI Protection / EMI Protector",
+  "Emergency Hotel Accommodation",
+  "Emergency Transport Expenses",
+  "Additional Towing Charges",
+  "Outstation Emergency Cover",
+  "Small Repair Claim",
+  "Loss of Driving Licence / RC Cover",
+  "Additional Limit of TPPD",
+  "Voluntary Deductible Option",
+
+  // Roadside / emergency assistance variants
+  "24x7 Towing Assistance",
+  "Fuel Delivery Assistance",
+  "Flat Tyre Assistance",
+  "Battery Jump-Start Assistance",
+  "Lockout Assistance",
+  "Lost Key Assistance",
+  "Duplicate Key Assistance",
+  "Minor On-Site Repair Assistance",
+  "Alternate Travel / Taxi Assistance",
+
+  // Glass, body and parts protection
+  "Glass / Windshield Protection",
+  "Repair of Glass, Fibre, Plastic & Rubber Parts",
+  "Plastic & Fibre Parts Protection",
+  "Electrical / Electronic Accessories Cover",
+  "Non-Electrical Accessories Cover",
+  "CNG / LPG Kit Cover",
+  "Trailer / Side-Car Cover",
+  "Vehicle Accessories Protection",
+  "Car Accessories Protection",
+
+  // Finance / vehicle value protection
+  "Road Tax & Registration Charges Cover",
+  "Registration Charges Protection",
+  "New Vehicle Replacement Cover",
+  "Vehicle Replacement / Car Replacement Cover",
+  "Loan / Finance Gap Protection",
+  "Invoice Price / On-Road Price Protection",
+
+  // Driver / passenger / legal protection
+  "Personal Accident Cover – Owner Driver",
+  "Personal Accident Cover – Unnamed Passengers",
+  "Hospital Cash Cover",
+  "Medical Expenses Cover",
+  "Legal Liability to Paid Driver",
+  "Legal Liability to Employees",
+  "Additional Third-Party Property Damage (TPPD)",
+  "Geographical Extension Cover",
+
+  // Usage / telematics based covers
+  "Pay As You Drive / Limit Sure",
+  "Pay How You Drive / Telematics",
+  "Limited Kilometre / Usage-Based Cover",
+
+  // EV-specific protection
+  "Electric Motor Protection",
+  "Electric Vehicle Battery Protection",
+  "Electric Vehicle Protect Cover",
+  "Zero Depreciation – Battery (Hybrid / EV)",
+  "EV Battery Management System (BMS) Protection",
+  "Electric Vehicle Charger Cover",
+  "Battery Charger & Accessories Cover",
+  "Home EV Charger & Charging Accessories Cover",
+  "EV Charger Zero Depreciation",
+  "Zero Depreciation for Battery & Charger",
+  "Electric Surge Secure",
+  "EV Electrical / Electronic Components Protection",
+  "EV Battery Water Ingress Protection",
+  "EV Battery Mechanical Shock Protection",
+  "EV Battery Uncontrolled Electrochemical Reaction Protection",
+  "EV Emergency Charging / Mobile Charging Assistance",
+  "EV Battery Breakdown Towing Assistance",
+  "EV Roadside Charging Assistance",
+
+  // Common specialised variants
+  "Hydrostatic Lock / Water Ingress Protection",
+  "Engine Hydrostatic Lock Cover",
+  "Consumable Fluids & Lubricants Cover",
+  "Tyre & Rim Protection Bundle",
+  "Key & Lock Replacement",
+  "Personal Effects & Baggage Cover",
+  "Child Seat / Baby Seat Protection",
+  "Vehicle Consumables & Small Parts Cover",
+  "Carrying Capacity / Passenger Extension",
+  "Other / Custom Add-on",
+];
 
 
 export default function Insurance() {
@@ -73,6 +183,9 @@ export default function Insurance() {
   ] = useState<number | null>(null);
 
   const [search, setSearch] =
+    useState("");
+
+  const [selectedAddon, setSelectedAddon] =
     useState("");
 
   /*
@@ -534,6 +647,67 @@ export default function Insurance() {
         "Failed to delete insurance policy."
       );
     }
+  }
+
+
+  /*
+   * =========================================================
+   * ADD-ONS
+   * =========================================================
+   */
+
+  function getSelectedAddons(): string[] {
+    return form.addons
+      .split(",")
+      .map((addon) => addon.trim())
+      .filter(Boolean);
+  }
+
+
+  function addAddon() {
+    const addon = selectedAddon.trim();
+
+    if (!addon) {
+      return;
+    }
+
+    const current = getSelectedAddons();
+
+    if (current.some((item) => item.toLowerCase() === addon.toLowerCase())) {
+      return;
+    }
+
+    setForm((previous) => ({
+      ...previous,
+      addons: [...current, addon].join(", "),
+    }));
+
+    setSelectedAddon("");
+  }
+
+
+  function removeAddon(addonToRemove: string) {
+    const updated = getSelectedAddons().filter(
+      (addon) => addon.toLowerCase() !== addonToRemove.toLowerCase()
+    );
+
+    setForm((previous) => ({
+      ...previous,
+      addons: updated.join(", "),
+    }));
+  }
+
+
+  function handleReset() {
+    if (!window.confirm("Are you sure you want to reset the values you have entered? This will clear the current form.")) {
+      return;
+    }
+
+    setEditingId(null);
+    setForm({ ...emptyPolicy });
+    setSelectedAddon("");
+    setShowAddVehicle(false);
+    setNewVehicle({ ...emptyVehicleForm });
   }
 
 
@@ -1067,7 +1241,7 @@ export default function Insurance() {
             <input
               type="number"
               value={
-                form.premium
+                form.premium === 0 ? "" : form.premium
               }
               onChange={(e) =>
                 setForm({
@@ -1090,7 +1264,7 @@ export default function Insurance() {
             <input
               type="number"
               value={
-                form.idv
+                form.idv === 0 ? "" : form.idv
               }
               onChange={(e) =>
                 setForm({
@@ -1110,20 +1284,90 @@ export default function Insurance() {
               Add-ons
             </label>
 
-            <input
-              type="text"
-              value={
-                form.addons
-              }
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  addons:
-                    e.target.value,
-                })
-              }
-              placeholder="Zero Dep, RSA, Engine Protect"
-            />
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                alignItems: "center",
+              }}
+            >
+              <select
+                value={selectedAddon}
+                onChange={(e) =>
+                  setSelectedAddon(e.target.value)
+                }
+                style={{
+                  flex: 1,
+                }}
+              >
+                <option value="">
+                  Select an add-on
+                </option>
+
+                {INSURANCE_ADDONS.map((addon) => (
+                  <option
+                    key={addon}
+                    value={addon}
+                  >
+                    {addon}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                className="saveButton"
+                onClick={addAddon}
+                disabled={!selectedAddon.trim()}
+              >
+                ＋ Add
+              </button>
+            </div>
+
+            {getSelectedAddons().length > 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "8px",
+                  marginTop: "10px",
+                }}
+              >
+                {getSelectedAddons().map((addon) => (
+                  <span
+                    key={addon}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "6px 10px",
+                      borderRadius: "16px",
+                      background: "#2563eb",
+                      border: "1px solid #60a5fa",
+                      color: "#ffffff",
+                      fontSize: "13px",
+                    }}
+                  >
+                    {addon}
+                    <button
+                      type="button"
+                      onClick={() => removeAddon(addon)}
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        cursor: "pointer",
+                        fontWeight: 700,
+                        color: "#dbeafe",
+                        padding: 0,
+                      }}
+                      aria-label={`Remove ${addon}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
 
@@ -1200,15 +1444,18 @@ export default function Insurance() {
         </label>
 
         <ReceiptUploader
-          value={
-            form.attachment
-          }
-          onChange={(
-            attachment
-          ) =>
+          value={form.attachment}
+          fileName={form.attachment_name}
+          onChange={(attachment) =>
             setForm({
               ...form,
               attachment,
+            })
+          }
+          onFileNameChange={(attachment_name) =>
+            setForm({
+              ...form,
+              attachment_name,
             })
           }
         />
@@ -1249,6 +1496,30 @@ export default function Insurance() {
             ? "Update Policy"
             : "Add Insurance Policy"}
         </button>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginTop: "16px",
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleReset}
+            style={{
+              background: "#dc2626",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "6px",
+              padding: "10px 18px",
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            Reset
+          </button>
+        </div>
 
       </div>
 
@@ -1346,7 +1617,7 @@ export default function Insurance() {
               0 ? (
 
                 <tr>
-                  <td colSpan={9}>
+                  <td colSpan={10}>
                     No insurance
                     policies found.
                   </td>
@@ -1436,18 +1707,39 @@ export default function Insurance() {
                         </td>
 
                         <td>
+                          {record.addons?.trim() || "-"}
+                        </td>
+
+                        <td>
 
                           {record.attachment ? (
+
+                            <>
 
                             <a
                               href={
                                 record.attachment
                               }
-                              download={`${record.company}-Insurance`}
+                              download={record.attachment_name || `${record.company}-Insurance`}
                               className="downloadButton"
                             >
                               ⬇ Download
                             </a>
+
+                            {record.attachment_name && (
+                              <div
+                                style={{
+                                  marginTop: "5px",
+                                  fontSize: "12px",
+                                  color: "#6b7280",
+                                  wordBreak: "break-word",
+                                }}
+                              >
+                                📎 {record.attachment_name}
+                              </div>
+                            )}
+
+                            </>
 
                           ) : (
                             "-"

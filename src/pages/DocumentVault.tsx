@@ -43,6 +43,7 @@ const emptyRecord: DocumentRecord = {
   vehicle: "",
   documentDate: "",
   file: "",
+  attachment_name: "",
   notes: "",
   createdAt: "",
 };
@@ -673,6 +674,25 @@ export default function DocumentVault() {
 
 
   /* =========================================================
+     RESET
+     ========================================================= */
+
+  function handleReset() {
+    if (!window.confirm("Are you sure you want to reset the values you have entered? This will clear the current form.")) {
+      return;
+    }
+
+    setEditingId(null);
+    setForm({ ...emptyRecord });
+    setShowVehicleForm(false);
+    setVehicleBrand("");
+    setVehicleModel("");
+    setShowCategoryForm(false);
+    setCategoryName("");
+  }
+
+
+  /* =========================================================
      SAVE / UPDATE
      ========================================================= */
 
@@ -1215,13 +1235,18 @@ export default function DocumentVault() {
 
 
         <ReceiptUploader
-          value={
-            form.file
-          }
+          value={form.file}
+          fileName={form.attachment_name}
           onChange={(file) =>
             setForm({
               ...form,
               file,
+            })
+          }
+          onFileNameChange={(attachment_name) =>
+            setForm({
+              ...form,
+              attachment_name,
             })
           }
         />
@@ -1259,6 +1284,30 @@ export default function DocumentVault() {
             ? "Update Document"
             : "Add Document"}
         </button>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginTop: "16px",
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleReset}
+            style={{
+              background: "#dc2626",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "6px",
+              padding: "10px 18px",
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            Reset
+          </button>
+        </div>
 
       </div>
 
@@ -1462,6 +1511,9 @@ export default function DocumentVault() {
 
                           {record.file ? (
 
+                            <>
+
+
                             <a
                               href={
                                 record.file
@@ -1474,6 +1526,21 @@ export default function DocumentVault() {
                               ⬇
                               Download
                             </a>
+
+                            {record.attachment_name && (
+                              <div
+                                style={{
+                                  marginTop: "5px",
+                                  fontSize: "12px",
+                                  color: "#6b7280",
+                                  wordBreak: "break-word",
+                                }}
+                              >
+                                📎 {record.attachment_name}
+                              </div>
+                            )}
+
+                            </>
 
                           ) : (
                             "-"

@@ -18,7 +18,12 @@ import {
 import { getCurrentUserId } from "../services/authHelper";
 
 
-const emptyRecord: TyreRecord = {
+type TyreRecordWithAttachmentName = TyreRecord & {
+  attachment_name: string;
+};
+
+
+const emptyRecord: TyreRecordWithAttachmentName = {
   id: 0,
 
   user_id: "",
@@ -37,6 +42,7 @@ const emptyRecord: TyreRecord = {
   warrantyMonths: 0,
 
   receipt: "",
+  attachment_name: "",
 
   notes: "",
 
@@ -47,7 +53,7 @@ const emptyRecord: TyreRecord = {
 
 export default function TyreHistory() {
   const [records, setRecords] =
-    useState<TyreRecord[]>([]);
+    useState<TyreRecordWithAttachmentName[]>([]);
 
 
   const [currentUserId, setCurrentUserId] =
@@ -55,7 +61,7 @@ export default function TyreHistory() {
 
 
   const [form, setForm] =
-    useState<TyreRecord>(
+    useState<TyreRecordWithAttachmentName>(
       emptyRecord
     );
 
@@ -131,7 +137,11 @@ export default function TyreHistory() {
         await getTyres();
 
       setRecords(
-        tyres
+        tyres.map((tyre) => ({
+          ...tyre,
+          attachment_name:
+            (tyre as TyreRecordWithAttachmentName).attachment_name ?? "",
+        }))
       );
 
     } catch (err) {
@@ -238,7 +248,7 @@ export default function TyreHistory() {
      ========================================================= */
 
   function handleEdit(
-    record: TyreRecord
+    record: TyreRecordWithAttachmentName
   ) {
     /*
      * UI-side ownership protection.
@@ -281,7 +291,7 @@ export default function TyreHistory() {
      ========================================================= */
 
   async function handleDelete(
-    record: TyreRecord
+    record: TyreRecordWithAttachmentName
   ) {
     /*
      * Only the owner can delete.
@@ -331,6 +341,20 @@ export default function TyreHistory() {
         "Delete failed."
       );
     }
+  }
+
+
+  /* =========================================================
+     RESET
+     ========================================================= */
+
+  function handleReset() {
+    if (!window.confirm("Are you sure you want to reset the values you have entered? This will clear the current form.")) {
+      return;
+    }
+
+    setEditingId(null);
+    setForm({ ...emptyRecord });
   }
 
 
@@ -613,7 +637,7 @@ export default function TyreHistory() {
             <input
               type="number"
               value={
-                form.odometer
+                form.odometer === 0 ? "" : form.odometer
               }
               onChange={(e) =>
                 setForm({
@@ -658,7 +682,7 @@ export default function TyreHistory() {
             <input
               type="number"
               value={
-                form.cost
+                form.cost === 0 ? "" : form.cost
               }
               onChange={(e) =>
                 setForm({
@@ -681,7 +705,7 @@ export default function TyreHistory() {
             <input
               type="number"
               value={
-                form.warrantyMonths
+                form.warrantyMonths === 0 ? "" : form.warrantyMonths
               }
               onChange={(e) =>
                 setForm({
@@ -743,15 +767,18 @@ export default function TyreHistory() {
 
 
         <ReceiptUploader
-          value={
-            form.receipt
-          }
-          onChange={(
-            receipt
-          ) =>
+          value={form.receipt}
+          fileName={form.attachment_name}
+          onChange={(receipt) =>
             setForm({
               ...form,
               receipt,
+            })
+          }
+          onFileNameChange={(attachment_name) =>
+            setForm({
+              ...form,
+              attachment_name,
             })
           }
         />
@@ -793,6 +820,30 @@ export default function TyreHistory() {
             ? "Update Tyre"
             : "Add Tyre"}
         </button>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginTop: "16px",
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleReset}
+            style={{
+              background: "#dc2626",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "6px",
+              padding: "10px 18px",
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            Reset
+          </button>
+        </div>
 
       </div>
 
@@ -1033,16 +1084,34 @@ export default function TyreHistory() {
                         <td>
                           {record.receipt ? (
 
+                            <>
+
+
                             <a
                               href={
                                 record.receipt
                               }
-                              download={`${record.brand}-${record.model}-Receipt`}
+                              download={record.attachment_name || `${record.brand}-${record.model}-Receipt`}
                               className="downloadButton"
                             >
                               ⬇
                               Download
                             </a>
+
+                            {record.attachment_name && (
+                              <div
+                                style={{
+                                  marginTop: "5px",
+                                  fontSize: "12px",
+                                  color: "#6b7280",
+                                  wordBreak: "break-word",
+                                }}
+                              >
+                                📎 {record.attachment_name}
+                              </div>
+                            )}
+
+                            </>
 
                           ) : (
                             "-"

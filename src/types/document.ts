@@ -1,11 +1,21 @@
 export interface DocumentRecord {
-    id: number;
-    user_id: string;
-    title: string;
-    category: string;
-    vehicle: string;
-    documentDate: string;
-    file: string;
-    notes?: string;
-    createdAt?: string;
-  }
+  id: number;
+
+  user_id: string;
+
+  title: string;
+
+  category: string;
+
+  vehicle: string;
+
+  documentDate: string;
+
+  file: string;
+
+  attachment_name: string;
+
+  notes?: string;
+
+  createdAt?: string;
+}

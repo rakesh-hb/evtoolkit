@@ -7,7 +7,6 @@ import { getCurrentUserId } from "./authHelper";
    SERVICE HISTORY
    ========================================================= */
 
-
 export async function getServiceRecords(): Promise<
   ServiceRecord[]
 > {
@@ -81,6 +80,9 @@ export async function getServiceRecords(): Promise<
 
       attachment:
         row.attachment ?? "",
+
+      attachment_name:
+        row.attachment_name ?? "",
     })
   );
 }
@@ -89,7 +91,6 @@ export async function getServiceRecords(): Promise<
 /* =========================================================
    ADD SERVICE RECORD
    ========================================================= */
-
 
 export async function addServiceRecord(
   record: Omit<
@@ -139,6 +140,9 @@ export async function addServiceRecord(
 
       attachment:
         record.attachment,
+
+      attachment_name:
+        record.attachment_name,
     });
 
 
@@ -151,7 +155,6 @@ export async function addServiceRecord(
 /* =========================================================
    UPDATE SERVICE RECORD
    ========================================================= */
-
 
 export async function updateServiceRecord(
   record: ServiceRecord
@@ -201,6 +204,9 @@ export async function updateServiceRecord(
 
       attachment:
         record.attachment,
+
+      attachment_name:
+        record.attachment_name,
     })
     .eq(
       "id",
@@ -221,7 +227,6 @@ export async function updateServiceRecord(
 /* =========================================================
    DELETE SERVICE RECORD
    ========================================================= */
-
 
 export async function deleteServiceRecord(
   id: number
@@ -260,7 +265,6 @@ export async function deleteServiceRecord(
 /* =========================================================
    RESTORE SERVICE RECORDS
    ========================================================= */
-
 
 export async function restoreServiceRecords(
   records: Omit<
@@ -320,6 +324,9 @@ export async function restoreServiceRecords(
 
           attachment:
             record.attachment,
+
+          attachment_name:
+            record.attachment_name,
         })
       )
     );

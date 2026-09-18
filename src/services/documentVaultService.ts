@@ -66,6 +66,9 @@ export async function getDocuments(): Promise<
       file:
         row.file,
 
+      attachment_name:
+        row.attachment_name ?? "",
+
       notes:
         row.notes ?? "",
 
@@ -118,6 +121,9 @@ export async function addDocument(
       file:
         document.file,
 
+      attachment_name:
+        document.attachment_name,
+
       notes:
         document.notes,
     });
@@ -167,6 +173,9 @@ export async function updateDocument(
 
       file:
         document.file,
+
+      attachment_name:
+        document.attachment_name,
 
       notes:
         document.notes,
@@ -278,6 +287,9 @@ export async function restoreDocuments(
 
           file:
             document.file,
+
+          attachment_name:
+            document.attachment_name,
 
           notes:
             document.notes,

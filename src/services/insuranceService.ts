@@ -144,6 +144,9 @@ export async function updateInsurance(
 
     attachment:
       policy.attachment,
+
+    attachment_name:
+      policy.attachment_name,
   };
 
 

@@ -45,6 +45,7 @@ const emptyRecord: ServiceRecord = {
   amount: 0,
   notes: "",
   attachment: "",
+  attachment_name: "",
 };
 
 
@@ -607,6 +608,25 @@ export default function ServiceHistory() {
 
 
   /* ============================================================
+     RESET
+     ============================================================ */
+
+  function handleReset() {
+    if (!window.confirm("Are you sure you want to reset the values you have entered? This will clear the current form.")) {
+      return;
+    }
+
+    setEditingId(null);
+    setForm({ ...emptyRecord });
+    setShowVehicleForm(false);
+    setVehicleBrand("");
+    setVehicleModel("");
+    setShowServiceTypeForm(false);
+    setServiceTypeName("");
+  }
+
+
+  /* ============================================================
      SAVE / UPDATE
      ============================================================ */
 
@@ -1079,7 +1099,7 @@ export default function ServiceHistory() {
             <input
               type="number"
               value={
-                form.odometer
+                form.odometer === 0 ? "" : form.odometer
               }
               onChange={(e) =>
                 setForm({
@@ -1288,7 +1308,7 @@ export default function ServiceHistory() {
             <input
               type="number"
               value={
-                form.amount
+                form.amount === 0 ? "" : form.amount
               }
               onChange={(e) =>
                 setForm({
@@ -1342,15 +1362,18 @@ export default function ServiceHistory() {
 
 
         <ReceiptUploader
-          value={
-            form.attachment
-          }
-          onChange={(
-            attachment
-          ) =>
+          value={form.attachment}
+          fileName={form.attachment_name}
+          onChange={(attachment) =>
             setForm({
               ...form,
               attachment,
+            })
+          }
+          onFileNameChange={(attachment_name) =>
+            setForm({
+              ...form,
+              attachment_name,
             })
           }
         />
@@ -1392,6 +1415,30 @@ export default function ServiceHistory() {
             ? "Update Service"
             : "Add Service Record"}
         </button>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginTop: "16px",
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleReset}
+            style={{
+              background: "#dc2626",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "6px",
+              padding: "10px 18px",
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            Reset
+          </button>
+        </div>
 
       </div>
 
@@ -1573,16 +1620,33 @@ export default function ServiceHistory() {
 
                           {record.attachment ? (
 
+                            <>
+
                             <a
                               href={
                                 record.attachment
                               }
-                              download={`${record.vehicle}-${record.serviceType}-Receipt`}
+                              download={record.attachment_name || `${record.vehicle}-${record.serviceType}-Receipt`}
                               className="downloadButton"
                             >
                               ⬇
                               Download
                             </a>
+
+                            {record.attachment_name && (
+                              <div
+                                style={{
+                                  marginTop: "5px",
+                                  fontSize: "12px",
+                                  color: "#6b7280",
+                                  wordBreak: "break-word",
+                                }}
+                              >
+                                📎 {record.attachment_name}
+                              </div>
+                            )}
+
+                            </>
 
                           ) : (
                             "-"
