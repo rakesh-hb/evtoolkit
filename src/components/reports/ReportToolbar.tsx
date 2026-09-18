@@ -216,11 +216,7 @@ function addPageBackground(pdf: jsPDF) {
 function addPageHeader(
   pdf: jsPDF,
   title: string,
-  pageNumber: number,
-  userDetails?: {
-    name: string;
-    email: string;
-  }
+  pageNumber: number
 ) {
   pdf.setFillColor(COLORS.card);
   pdf.rect(0, 0, PAGE_WIDTH, 22, "F");
