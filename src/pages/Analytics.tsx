@@ -1991,18 +1991,15 @@ function Analytics({
           DASHBOARD HEADER
           ================================================== */}
 
-      <div
-        className="welcome"
-        style={{
-          position: "relative",
-        }}
-      >
+      <div className="welcome">
 
         <div
           style={{
-            position: "absolute",
-            top: "4px",
-            right: "0",
+            display: "flex",
+            justifyContent: "flex-end",
+            alignItems: "center",
+            marginBottom: "12px",
+            width: "100%",
           }}
         >
           <UserDetails
@@ -2015,18 +2012,14 @@ function Analytics({
 
         <h2
           style={{
-            paddingRight: "340px",
+            margin: 0,
           }}
         >
           📊 Analytics Dashboard
         </h2>
 
 
-        <p
-          style={{
-            paddingRight: "340px",
-          }}
-        >
+        <p>
           Family-wide insights into
           your EV charging history.
         </p>

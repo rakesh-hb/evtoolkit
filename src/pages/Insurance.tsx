@@ -1628,10 +1628,15 @@ export default function Insurance({
                 setForm({
                   ...form,
                   agent:
-                    e.target.value,
+                    e.target.value.replace(
+                      /[^A-Za-z\s.'-]/g,
+                      ""
+                    ),
                 })
               }
               placeholder="Agent Name"
+              inputMode="text"
+              autoComplete="name"
             />
           </div>
 
@@ -1642,7 +1647,7 @@ export default function Insurance({
             </label>
 
             <input
-              type="text"
+              type="tel"
               value={
                 form.contact_number
               }
@@ -1651,10 +1656,16 @@ export default function Insurance({
                 setForm({
                   ...form,
                   contact_number:
-                    e.target.value,
+                    e.target.value.replace(
+                      /\D/g,
+                      ""
+                    ),
                 })
               }
               placeholder="9876543210"
+              inputMode="numeric"
+              autoComplete="tel"
+              maxLength={15}
             />
           </div>
 
