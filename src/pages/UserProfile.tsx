@@ -12,6 +12,11 @@ import {
 
 import UserDetails from "../components/UserDetails";
 
+import {
+  getCurrentPlan,
+  type SubscriptionPlan,
+} from "../services/subscriptionService";
+
 export default function UserProfile() {
   const [firstName, setFirstName] =
     useState("");
@@ -40,9 +45,36 @@ export default function UserProfile() {
   const [changingPassword, setChangingPassword] =
     useState(false);
 
+  const [subscriptionPlan, setSubscriptionPlan] =
+    useState<SubscriptionPlan>("free");
+
+  const [loadingSubscriptionPlan, setLoadingSubscriptionPlan] =
+    useState(true);
+
   useEffect(() => {
     void loadProfile();
   }, []);
+
+  useEffect(() => {
+    void loadSubscriptionPlan();
+  }, []);
+
+  async function loadSubscriptionPlan() {
+    setLoadingSubscriptionPlan(true);
+
+    try {
+      const plan = await getCurrentPlan();
+      setSubscriptionPlan(plan);
+    } catch (error) {
+      console.error(
+        "Failed to load subscription plan:",
+        error
+      );
+      setSubscriptionPlan("free");
+    } finally {
+      setLoadingSubscriptionPlan(false);
+    }
+  }
 
   async function loadProfile() {
     try {
@@ -371,6 +403,82 @@ export default function UserProfile() {
             ? "Saving..."
             : "Save Profile"}
         </button>
+      </div>
+
+      <div className="card">
+        <h3>
+          ⭐ Subscription
+        </h3>
+
+        {loadingSubscriptionPlan ? (
+          <p
+            style={{
+              marginTop: 10,
+              color: "#6b7280",
+            }}
+          >
+            Loading subscription...
+          </p>
+        ) : (
+          <div
+            style={{
+              marginTop: 14,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "10px 14px",
+              borderRadius: 999,
+              background:
+                subscriptionPlan === "premium_plus"
+                  ? "#eff6ff"
+                  : subscriptionPlan === "premium"
+                    ? "#fef2f2"
+                    : "#f0fdf4",
+              border:
+                subscriptionPlan === "premium_plus"
+                  ? "1px solid #93c5fd"
+                  : subscriptionPlan === "premium"
+                    ? "1px solid #fecaca"
+                    : "1px solid #86efac",
+              color:
+                subscriptionPlan === "premium_plus"
+                  ? "#1d4ed8"
+                  : subscriptionPlan === "premium"
+                    ? "#b91c1c"
+                    : "#166534",
+              fontWeight: 700,
+            }}
+          >
+            <span>
+              {subscriptionPlan === "premium_plus"
+                ? "Premium Plus"
+                : subscriptionPlan === "premium"
+                  ? "Premium"
+                  : "Free"}
+            </span>
+
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                opacity: 0.8,
+              }}
+            >
+              Active
+            </span>
+          </div>
+        )}
+
+        <p
+          style={{
+            marginTop: 10,
+            fontSize: 13,
+            color: "#6b7280",
+            lineHeight: 1.5,
+          }}
+        >
+          Your current EV Toolkit subscription plan.
+        </p>
       </div>
 
       <div className="card">

@@ -149,7 +149,7 @@ export default function Login({
        * Plan selection is currently informational only.
        * Plan selection is informational only.
        * Premium access is NOT granted by selecting Premium.
-       * Premium Plus is displayed as Coming Soon and cannot
+       * Premium Plus is displayed as Coming in the Future and cannot
        * be selected during registration.
        */
       if (result.session) {
@@ -293,7 +293,7 @@ export default function Login({
               >
                 Choose the plan that fits your EV
                 ownership needs. Premium Plus is
-                shown as Coming Soon.
+                shown as Coming in the Future.
               </p>
 
               <div
@@ -358,8 +358,6 @@ export default function Login({
                     <br />
                     • 1 insurance
                     <br />
-                    • 3 documents
-                    <br />
                     • 2 tyre history records
                     <br />
                     • 3 service history records
@@ -420,11 +418,11 @@ export default function Login({
                   >
                     One-time payment
                     <br />
-                    • Family members
+                    • Can add up to 4 family members
                     <br />
-                    • Automatic backup
+                    • Manual backup & restore
                     <br />
-                    • More records
+                    • Unlimited records
                     <br />
                     • Unlimited charging sessions
                     <br />
@@ -473,7 +471,7 @@ export default function Login({
                         whiteSpace: "nowrap",
                       }}
                     >
-                      COMING SOON
+                      COMING IN THE FUTURE
                     </span>
                   </div>
 
@@ -496,11 +494,15 @@ export default function Login({
                   >
                     • All Premium features
                     <br />
+                    • Unlimited family members
+                    <br />
                     • File uploads
                     <br />
                     • Cloud storage
                     <br />
-                    • Cloud backup
+                    • Automatic backup schedule
+                    <br />
+                    • Local & cloud backup
                     <br />
                     • Additional Premium Plus features
                   </div>
@@ -530,7 +532,7 @@ export default function Login({
               >
                 {selectedPlan === "premium"
                   ? "Premium access is activated only after the ₹69 one-time payment is successfully verified."
-                  : "Free access is available without payment. Premium Plus is coming soon."}
+                  : "Free access is available without payment. Premium Plus is coming in the future."}
               </div>
             </div>
           </>

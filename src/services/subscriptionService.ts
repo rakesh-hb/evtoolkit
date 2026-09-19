@@ -64,7 +64,7 @@ export const SUBSCRIPTION_PLANS = {
 
 export const FREE_LIMITS = {
   insurance: 1,
-  documents: 3,
+  documents: 0,
   tyreHistory: 2,
   serviceHistory: 3,
   chargingSessions: 20,
@@ -80,6 +80,17 @@ export const PREMIUM_LIMITS = {
   tyreHistory: null,
   serviceHistory: null,
   chargingSessions: null,
+} as const;
+
+/*
+ * Family member limits exclude the family owner.
+ * Premium allows up to 4 added family members.
+ * Premium Plus allows unlimited added family members.
+ */
+export const FAMILY_LIMITS = {
+  free: 0,
+  premium: 4,
+  premium_plus: null,
 } as const;
 
 /*
@@ -266,10 +277,21 @@ export function canUseFamily(
   return plan === "premium" || plan === "premium_plus";
 }
 
+export function canAddFamilyMember(
+  currentMemberCount: number,
+  plan: SubscriptionPlan
+): boolean {
+  return canAddWithinLimit(
+    currentMemberCount,
+    FAMILY_LIMITS[plan]
+  );
+}
+
 export function canUseAutoBackup(
   plan: SubscriptionPlan
 ): boolean {
-  return plan === "premium" || plan === "premium_plus";
+  // Automatic Backup is reserved for Premium Plus.
+  return plan === "premium_plus";
 }
 
 export function canUseAnalytics(

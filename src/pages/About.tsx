@@ -86,8 +86,54 @@ export default function About({
           <li>📁 Vehicle documents and receipts</li>
           <li>📊 EV ownership analytics</li>
           <li>⚡ EV planning and tracking</li>
-          <li>💾 Backup and restore</li>
+          <li>💾 Backup and restore according to your subscription plan</li>
+          <li>💳 Premium subscriptions and Premium Plus features</li>
         </ul>
+      </div>
+
+      <div className="card">
+        <h3>💳 Subscription Plans</h3>
+
+        <p>
+          EV Toolkit has three subscription levels. Premium is a ₹69
+          one-time payment. Premium Plus is a separate subscription
+          plan whose pricing and activation will be announced in a
+          future release.
+        </p>
+
+        <ul
+          style={{
+            lineHeight: "1.8",
+            paddingLeft: "22px",
+            marginBottom: 0,
+          }}
+        >
+          <li>
+            <strong>Free — ₹0:</strong> up to 20 charging sessions,
+            1 insurance record, 2 tyre history records, 3 service
+            history records, basic application features, and no
+            Document Vault service.
+          </li>
+          <li>
+            <strong>Premium — ₹69 one-time:</strong> unlimited
+            records, unlimited charging sessions, up to 4 family
+            members, Full Analytics, Analytics PDF export, and
+            manual local Backup &amp; Restore.
+          </li>
+          <li>
+            <strong>Premium Plus — subscription, coming in the
+            future:</strong> all Premium features plus unlimited
+            family members, file uploads, Document Vault, cloud
+            storage, cloud backup, automatic backup scheduling,
+            and local &amp; cloud backup capabilities.
+          </li>
+        </ul>
+
+        <p style={{ marginBottom: 0, marginTop: "12px" }}>
+          Automatic backup and cloud backup are Premium Plus features.
+          Premium users have manual local Backup &amp; Restore only.
+          Free users do not have Backup &amp; Restore.
+        </p>
       </div>
 
       <div className="card">
@@ -510,6 +556,11 @@ export default function About({
                   A user can edit or delete only their own insurance
                   records. Other records are presented as view-only
                   where applicable.
+                </p>                <p>
+                  Policy document file upload is a Premium Plus
+                  feature. Existing saved documents can remain
+                  available through the application's supported
+                  viewing/download workflow.
                 </p>
                 <p>
                   Insurance drafts are autosaved to the application's
@@ -531,6 +582,11 @@ export default function About({
                   Keep service entries accurate and attach supporting
                   documents or receipts where the page provides that
                   capability.
+                </p>                <p>
+                  Invoice and receipt file uploads on Service History
+                  are Premium Plus features. The service record itself
+                  remains available according to the subscription
+                  limits.
                 </p>
               </InfoSection>
 
@@ -544,6 +600,11 @@ export default function About({
                   Use separate records when tyres are replaced or when
                   a significant tyre-related event needs to be retained
                   as part of the vehicle history.
+                </p>                <p>
+                  Invoice and receipt file uploads on Tyre History are
+                  Premium Plus features. Existing saved receipts remain
+                  accessible through the application's supported
+                  viewing/download workflow.
                 </p>
               </InfoSection>
 
@@ -554,10 +615,15 @@ export default function About({
                   application.
                 </p>
                 <p>
-                  Examples include policy documents, receipts and
-                  other vehicle-related documents supported by the
-                  upload control. Use descriptive filenames so that
-                  documents remain easy to identify later.
+                  Document Vault and its file-upload functionality are
+                  Premium Plus features. Free and Premium users do not
+                  have the Document Vault service.
+                </p>
+                <p>
+                  Premium Plus can be used for policy documents,
+                  receipts and other supported vehicle-related files.
+                  Use descriptive filenames so that documents remain
+                  easy to identify later.
                 </p>
               </InfoSection>
 
@@ -584,10 +650,138 @@ export default function About({
                   checks can be modified only by their owner. This
                   separates viewing shared information from permission
                   to modify or delete another user's records.
+                </p>                <p>
+                  Family access is plan-based. Free users do not have
+                  the family-member feature. Premium users can add up
+                  to 4 family members. Premium Plus supports unlimited
+                  family members.
                 </p>
               </InfoSection>
 
-              <InfoSection title="13. Autosave & Drafts">
+              <InfoSection title="13. Subscription Plans & Feature Access">
+                <p>
+                  EV Toolkit provides Free, Premium and Premium Plus
+                  access levels. The plan shown in User Profile and
+                  in the Side Drawer is the user's current active
+                  subscription status.
+                </p>
+
+                <p>
+                  <strong>Free — ₹0:</strong>
+                </p>
+                <ul>
+                  <li>Up to 20 charging sessions.</li>
+                  <li>1 insurance record.</li>
+                  <li>2 tyre history records.</li>
+                  <li>3 service history records.</li>
+                  <li>Basic application features.</li>
+                  <li>
+                    No Document Vault service or document upload
+                    capability.
+                  </li>
+                  <li>
+                    No family-member feature.
+                  </li>
+                  <li>
+                    No Backup &amp; Restore option.
+                  </li>
+                  <li>
+                    No automatic backup or cloud backup.
+                  </li>
+                  <li>
+                    Full Analytics and Analytics PDF export are not
+                    available.
+                  </li>
+                </ul>
+
+                <p>
+                  <strong>Premium — ₹69 one-time payment:</strong>
+                </p>
+                <ul>
+                  <li>
+                    Removes the Free record limits and provides
+                    unlimited charging sessions and unlimited
+                    applicable ownership records.
+                  </li>
+                  <li>
+                    Family sharing with up to 4 added family members.
+                  </li>
+                  <li>
+                    Full Analytics.
+                  </li>
+                  <li>
+                    Analytics PDF export.
+                  </li>
+                  <li>
+                    Manual local Backup &amp; Restore.
+                  </li>
+                  <li>
+                    No automatic backup schedule.
+                  </li>
+                  <li>
+                    No cloud backup or cloud storage.
+                  </li>
+                </ul>
+
+                <p>
+                  <strong>
+                    Premium Plus — separate subscription, coming in
+                    the future:
+                  </strong>
+                </p>
+                <ul>
+                  <li>
+                    Includes all Premium features.
+                  </li>
+                  <li>
+                    Unlimited family members.
+                  </li>
+                  <li>
+                    File uploads and Document Vault functionality.
+                  </li>
+                  <li>
+                    Cloud storage.
+                  </li>
+                  <li>
+                    Cloud backup.
+                  </li>
+                  <li>
+                    Automatic backup scheduling.
+                  </li>
+                  <li>
+                    Manual local Backup &amp; Restore remains
+                    available.
+                  </li>
+                  <li>
+                    Backup can use both local and cloud capabilities.
+                  </li>
+                  <li>
+                    Additional Premium Plus features may be added in
+                    future releases.
+                  </li>
+                  <li>
+                    Pricing and activation will be announced in a
+                    future release.
+                  </li>
+                </ul>
+
+                <p>
+                  The Premium ₹69 purchase is a one-time payment, not
+                  a recurring Premium charge. Premium Plus is a
+                  separate subscription product and is currently
+                  presented as coming in the future.
+                </p>                <p>
+                  Premium purchases are processed through the
+                  application's Razorpay payment integration. The
+                  application creates a payment order for the
+                  authenticated user and activates Premium only after
+                  the payment is verified by the backend. Payment
+                  credentials and verification secrets are kept on
+                  the backend rather than in the frontend application.
+                </p>
+              </InfoSection>
+
+              <InfoSection title="14. Autosave & Drafts">
                 <p>
                   Several data-entry pages use an autosave draft
                   workflow. Drafts are stored through the application's
@@ -609,7 +803,7 @@ export default function About({
                 </p>
               </InfoSection>
 
-              <InfoSection title="14. PDF Reports">
+              <InfoSection title="15. PDF Reports">
                 <p>
                   Analytics includes reporting tools for exporting
                   analytics information as a PDF report.
@@ -636,19 +830,27 @@ export default function About({
                 </p>
               </InfoSection>
 
-              <InfoSection title="15. Data Export & Backup">
+              <InfoSection title="16. Data Export & Backup">
                 <p>
-                  The application provides backup/restore and data
-                  export functionality where exposed by the current
-                  application controls. Exported data is intended to
-                  provide a portable copy of the information maintained
-                  by the toolkit and can be used for backup, migration
-                  or analysis outside the application.
+                  Backup access depends on the subscription plan.
+                  Free users do not have a Backup &amp; Restore option.
+                </p>
+                <p>
+                  Premium users have manual local Backup &amp; Restore.
+                  This creates a local backup that the user can retain
+                  and restore through the application. Premium does not
+                  include automatic backup or cloud backup.
+                </p>
+                <p>
+                  Premium Plus includes the Premium manual local backup
+                  capability and is designed to add automatic backup
+                  scheduling, cloud backup and cloud storage, with
+                  local and cloud backup capabilities.
                 </p>
                 <p>
                   Export is different from PDF reporting: a PDF is a
-                  human-readable report, while a data export is intended
-                  to preserve structured application data.
+                  human-readable report, while a structured backup or
+                  data export is intended to preserve application data.
                 </p>
                 <p>
                   Always keep exported backups in a secure location
@@ -658,7 +860,7 @@ export default function About({
                 </p>
               </InfoSection>
 
-              <InfoSection title="16. Data Validation & Integrity">
+              <InfoSection title="17. Data Validation & Integrity">
                 <ul>
                   <li>
                     Required fields are checked before applicable
@@ -692,7 +894,7 @@ export default function About({
                 </ul>
               </InfoSection>
 
-              <InfoSection title="17. Privacy & Security">
+              <InfoSection title="18. Privacy & Security">
                 <p>
                   EV Toolkit uses authenticated user accounts and
                   database-level access controls for user-specific
@@ -728,7 +930,7 @@ export default function About({
                 </p>
               </InfoSection>
 
-              <InfoSection title="18. Recommended Usage Workflow">
+              <InfoSection title="19. Recommended Usage Workflow">
                 <ol>
                   <li>
                     Sign in and review your User Profile and Settings.
@@ -765,7 +967,7 @@ export default function About({
                 </ol>
               </InfoSection>
 
-              <InfoSection title="19. Important Data Relationships">
+              <InfoSection title="20. Important Data Relationships">
                 <ul>
                   <li>
                     Charging records entered in Tracker are the source
@@ -794,7 +996,7 @@ export default function About({
                 </ul>
               </InfoSection>
 
-              <InfoSection title="20. Mobile & Responsive Use">
+              <InfoSection title="21. Mobile & Responsive Use">
                 <p>
                   EV Toolkit is designed to work across desktop and
                   mobile browser layouts. Form controls are sized for
@@ -807,7 +1009,7 @@ export default function About({
                 </p>
               </InfoSection>
 
-              <InfoSection title="21. Technology & Architecture">
+              <InfoSection title="22. Technology & Architecture">
                 <p>
                   The application is a React and TypeScript web
                   application built with a Vite-based frontend. It
@@ -824,7 +1026,7 @@ export default function About({
                 </p>
               </InfoSection>
 
-              <InfoSection title="22. Security & Maintenance Notes">
+              <InfoSection title="23. Security & Maintenance Notes">
                 <p>
                   Keeping the application secure requires maintaining
                   the frontend, backend policies, storage controls and
@@ -841,7 +1043,7 @@ export default function About({
                 </p>
               </InfoSection>
 
-              <InfoSection title="23. Support & Application Ownership">
+              <InfoSection title="24. Support & Application Ownership">
                 <p>
                   Application: EV Toolkit
                 </p>

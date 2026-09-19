@@ -1,5 +1,10 @@
+import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { signOut } from "../services/authService";
+import {
+  getCurrentPlan,
+  type SubscriptionPlan,
+} from "../services/subscriptionService";
 
 interface SideDrawerProps {
   open: boolean;
@@ -63,6 +68,10 @@ export default function SideDrawer({
   onNavigate,
 }: SideDrawerProps) {
   const { session } = useAuth();
+  const [subscriptionPlan, setSubscriptionPlan] =
+    useState<SubscriptionPlan>("free");
+  const [loadingSubscriptionPlan, setLoadingSubscriptionPlan] =
+    useState(true);
 
   const firstName =
     session?.user?.user_metadata
@@ -85,6 +94,75 @@ export default function SideDrawer({
     firstName.charAt(0) ||
     email.charAt(0) ||
     "U";
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadSubscriptionPlan() {
+      if (!session?.user?.id) {
+        if (mounted) {
+          setSubscriptionPlan("free");
+          setLoadingSubscriptionPlan(false);
+        }
+        return;
+      }
+
+      setLoadingSubscriptionPlan(true);
+
+      try {
+        const plan = await getCurrentPlan();
+
+        if (mounted) {
+          setSubscriptionPlan(plan);
+        }
+      } catch (error) {
+        console.error(
+          "Failed to load subscription plan:",
+          error
+        );
+
+        if (mounted) {
+          setSubscriptionPlan("free");
+        }
+      } finally {
+        if (mounted) {
+          setLoadingSubscriptionPlan(false);
+        }
+      }
+    }
+
+    loadSubscriptionPlan();
+
+    return () => {
+      mounted = false;
+    };
+  }, [session?.user?.id]);
+
+  const planLabel =
+    subscriptionPlan === "premium_plus"
+      ? "Premium Plus"
+      : subscriptionPlan === "premium"
+        ? "Premium"
+        : "Free";
+
+  const planStyle =
+    subscriptionPlan === "premium_plus"
+      ? {
+          background: "#bfdbfe",
+          color: "#1d4ed8",
+          border: "1px solid #3b82f6",
+        }
+      : subscriptionPlan === "premium"
+        ? {
+            background: "#fee2e2",
+            color: "#b91c1c",
+            border: "1px solid #ef4444",
+          }
+        : {
+            background: "#dcfce7",
+            color: "#15803d",
+            border: "1px solid #22c55e",
+          };
 
   function navigate(page: string) {
     onNavigate(page);
@@ -223,7 +301,8 @@ export default function SideDrawer({
               "profile"
                 ? "#eef5ff"
                 : "transparent",
-            cursor: "pointer",
+            cursor:
+              "pointer",
             padding:
               "16px 18px",
             color: "inherit",
@@ -268,6 +347,7 @@ export default function SideDrawer({
             <div
               style={{
                 minWidth: 0,
+                flex: 1,
               }}
             >
               <div
@@ -276,7 +356,7 @@ export default function SideDrawer({
                     600,
                   fontSize: 14,
                   marginBottom:
-                    3,
+                    5,
                   overflow:
                     "hidden",
                   textOverflow:
@@ -286,6 +366,40 @@ export default function SideDrawer({
                 }}
               >
                 {fullName}
+              </div>
+
+              <div
+                style={{
+                  display:
+                    "inline-flex",
+                  alignItems:
+                    "center",
+                  gap: 5,
+                  padding:
+                    "3px 8px",
+                  borderRadius:
+                    999,
+                  fontSize: 11,
+                  fontWeight:
+                    600,
+                  lineHeight: 1.2,
+                  ...planStyle,
+                  marginBottom: 4,
+                }}
+              >
+                {loadingSubscriptionPlan
+                  ? "Loading..."
+                  : planLabel}
+                {!loadingSubscriptionPlan && (
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 500,
+                    }}
+                  >
+                    · Active
+                  </span>
+                )}
               </div>
 
               <div

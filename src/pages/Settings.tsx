@@ -8,8 +8,8 @@ import { supabase } from "../lib/supabase";
 import UserDetails from "../components/UserDetails";
 
 import {
+  canAddFamilyMember,
   getCurrentPlan,
-  canUseAutoBackup,
   type SubscriptionPlan,
 } from "../services/subscriptionService";
 
@@ -232,9 +232,15 @@ function Settings({ onNavigate }: SettingsProps) {
       const plan = await getCurrentPlan();
       setSubscriptionPlan(plan);
 
-      await loadLastBackup(user.id);
+      if (plan !== "free") {
+        await loadLastBackup(user.id);
+      }
 
-      await loadBackupSchedule();
+      if (plan === "premium_plus") {
+        await loadBackupSchedule();
+      } else {
+        setLoadingBackupSchedule(false);
+      }
 
 
       /*
@@ -432,9 +438,9 @@ function Settings({ onNavigate }: SettingsProps) {
 
     const plan = await getCurrentPlan();
 
-    if (!canUseAutoBackup(plan)) {
+    if (plan !== "premium_plus") {
       alert(
-        "Automatic Backup is a Premium feature. Upgrade to Premium for ₹69 one-time to use automatic backups."
+        "Automatic Backup is available only with Premium Plus."
       );
       return;
     }
@@ -827,6 +833,25 @@ function Settings({ onNavigate }: SettingsProps) {
     family.role ===
       "owner";
 
+  // The Premium limit applies to added members and does not count the owner.
+  // Pending invitations also reserve a family-member slot.
+  const currentFamilyMemberCount =
+    familyMembers.filter(
+      (member) => member.role !== "owner"
+    ).length +
+    invitations.filter(
+      (invitation) =>
+        invitation.family_id === family?.family_id &&
+        invitation.status === "pending"
+    ).length;
+
+  const familyMemberLimitReached =
+    subscriptionPlan === "premium" &&
+    !canAddFamilyMember(
+      currentFamilyMemberCount,
+      subscriptionPlan
+    );
+
 
   /*
    * ============================================================
@@ -995,6 +1020,15 @@ function Settings({ onNavigate }: SettingsProps) {
     if (!family?.family_id) {
       alert(
         "Family information is not available."
+      );
+
+      return;
+    }
+
+
+    if (familyMemberLimitReached) {
+      alert(
+        "Premium allows up to 4 added family members. Remove an existing member or upgrade to Premium Plus for unlimited family members."
       );
 
       return;
@@ -1282,6 +1316,10 @@ function Settings({ onNavigate }: SettingsProps) {
    */
 
   async function handleCreateBackup() {
+    if (subscriptionPlan === "free") {
+      return;
+    }
+
     try {
       await createBackup();
 
@@ -1306,6 +1344,10 @@ function Settings({ onNavigate }: SettingsProps) {
   async function handleRestore(
     file: File
   ) {
+    if (subscriptionPlan === "free") {
+      return;
+    }
+
     try {
       await restoreBackup(
         file
@@ -1439,29 +1481,42 @@ function Settings({ onNavigate }: SettingsProps) {
 
           <div
             style={{
-              marginTop: "12px",
-              padding: "14px 16px",
-              border: "1px solid #fecaca",
-              borderRadius: "8px",
-              background: "#fef2f2",
-              color: "#991b1b",
-              maxWidth: "520px",
+              marginTop: "14px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "10px 14px",
+              borderRadius: 999,
+              background:
+                subscriptionPlan === "premium_plus"
+                  ? "#eff6ff"
+                  : "#fef2f2",
+              border:
+                subscriptionPlan === "premium_plus"
+                  ? "1px solid #93c5fd"
+                  : "1px solid #fecaca",
+              color:
+                subscriptionPlan === "premium_plus"
+                  ? "#1d4ed8"
+                  : "#b91c1c",
+              fontWeight: 700,
             }}
           >
-            <div style={{ fontWeight: 700 }}>
+            <span>
               {subscriptionPlan === "premium_plus"
                 ? "Premium Plus"
                 : "Premium"}
-            </div>
+            </span>
 
-            <div
+            <span
               style={{
-                fontSize: "13px",
-                marginTop: "5px",
+                fontSize: 12,
+                fontWeight: 600,
+                opacity: 0.8,
               }}
             >
-              Your plan is currently active.
-            </div>
+              Active
+            </span>
           </div>
 
         )}
@@ -1553,6 +1608,19 @@ function Settings({ onNavigate }: SettingsProps) {
               <h4>
                 Family Members
               </h4>
+
+              <p
+                style={{
+                  fontSize: "13px",
+                  color: "#6b7280",
+                  marginTop: "6px",
+                  marginBottom: 0,
+                }}
+              >
+                {subscriptionPlan === "premium"
+                  ? `Premium allows up to 4 added family members. ${Math.min(currentFamilyMemberCount, 4)}/4 slots used.`
+                  : "Premium Plus allows unlimited family members."}
+              </p>
 
               <div
                 style={{
@@ -1677,6 +1745,24 @@ function Settings({ onNavigate }: SettingsProps) {
                   by first name, last name,
                   or email address.
                 </p>
+
+                {familyMemberLimitReached && (
+                  <div
+                    style={{
+                      marginTop: "12px",
+                      padding: "12px 14px",
+                      border: "1px solid #f59e0b",
+                      borderRadius: "8px",
+                      background: "#fffbeb",
+                      color: "#92400e",
+                      maxWidth: "520px",
+                      fontSize: "13px",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    You have reached the Premium limit of 4 added family members. Premium Plus will support unlimited family members.
+                  </div>
+                )}
 
                 <div
                   style={{
@@ -1880,7 +1966,8 @@ function Settings({ onNavigate }: SettingsProps) {
                   className="primaryButton"
                   disabled={
                     sendingInvitation ||
-                    !selectedUser
+                    !selectedUser ||
+                    familyMemberLimitReached
                   }
                   onClick={() =>
                     void handleInvite()
@@ -2101,7 +2188,8 @@ function Settings({ onNavigate }: SettingsProps) {
           BACKUP & RESTORE
           ====================================================== */}
 
-      <div className="card">
+      {!loadingSubscriptionPlan && subscriptionPlan !== "free" && (
+        <div className="card">
 
         <h3>
           💾 Backup & Restore
@@ -2217,14 +2305,16 @@ function Settings({ onNavigate }: SettingsProps) {
           modules.
         </p>
 
-      </div>
+        </div>
+      )}
 
 
       {/* ======================================================
           AUTOMATIC BACKUP
           ====================================================== */}
 
-      <div className="card">
+      {!loadingSubscriptionPlan && subscriptionPlan === "premium_plus" && (
+        <div className="card">
 
         <h3>
           🔄 Automatic Backup
@@ -2241,49 +2331,12 @@ function Settings({ onNavigate }: SettingsProps) {
           or monthly schedule.
         </p>
 
-        {loadingSubscriptionPlan || loadingBackupSchedule ? (
-
-          <p
-            style={{
-              marginTop: 16,
-            }}
-          >
+        {loadingBackupSchedule ? (
+          <p style={{ marginTop: 16 }}>
             Loading backup settings...
           </p>
-
-        ) : subscriptionPlan === "free" ? (
-
-          <div
-            style={{
-              marginTop: "16px",
-              padding: "14px 16px",
-              border: "1px solid #93c5fd",
-              borderRadius: "8px",
-              background: "#eff6ff",
-              color: "#1e3a8a",
-              maxWidth: "520px",
-            }}
-          >
-            <div style={{ fontWeight: 700 }}>
-              Premium feature
-            </div>
-            <div
-              style={{
-                fontSize: "13px",
-                marginTop: "5px",
-                lineHeight: 1.5,
-              }}
-            >
-              Automatic Backup is available with Premium for
-              ₹69 one-time. Free users can still create and
-              restore backups manually.
-            </div>
-          </div>
-
         ) : (
-
           <>
-
             <div
               style={{
                 marginTop: 20,
@@ -2293,7 +2346,6 @@ function Settings({ onNavigate }: SettingsProps) {
                 maxWidth: 520,
               }}
             >
-
               <label
                 style={{
                   display: "flex",
@@ -2302,36 +2354,24 @@ function Settings({ onNavigate }: SettingsProps) {
                   cursor: "pointer",
                 }}
               >
-
                 <input
                   type="checkbox"
                   checked={backupEnabled}
                   disabled={savingBackupSchedule}
                   onChange={(e) =>
-                    setBackupEnabled(
-                      e.target.checked
-                    )
+                    setBackupEnabled(e.target.checked)
                   }
-                  style={{
-                    width: 18,
-                    height: 18,
-                  }}
+                  style={{ width: 18, height: 18 }}
                 />
-
                 <span>
                   Enable Automatic Backup
                 </span>
-
               </label>
 
               {backupEnabled && (
                 <>
                   <div>
-
-                    <label>
-                      Backup Frequency
-                    </label>
-
+                    <label>Backup Frequency</label>
                     <select
                       value={backupFrequency}
                       disabled={savingBackupSchedule}
@@ -2344,112 +2384,55 @@ function Settings({ onNavigate }: SettingsProps) {
                         )
                       }
                     >
-
-                      <option value="daily">
-                        Daily
-                      </option>
-
-                      <option value="weekly">
-                        Weekly
-                      </option>
-
-                      <option value="monthly">
-                        Monthly
-                      </option>
-
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
                     </select>
-
                   </div>
 
                   <div>
-
-                    <label>
-                      Backup Time
-                    </label>
-
+                    <label>Backup Time</label>
                     <input
                       type="time"
                       value={backupTime}
                       disabled={savingBackupSchedule}
                       onChange={(e) =>
-                        setBackupTime(
-                          e.target.value
-                        )
+                        setBackupTime(e.target.value)
                       }
                     />
-
                   </div>
 
                   {backupFrequency === "weekly" && (
-
                     <div>
-
-                      <label>
-                        Weekday
-                      </label>
-
+                      <label>Weekday</label>
                       <select
                         value={backupWeekday}
                         disabled={savingBackupSchedule}
                         onChange={(e) =>
-                          setBackupWeekday(
-                            e.target.value
-                          )
+                          setBackupWeekday(e.target.value)
                         }
                       >
-
-                        <option value="1">
-                          Monday
-                        </option>
-
-                        <option value="2">
-                          Tuesday
-                        </option>
-
-                        <option value="3">
-                          Wednesday
-                        </option>
-
-                        <option value="4">
-                          Thursday
-                        </option>
-
-                        <option value="5">
-                          Friday
-                        </option>
-
-                        <option value="6">
-                          Saturday
-                        </option>
-
-                        <option value="7">
-                          Sunday
-                        </option>
-
+                        <option value="1">Monday</option>
+                        <option value="2">Tuesday</option>
+                        <option value="3">Wednesday</option>
+                        <option value="4">Thursday</option>
+                        <option value="5">Friday</option>
+                        <option value="6">Saturday</option>
+                        <option value="7">Sunday</option>
                       </select>
-
                     </div>
-
                   )}
 
                   {backupFrequency === "monthly" && (
-
                     <div>
-
-                      <label>
-                        Day of Month
-                      </label>
-
+                      <label>Day of Month</label>
                       <select
                         value={backupDayOfMonth}
                         disabled={savingBackupSchedule}
                         onChange={(e) =>
-                          setBackupDayOfMonth(
-                            e.target.value
-                          )
+                          setBackupDayOfMonth(e.target.value)
                         }
                       >
-
                         {Array.from(
                           { length: 28 },
                           (_, index) => (
@@ -2461,9 +2444,7 @@ function Settings({ onNavigate }: SettingsProps) {
                             </option>
                           )
                         )}
-
                       </select>
-
                       <p
                         style={{
                           fontSize: 12,
@@ -2471,13 +2452,9 @@ function Settings({ onNavigate }: SettingsProps) {
                           marginTop: 6,
                         }}
                       >
-                        Select up to day 28 so
-                        the schedule is valid for
-                        every month.
+                        Select up to day 28 so the schedule is valid for every month.
                       </p>
-
                     </div>
-
                   )}
 
                   <button
@@ -2495,10 +2472,8 @@ function Settings({ onNavigate }: SettingsProps) {
                       ? "Saving..."
                       : "Save Backup Schedule"}
                   </button>
-
                 </>
               )}
-
             </div>
 
             <p
@@ -2509,17 +2484,13 @@ function Settings({ onNavigate }: SettingsProps) {
                 lineHeight: 1.5,
               }}
             >
-              Automatic Backup is included
-              with Premium and Premium Plus.
-              Free users can still create
-              and restore backups manually.
+              Automatic Backup and Cloud Backup are Premium Plus features.
             </p>
-
           </>
-
         )}
 
-      </div>
+        </div>
+      )}
 
     </>
   );
