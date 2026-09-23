@@ -11,11 +11,11 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Terms from "./pages/Terms";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import RefundPolicy from "./pages/RefundPolicy";
 
 import { useAuth } from "./context/AuthContext";
 
 import SideDrawer from "./components/SideDrawer";
-
 
 /*
  * ============================================================
@@ -82,7 +82,6 @@ const UserProfile =
     import("./pages/UserProfile")
   );
 
-
 /*
  * ============================================================
  * PAGE LOADING FALLBACK
@@ -105,27 +104,22 @@ function PageLoading() {
   );
 }
 
-
 function App() {
   const {
     session,
     loading,
   } = useAuth();
 
-
   const [page, setPage] =
     useState("dashboard");
 
-
   const [drawerOpen, setDrawerOpen] =
     useState(false);
-
 
   const [authPage, setAuthPage] =
     useState<
       "login" | "forgot"
     >("login");
-
 
   /*
    * Keep track of whether the previous
@@ -135,7 +129,6 @@ function App() {
    */
   const wasAuthenticated =
     useRef(false);
-
 
   /*
    * ============================================================
@@ -148,10 +141,8 @@ function App() {
       return;
     }
 
-
     const isAuthenticated =
       !!session;
-
 
     if (
       isAuthenticated &&
@@ -166,7 +157,6 @@ function App() {
       );
     }
 
-
     wasAuthenticated.current =
       isAuthenticated;
 
@@ -175,11 +165,9 @@ function App() {
     loading,
   ]);
 
-
   const isResetPassword =
     window.location.pathname ===
     "/reset-password";
-
 
   /*
    * ============================================================
@@ -199,7 +187,6 @@ function App() {
     window.location.pathname ===
       "/terms-and-conditions";
 
-
   /*
    * ============================================================
    * PRIVACY POLICY
@@ -216,6 +203,21 @@ function App() {
     window.location.pathname ===
       "/privacy-policy";
 
+  /*
+   * ============================================================
+   * RETURN & REFUND POLICY
+   * ============================================================
+   *
+   * Return & Refund Policy must also be publicly accessible.
+   *
+   * Users do not need to log in to view this page.
+   */
+
+  const isRefundPolicyPage =
+    window.location.pathname ===
+      "/refund" ||
+    window.location.pathname ===
+      "/return-refund";
 
   /*
    * ============================================================
@@ -239,7 +241,6 @@ function App() {
     );
   }
 
-
   /*
    * ============================================================
    * TERMS & CONDITIONS
@@ -253,7 +254,6 @@ function App() {
       <Terms />
     );
   }
-
 
   /*
    * ============================================================
@@ -269,6 +269,19 @@ function App() {
     );
   }
 
+  /*
+   * ============================================================
+   * RETURN & REFUND POLICY
+   * ============================================================
+   *
+   * Public page — no authentication required.
+   */
+
+  if (isRefundPolicyPage) {
+    return (
+      <RefundPolicy />
+    );
+  }
 
   /*
    * ============================================================
@@ -280,20 +293,17 @@ function App() {
     return (
       <ResetPassword
         onComplete={() => {
-
           window.history.replaceState(
             {},
             "",
             "/"
           );
 
-
           window.location.reload();
         }}
       />
     );
   }
-
 
   /*
    * ============================================================
@@ -302,7 +312,6 @@ function App() {
    */
 
   if (!session) {
-
     if (
       authPage ===
       "forgot"
@@ -318,7 +327,6 @@ function App() {
       );
     }
 
-
     return (
       <Login
         onForgotPassword={() =>
@@ -329,7 +337,6 @@ function App() {
       />
     );
   }
-
 
   /*
    * ============================================================
@@ -347,7 +354,6 @@ function App() {
     setDrawerOpen(false);
   }
 
-
   /*
    * ============================================================
    * PAGE ROUTING
@@ -355,16 +361,13 @@ function App() {
    */
 
   function renderPage() {
-
     switch (page) {
-
       case "dashboard":
         return (
           <Dashboard
             onNavigate={navigateTo}
           />
         );
-
 
       case "planner":
         return (
@@ -373,14 +376,12 @@ function App() {
           />
         );
 
-
       case "tracker":
         return (
           <Tracker
             onNavigate={navigateTo}
           />
         );
-
 
       case "analytics":
         return (
@@ -391,14 +392,12 @@ function App() {
           />
         );
 
-
       case "service":
         return (
           <ServiceHistory
             onNavigate={navigateTo}
           />
         );
-
 
       case "tyres":
         return (
@@ -407,14 +406,12 @@ function App() {
           />
         );
 
-
       case "insurance":
         return (
           <Insurance
             onNavigate={navigateTo}
           />
         );
-
 
       case "documents":
         return (
@@ -423,14 +420,12 @@ function App() {
           />
         );
 
-
       case "settings":
         return (
           <Settings
             onNavigate={navigateTo}
           />
         );
-
 
       case "about":
         return (
@@ -441,24 +436,25 @@ function App() {
           />
         );
 
-
       case "profile":
         return (
           <UserProfile />
         );
-
 
       case "terms":
         return (
           <Terms />
         );
 
-
       case "privacy":
         return (
           <PrivacyPolicy />
         );
 
+      case "refund":
+        return (
+          <RefundPolicy />
+        );
 
       default:
         return (
@@ -468,7 +464,6 @@ function App() {
         );
     }
   }
-
 
   /*
    * ============================================================
@@ -482,31 +477,24 @@ function App() {
         open={
           drawerOpen
         }
-
         currentPage={
           page
         }
-
         onClose={() =>
           setDrawerOpen(
             false
           )
         }
-
         onNavigate={(
           selectedPage
         ) => {
-
           navigateTo(
             selectedPage
           );
-
         }}
       />
 
-
       <main className="content">
-
         <Suspense
           fallback={
             <PageLoading />
@@ -514,12 +502,9 @@ function App() {
         >
           {renderPage()}
         </Suspense>
-
       </main>
 
-
       <nav className="bottomNav">
-
         <button
           className={
             page ===
@@ -527,7 +512,6 @@ function App() {
               ? "active"
               : ""
           }
-
           onClick={() =>
             navigateTo(
               "dashboard"
@@ -543,7 +527,6 @@ function App() {
           </span>
         </button>
 
-
         <button
           className={
             page ===
@@ -551,7 +534,6 @@ function App() {
               ? "active"
               : ""
           }
-
           onClick={() =>
             navigateTo(
               "planner"
@@ -567,7 +549,6 @@ function App() {
           </span>
         </button>
 
-
         <button
           className={
             page ===
@@ -575,7 +556,6 @@ function App() {
               ? "active"
               : ""
           }
-
           onClick={() =>
             navigateTo(
               "tracker"
@@ -591,7 +571,6 @@ function App() {
           </span>
         </button>
 
-
         <button
           className={
             page ===
@@ -599,7 +578,6 @@ function App() {
               ? "active"
               : ""
           }
-
           onClick={() =>
             navigateTo(
               "analytics"
@@ -614,7 +592,6 @@ function App() {
             Analytics
           </span>
         </button>
-
 
         <button
           onClick={() =>
@@ -631,11 +608,9 @@ function App() {
             More
           </span>
         </button>
-
       </nav>
     </>
   );
 }
-
 
 export default App;

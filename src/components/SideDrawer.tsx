@@ -67,6 +67,11 @@ const menu = [
         icon: "🔒",
         label: "Privacy Policy",
       },
+      {
+        key: "refund",
+        icon: "💳",
+        label: "Return & Refund Policy",
+      },
     ],
   },
 ];
