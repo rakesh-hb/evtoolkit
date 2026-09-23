@@ -103,22 +103,16 @@ export default function About({
             lineHeight: "1.6",
           }}
         >
-          <strong>Legal Name</strong>
+          <strong>Name</strong>
           <span>Rakesh H B</span>
-
-          <strong>Trade Name</strong>
-          <span>Rocky Tales</span>
 
           <strong>Product / Service</strong>
           <span>EV Toolkit</span>
 
           <strong>Registered Address</strong>
           <span>
-            103, NORTH WINDS-2, NEHRU NAGAR,
-            <br />
-            JAKKUR MAIN ROAD, YELAHANKA,
-            <br />
-            BENGALURU - 560064
+            103, North Winds 2, Jakkur main road, Near The Ledge,
+            Yelahanka Old Town, Bengaluru, Karnataka, 560064, India
           </span>
         </div>
       </div>
@@ -210,7 +204,7 @@ export default function About({
           <span>Web Application</span>
 
           <strong>Techsmith</strong>
-          <span>Rakesh HB</span>
+          <span>Rakesh H B</span>
 
           <strong>Contact</strong>
 
@@ -1083,7 +1077,7 @@ export default function About({
                   Version: 1.0
                 </p>
                 <p>
-                  Techsmith: Rakesh HB
+                  Techsmith: Rakesh H B
                 </p>
                 <p>
                   For application support, use the support contact
