@@ -72,6 +72,11 @@ const menu = [
         icon: "💳",
         label: "Return & Refund Policy",
       },
+      {
+        key: "cancellation",
+        icon: "❌",
+        label: "Cancellation Policy",
+      },
     ],
   },
 ];

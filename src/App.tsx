@@ -12,6 +12,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Terms from "./pages/Terms";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import RefundPolicy from "./pages/RefundPolicy";
+import CancellationPolicy from "./pages/CancellationPolicy";
 
 import { useAuth } from "./context/AuthContext";
 
@@ -221,6 +222,22 @@ function App() {
 
   /*
    * ============================================================
+   * CANCELLATION POLICY
+   * ============================================================
+   *
+   * Cancellation Policy must also be publicly accessible.
+   *
+   * Users do not need to log in to view this page.
+   */
+
+  const isCancellationPolicyPage =
+    window.location.pathname ===
+      "/cancellation" ||
+    window.location.pathname ===
+      "/cancellation-policy";
+
+  /*
+   * ============================================================
    * LOADING
    * ============================================================
    */
@@ -280,6 +297,20 @@ function App() {
   if (isRefundPolicyPage) {
     return (
       <RefundPolicy />
+    );
+  }
+
+  /*
+   * ============================================================
+   * CANCELLATION POLICY
+   * ============================================================
+   *
+   * Public page — no authentication required.
+   */
+
+  if (isCancellationPolicyPage) {
+    return (
+      <CancellationPolicy />
     );
   }
 
@@ -454,6 +485,11 @@ function App() {
       case "refund":
         return (
           <RefundPolicy />
+        );
+
+      case "cancellation":
+        return (
+          <CancellationPolicy />
         );
 
       default:
