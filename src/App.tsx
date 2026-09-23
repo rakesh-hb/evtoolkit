@@ -9,6 +9,8 @@ import {
 import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import Terms from "./pages/Terms";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 
 import { useAuth } from "./context/AuthContext";
 
@@ -181,6 +183,42 @@ function App() {
 
   /*
    * ============================================================
+   * TERMS & CONDITIONS
+   * ============================================================
+   *
+   * Terms & Conditions must be publicly accessible.
+   *
+   * This check is intentionally placed before the
+   * authentication check so users do not need to log in
+   * to view the Terms & Conditions.
+   */
+
+  const isTermsPage =
+    window.location.pathname ===
+      "/terms" ||
+    window.location.pathname ===
+      "/terms-and-conditions";
+
+
+  /*
+   * ============================================================
+   * PRIVACY POLICY
+   * ============================================================
+   *
+   * Privacy Policy must also be publicly accessible.
+   *
+   * Users do not need to log in to view this page.
+   */
+
+  const isPrivacyPolicyPage =
+    window.location.pathname ===
+      "/privacy" ||
+    window.location.pathname ===
+      "/privacy-policy";
+
+
+  /*
+   * ============================================================
    * LOADING
    * ============================================================
    */
@@ -198,6 +236,36 @@ function App() {
       >
         ⚡ Loading EV Toolkit...
       </div>
+    );
+  }
+
+
+  /*
+   * ============================================================
+   * TERMS & CONDITIONS
+   * ============================================================
+   *
+   * Public page — no authentication required.
+   */
+
+  if (isTermsPage) {
+    return (
+      <Terms />
+    );
+  }
+
+
+  /*
+   * ============================================================
+   * PRIVACY POLICY
+   * ============================================================
+   *
+   * Public page — no authentication required.
+   */
+
+  if (isPrivacyPolicyPage) {
+    return (
+      <PrivacyPolicy />
     );
   }
 
@@ -377,6 +445,18 @@ function App() {
       case "profile":
         return (
           <UserProfile />
+        );
+
+
+      case "terms":
+        return (
+          <Terms />
+        );
+
+
+      case "privacy":
+        return (
+          <PrivacyPolicy />
         );
 
 

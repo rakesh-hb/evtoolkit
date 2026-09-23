@@ -55,7 +55,17 @@ const menu = [
       {
         key: "about",
         icon: "ℹ️",
-        label: "About EV Toolkit",
+        label: "About us",
+      },
+      {
+        key: "terms",
+        icon: "📄",
+        label: "Terms & Conditions",
+      },
+      {
+        key: "privacy",
+        icon: "🔒",
+        label: "Privacy Policy",
       },
     ],
   },
@@ -68,8 +78,10 @@ export default function SideDrawer({
   onNavigate,
 }: SideDrawerProps) {
   const { session } = useAuth();
+
   const [subscriptionPlan, setSubscriptionPlan] =
     useState<SubscriptionPlan>("free");
+
   const [loadingSubscriptionPlan, setLoadingSubscriptionPlan] =
     useState(true);
 
@@ -104,6 +116,7 @@ export default function SideDrawer({
           setSubscriptionPlan("free");
           setLoadingSubscriptionPlan(false);
         }
+
         return;
       }
 
@@ -390,6 +403,7 @@ export default function SideDrawer({
                 {loadingSubscriptionPlan
                   ? "Loading..."
                   : planLabel}
+
                 {!loadingSubscriptionPlan && (
                   <span
                     style={{
