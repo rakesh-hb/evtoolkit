@@ -55,7 +55,7 @@ const menu = [
       {
         key: "about",
         icon: "ℹ️",
-        label: "About us",
+        label: "About Us",
       },
       {
         key: "terms",
