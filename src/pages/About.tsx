@@ -92,6 +92,38 @@ export default function About({
       </div>
 
       <div className="card">
+        <h3>🏢 Business &amp; Legal Information</h3>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "150px 1fr",
+            gap: "10px",
+            fontSize: "14px",
+            lineHeight: "1.6",
+          }}
+        >
+          <strong>Legal Name</strong>
+          <span>Rakesh H B</span>
+
+          <strong>Trade Name</strong>
+          <span>Rocky Tales</span>
+
+          <strong>Product / Service</strong>
+          <span>EV Toolkit</span>
+
+          <strong>Registered Address</strong>
+          <span>
+            103, NORTH WINDS-2, NEHRU NAGAR,
+            <br />
+            JAKKUR MAIN ROAD, YELAHANKA,
+            <br />
+            BENGALURU - 560064
+          </span>
+        </div>
+      </div>
+
+      <div className="card">
         <h3>💳 Subscription Plans</h3>
 
         <p>
