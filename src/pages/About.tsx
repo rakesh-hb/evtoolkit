@@ -1,5 +1,7 @@
 import { useState } from "react";
 import UserDetails from "../components/UserDetails";
+import { supabase } from "../lib/supabase";
+import { getCurrentPlan } from "../services/subscriptionService";
 
 interface AboutProps {
   onNavigate?: (page: string) => void;
@@ -10,6 +12,104 @@ export default function About({
 }: AboutProps) {
   const [showMoreInformation, setShowMoreInformation] =
     useState(false);
+
+  async function handleContactSupport() {
+    try {
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser();
+
+      if (error) {
+        throw error;
+      }
+
+      const metadata = user?.user_metadata ?? {};
+      const firstName = String(metadata.first_name ?? "").trim();
+      const lastName = String(metadata.last_name ?? "").trim();
+      const fullName =
+        `${firstName} ${lastName}`.trim() || "Not provided";
+      const email = user?.email || "Not provided";
+      const phone = String(metadata.phone ?? "").trim() || "Not provided";
+      const userId = user?.id || "Not available";
+      const accountCreated =
+        user?.created_at
+          ? new Date(user.created_at).toLocaleString()
+          : "Not available";
+      const lastSignIn =
+        user?.last_sign_in_at
+          ? new Date(user.last_sign_in_at).toLocaleString()
+          : "Not available";
+
+      let subscriptionPlan = "Not available";
+
+      try {
+        subscriptionPlan = await getCurrentPlan();
+      } catch (planError) {
+        console.warn(
+          "Unable to load subscription plan for support email:",
+          planError
+        );
+      }
+
+      const browserDetails =
+        typeof navigator !== "undefined"
+          ? navigator.userAgent
+          : "Not available";
+
+      const currentPage =
+        typeof window !== "undefined"
+          ? window.location.href
+          : "About page";
+
+      const subject = `EV Toolkit Support - ${fullName}`;
+
+      const body = [
+        "Hello EV Toolkit Support,",
+        "",
+        "I need help with EV Toolkit.",
+        "",
+        "USER DETAILS",
+        "----------------------------------------",
+        `Name: ${fullName}`,
+        `Email: ${email}`,
+        `Phone: ${phone}`,
+        `User ID: ${userId}`,
+        `Subscription Plan: ${subscriptionPlan}`,
+        `Account Created: ${accountCreated}`,
+        `Last Sign-In: ${lastSignIn}`,
+        "",
+        "APPLICATION / ENVIRONMENT",
+        "----------------------------------------",
+        "Current Page: About",
+        `Browser / Device: ${browserDetails}`,
+        "",
+        "SUPPORT MESSAGE",
+        "----------------------------------------",
+        "Please describe the issue or request here:",
+        "",
+        "",
+        "",
+        "",
+        "Thank you.",
+      ].join("\n");
+
+      const mailtoUrl =
+        `mailto:iamrakeshhb@gmail.com` +
+        `?subject=${encodeURIComponent(subject)}` +
+        `&body=${encodeURIComponent(body)}`;
+
+      window.location.href = mailtoUrl;
+    } catch (error) {
+      console.error(
+        "Failed to prepare support email:",
+        error
+      );
+
+      window.location.href =
+        "mailto:iamrakeshhb@gmail.com?subject=EV%20Toolkit%20Support";
+    }
+  }
 
   return (
     <>
@@ -222,8 +322,11 @@ export default function About({
               gap: "10px",
             }}
           >
-            <a
-              href="mailto:iamrakeshhb@gmail.com?subject=EV%20Toolkit%20Support"
+            <button
+              type="button"
+              onClick={() => {
+                void handleContactSupport();
+              }}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -231,15 +334,16 @@ export default function About({
                 width: "fit-content",
                 padding: "8px 14px",
                 borderRadius: "6px",
+                border: "none",
                 background: "#f97316",
                 color: "#ffffff",
-                textDecoration: "none",
+                cursor: "pointer",
                 fontWeight: 600,
                 fontSize: "14px",
               }}
             >
               ✉️ Contact Support
-            </a>
+            </button>
 
             <div
               style={{
