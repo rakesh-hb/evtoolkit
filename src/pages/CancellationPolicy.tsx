@@ -135,10 +135,10 @@ const CancellationPolicy: React.FC = () => {
             <p>
               <strong>Email:</strong>{" "}
               <a
-                href="mailto:rakesh.hb88@gmail.com"
+                href="mailto:iamrakeshhb@gmail.com"
                 style={{ color: "#f97316", textDecoration: "none" }}
               >
-                rakesh.hb88@gmail.com
+                iamrakeshhb@gmail.com
               </a>
             </p>
             <p>

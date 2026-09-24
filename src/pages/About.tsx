@@ -106,6 +106,9 @@ export default function About({
           <strong>Name</strong>
           <span>Rakesh H B</span>
 
+          <strong>Trade Name</strong>
+          <span>Rocky Tales</span>
+
           <strong>Product / Service</strong>
           <span>EV Toolkit</span>
 
@@ -197,6 +200,9 @@ export default function About({
           <strong>Application</strong>
           <span>EV Toolkit</span>
 
+          <strong>Trade Name</strong>
+          <span>Rocky Tales</span>
+
           <strong>Version</strong>
           <span>1.0</span>
 
@@ -217,7 +223,7 @@ export default function About({
             }}
           >
             <a
-              href="mailto:rakesh.hb88@gmail.com?subject=EV%20Toolkit%20Support"
+              href="mailto:iamrakeshhb@gmail.com?subject=EV%20Toolkit%20Support"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -244,13 +250,13 @@ export default function About({
               <div>
                 <strong>Email:</strong>{" "}
                 <a
-                  href="mailto:rakesh.hb88@gmail.com"
+                  href="mailto:iamrakeshhb@gmail.com"
                   style={{
                     color: "#f97316",
                     textDecoration: "none",
                   }}
                 >
-                  rakesh.hb88@gmail.com
+                  iamrakeshhb@gmail.com
                 </a>
               </div>
 

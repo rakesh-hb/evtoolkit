@@ -357,13 +357,13 @@ const PrivacyPolicy: React.FC = () => {
             <p>
               <strong>Email:</strong>{" "}
               <a
-                href="mailto:rakesh.hb88@gmail.com?subject=EV%20Toolkit%20Privacy%20Support"
+                href="mailto:iamrakeshhb@gmail.com?subject=EV%20Toolkit%20Privacy%20Support"
                 style={{
                   color: "#f97316",
                   textDecoration: "none",
                 }}
               >
-                rakesh.hb88@gmail.com
+                iamrakeshhb@gmail.com
               </a>
             </p>
 
@@ -388,8 +388,39 @@ const PrivacyPolicy: React.FC = () => {
               borderTop: "1px solid #2a2a2a",
             }}
           >
+            <p style={{ margin: "4px 0" }}>
+              <strong>Trade Name:</strong> Rocky Tales
+            </p>
 
+            <p style={{ margin: "4px 0" }}>
+              <strong>Product/Service:</strong> EV Toolkit
+            </p>
 
+            <p style={{ margin: "4px 0" }}>
+              <strong>Email:</strong>{" "}
+              <a
+                href="mailto:iamrakeshhb@gmail.com"
+                style={{
+                  color: "#f97316",
+                  textDecoration: "none",
+                }}
+              >
+                iamrakeshhb@gmail.com
+              </a>
+            </p>
+
+            <p style={{ margin: "4px 0" }}>
+              <strong>Phone:</strong>{" "}
+              <a
+                href="tel:+919611761243"
+                style={{
+                  color: "#f97316",
+                  textDecoration: "none",
+                }}
+              >
+                +91 96117 61243
+              </a>
+            </p>
           </section>
         </div>
       </div>
