@@ -13,6 +13,11 @@ interface SideDrawerProps {
   onNavigate: (page: string) => void;
 }
 
+const SCREENING_HIDDEN_MENU_ITEMS = new Set([
+  "insurance",
+  "documents",
+]);
+
 const menu = [
   {
     title: "Maintenance",
@@ -276,8 +281,15 @@ export default function SideDrawer({
                 {section.title}
               </div>
 
-              {section.items.map(
-                (item) => (
+              {section.items
+                .filter(
+                  (item) =>
+                    !SCREENING_HIDDEN_MENU_ITEMS.has(
+                      item.key
+                    )
+                )
+                .map(
+                  (item) => (
                   <button
                     key={item.key}
                     onClick={() =>

@@ -150,10 +150,9 @@ export default function About({
         </p>
 
         <p style={{ marginBottom: 0 }}>
-          From charging and service history to tyres, insurance,
-          documents, analytics, and ownership planning, EV Toolkit
-          keeps important vehicle information organised and easily
-          accessible.
+          From charging and service history to tyres, analytics,
+          and ownership planning, EV Toolkit keeps important vehicle
+          information organised and easily accessible.
         </p>
 
         <button
@@ -182,8 +181,6 @@ export default function About({
           <li>📍 Charging stations</li>
           <li>🔧 Service and maintenance history</li>
           <li>🛞 Tyre history and warranty information</li>
-          <li>🛡️ Insurance policies and policy documents</li>
-          <li>📁 Vehicle documents and receipts</li>
           <li>📊 EV ownership analytics</li>
           <li>⚡ EV planning and tracking</li>
           <li>💾 Backup and restore according to your subscription plan</li>
@@ -239,9 +236,8 @@ export default function About({
         >
           <li>
             <strong>Free — ₹0:</strong> up to 20 charging sessions,
-            1 insurance record, 2 tyre history records, 3 service
-            history records, basic application features, and no
-            Document Vault service.
+            2 tyre history records, 3 service history records,
+            and basic application features.
           </li>
           <li>
             <strong>Premium — ₹69 one-time:</strong> unlimited
@@ -252,7 +248,7 @@ export default function About({
           <li>
             <strong>Premium Plus — subscription, coming in the
             future:</strong> all Premium features plus unlimited
-            family members, file uploads, Document Vault, cloud
+            family members, additional file features, cloud
             storage, cloud backup, automatic backup scheduling,
             and local &amp; cloud backup capabilities.
           </li>
@@ -281,8 +277,8 @@ export default function About({
 
         <p style={{ marginBottom: 0 }}>
           EV Toolkit aims to make EV ownership simpler by bringing
-          charging, maintenance, costs, documents, insurance, and
-          vehicle information together in one easy-to-use application.
+          charging, maintenance, costs, analytics, and vehicle
+          information together in one easy-to-use application.
         </p>
       </div>
 
@@ -497,8 +493,7 @@ export default function About({
                   EV Toolkit is a personal and family-oriented EV
                   ownership management application. It brings
                   charging, vehicle information, planning, maintenance,
-                  tyres, insurance, documents and analytics into one
-                  application.
+                  tyres and analytics into one application.
                 </p>
                 <p>
                   The application is intended to provide a single,
@@ -534,15 +529,6 @@ export default function About({
                   <li>
                     <strong>Tyre History:</strong> maintain tyre
                     replacement, usage and related warranty information.
-                  </li>
-                  <li>
-                    <strong>Insurance:</strong> maintain insurance
-                    policies, dates, financial information, add-ons,
-                    agent/broker details and policy documents.
-                  </li>
-                  <li>
-                    <strong>Document Vault:</strong> organise important
-                    vehicle documents and receipts.
                   </li>
                   <li>
                     <strong>Settings:</strong> manage application
@@ -700,55 +686,8 @@ export default function About({
                 </p>
               </InfoSection>
 
-              <InfoSection title="7. Insurance">
-                <p>
-                  Insurance stores the information needed to keep EV
-                  insurance policies organised.
-                </p>
-                <ul>
-                  <li>Vehicle</li>
-                  <li>Insurance company</li>
-                  <li>Policy number</li>
-                  <li>Policy type</li>
-                  <li>Policy start date</li>
-                  <li>Policy expiry date</li>
-                  <li>Premium</li>
-                  <li>IDV</li>
-                  <li>Insurance add-ons</li>
-                  <li>Agent / Broker</li>
-                  <li>Contact number</li>
-                  <li>Notes</li>
-                  <li>Policy document / attachment</li>
-                </ul>
-                <p>
-                  The policy start date cannot be in the future.
-                  Expiry dates may be in the future and must not be
-                  earlier than the start date.
-                </p>
-                <p>
-                  Agent / Broker is validated as a name-style text
-                  field. Contact Number is a numeric telephone field
-                  and accepts digits only.
-                </p>
-                <p>
-                  A user can edit or delete only their own insurance
-                  records. Other records are presented as view-only
-                  where applicable.
-                </p>                <p>
-                  Policy document file upload is a Premium Plus
-                  feature. Existing saved documents can remain
-                  available through the application's supported
-                  viewing/download workflow.
-                </p>
-                <p>
-                  Insurance drafts are autosaved to the application's
-                  draft storage after inactivity. Attachment content
-                  is intentionally excluded from drafts because files
-                  can be large; the attachment filename can be retained.
-                </p>
-              </InfoSection>
 
-              <InfoSection title="8. Service History">
+              <InfoSection title="7. Service History">
                 <p>
                   Service History is used to maintain a chronological
                   record of vehicle servicing and maintenance. Use it
@@ -768,7 +707,7 @@ export default function About({
                 </p>
               </InfoSection>
 
-              <InfoSection title="9. Tyre History">
+              <InfoSection title="7. Tyre History">
                 <p>
                   Tyre History is used to maintain tyre-related
                   ownership information, including replacement and
@@ -786,26 +725,8 @@ export default function About({
                 </p>
               </InfoSection>
 
-              <InfoSection title="10. Document Vault">
-                <p>
-                  Document Vault is intended to keep important EV and
-                  vehicle documents organised and accessible from the
-                  application.
-                </p>
-                <p>
-                  Document Vault and its file-upload functionality are
-                  Premium Plus features. Free and Premium users do not
-                  have the Document Vault service.
-                </p>
-                <p>
-                  Premium Plus can be used for policy documents,
-                  receipts and other supported vehicle-related files.
-                  Use descriptive filenames so that documents remain
-                  easy to identify later.
-                </p>
-              </InfoSection>
 
-              <InfoSection title="11. Settings">
+              <InfoSection title="7. Settings">
                 <p>
                   Settings provides the application's supported
                   preferences and configuration. Review the available
@@ -815,7 +736,7 @@ export default function About({
                 </p>
               </InfoSection>
 
-              <InfoSection title="12. User Profile & Family Data">
+              <InfoSection title="10. User Profile & Family Data">
                 <p>
                   User Profile contains account-related user
                   information. The User Details control shown on
@@ -836,7 +757,7 @@ export default function About({
                 </p>
               </InfoSection>
 
-              <InfoSection title="13. Subscription Plans & Feature Access">
+              <InfoSection title="7. Subscription Plans & Feature Access">
                 <p>
                   EV Toolkit provides Free, Premium and Premium Plus
                   access levels. The plan shown in User Profile and
@@ -849,14 +770,9 @@ export default function About({
                 </p>
                 <ul>
                   <li>Up to 20 charging sessions.</li>
-                  <li>1 insurance record.</li>
-                  <li>2 tyre history records.</li>
+                          <li>2 tyre history records.</li>
                   <li>3 service history records.</li>
                   <li>Basic application features.</li>
-                  <li>
-                    No Document Vault service or document upload
-                    capability.
-                  </li>
                   <li>
                     No family-member feature.
                   </li>
@@ -915,7 +831,7 @@ export default function About({
                     Unlimited family members.
                   </li>
                   <li>
-                    File uploads and Document Vault functionality.
+                    Additional file and storage features.
                   </li>
                   <li>
                     Cloud storage.
@@ -959,7 +875,7 @@ export default function About({
                 </p>
               </InfoSection>
 
-              <InfoSection title="14. Autosave & Drafts">
+              <InfoSection title="10. Autosave & Drafts">
                 <p>
                   Several data-entry pages use an autosave draft
                   workflow. Drafts are stored through the application's
@@ -975,13 +891,12 @@ export default function About({
                 </p>
                 <p>
                   Large attachment content is intentionally excluded
-                  from the insurance draft payload; the actual
-                  document is handled separately by the attachment
-                  workflow.
+                  from applicable draft payloads; attachment content
+                  is handled separately by the supported file workflow.
                 </p>
               </InfoSection>
 
-              <InfoSection title="15. PDF Reports">
+              <InfoSection title="7. PDF Reports">
                 <p>
                   Analytics includes reporting tools for exporting
                   analytics information as a PDF report.
@@ -1008,7 +923,7 @@ export default function About({
                 </p>
               </InfoSection>
 
-              <InfoSection title="16. Data Export & Backup">
+              <InfoSection title="10. Data Export & Backup">
                 <p>
                   Backup access depends on the subscription plan.
                   Free users do not have a Backup &amp; Restore option.
@@ -1033,12 +948,12 @@ export default function About({
                 <p>
                   Always keep exported backups in a secure location
                   because they may contain detailed vehicle,
-                  financial, maintenance, insurance and document
+                  financial, maintenance, ownership
                   information.
                 </p>
               </InfoSection>
 
-              <InfoSection title="17. Data Validation & Integrity">
+              <InfoSection title="7. Data Validation & Integrity">
                 <ul>
                   <li>
                     Required fields are checked before applicable
@@ -1049,20 +964,23 @@ export default function About({
                     to the record.
                   </li>
                   <li>
-                    Insurance start dates cannot be future dates.
+                    Date fields are validated according to the
+                    applicable record rules.
                   </li>
                   <li>
-                    Insurance expiry dates cannot precede start dates.
+                    Date relationships are validated before
+                    applicable records are saved.
                   </li>
                   <li>
-                    Insurance Agent / Broker input filters unsupported
-                    characters.
+                    Text inputs filter unsupported characters
+                    where applicable.
                   </li>
                   <li>
-                    Insurance Contact Number accepts digits only.
+                    Telephone inputs accept valid digits
+                    where applicable.
                   </li>
                   <li>
-                    Ownership is checked before protected insurance
+                    Ownership is checked before protected
                     update and delete operations.
                   </li>
                   <li>
@@ -1072,7 +990,7 @@ export default function About({
                 </ul>
               </InfoSection>
 
-              <InfoSection title="18. Privacy & Security">
+              <InfoSection title="10. Privacy & Security">
                 <p>
                   EV Toolkit uses authenticated user accounts and
                   database-level access controls for user-specific
@@ -1093,9 +1011,9 @@ export default function About({
                   persistent store for user-created records.
                 </p>
                 <p>
-                  Documents and exported reports can contain sensitive
-                  ownership information. Protect downloaded files and
-                  do not share them outside the intended audience.
+                  Exported reports can contain sensitive ownership
+                  information. Protect downloaded files and do not share
+                  them outside the intended audience.
                 </p>
                 <p>
                   Security statements in this page describe the
@@ -1108,7 +1026,7 @@ export default function About({
                 </p>
               </InfoSection>
 
-              <InfoSection title="19. Recommended Usage Workflow">
+              <InfoSection title="7. Recommended Usage Workflow">
                 <ol>
                   <li>
                     Sign in and review your User Profile and Settings.
@@ -1125,13 +1043,6 @@ export default function About({
                     completed.
                   </li>
                   <li>
-                    Add current insurance information and upload
-                    supporting policy documents.
-                  </li>
-                  <li>
-                    Store important vehicle documents in Document Vault.
-                  </li>
-                  <li>
                     Use Planner for future ownership/trip planning.
                   </li>
                   <li>
@@ -1145,7 +1056,7 @@ export default function About({
                 </ol>
               </InfoSection>
 
-              <InfoSection title="20. Important Data Relationships">
+              <InfoSection title="10. Important Data Relationships">
                 <ul>
                   <li>
                     Charging records entered in Tracker are the source
@@ -1174,7 +1085,7 @@ export default function About({
                 </ul>
               </InfoSection>
 
-              <InfoSection title="21. Mobile & Responsive Use">
+              <InfoSection title="7. Mobile & Responsive Use">
                 <p>
                   EV Toolkit is designed to work across desktop and
                   mobile browser layouts. Form controls are sized for
@@ -1187,7 +1098,7 @@ export default function About({
                 </p>
               </InfoSection>
 
-              <InfoSection title="22. Technology & Architecture">
+              <InfoSection title="10. Technology & Architecture">
                 <p>
                   The application is a React and TypeScript web
                   application built with a Vite-based frontend. It
@@ -1204,7 +1115,7 @@ export default function About({
                 </p>
               </InfoSection>
 
-              <InfoSection title="23. Security & Maintenance Notes">
+              <InfoSection title="7. Security & Maintenance Notes">
                 <p>
                   Keeping the application secure requires maintaining
                   the frontend, backend policies, storage controls and
@@ -1221,7 +1132,7 @@ export default function About({
                 </p>
               </InfoSection>
 
-              <InfoSection title="24. Support & Application Ownership">
+              <InfoSection title="10. Support & Application Ownership">
                 <p>
                   Application: EV Toolkit
                 </p>
@@ -1251,7 +1162,7 @@ export default function About({
               >
                 <strong>Data protection reminder:</strong>{" "}
                 EV Toolkit can contain detailed vehicle, charging,
-                financial, insurance, maintenance and document
+                financial, maintenance and ownership
                 information. Review recipients carefully before
                 exporting or sharing reports, backups or documents.
               </div>
