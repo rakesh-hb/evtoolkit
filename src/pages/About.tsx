@@ -208,24 +208,66 @@ export default function About({
 
           <strong>Contact</strong>
 
-          <a
-            href="mailto:rakeshhbofficial@gmail.com?subject=EV%20Toolkit%20Support"
+          <div
             style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "fit-content",
-              padding: "8px 14px",
-              borderRadius: "6px",
-              background: "#f97316",
-              color: "#ffffff",
-              textDecoration: "none",
-              fontWeight: 600,
-              fontSize: "14px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: "10px",
             }}
           >
-            ✉️ Contact Support
-          </a>
+            <a
+              href="mailto:rakesh.hb88@gmail.com?subject=EV%20Toolkit%20Support"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "fit-content",
+                padding: "8px 14px",
+                borderRadius: "6px",
+                background: "#f97316",
+                color: "#ffffff",
+                textDecoration: "none",
+                fontWeight: 600,
+                fontSize: "14px",
+              }}
+            >
+              ✉️ Contact Support
+            </a>
+
+            <div
+              style={{
+                fontSize: "14px",
+                lineHeight: 1.7,
+              }}
+            >
+              <div>
+                <strong>Email:</strong>{" "}
+                <a
+                  href="mailto:rakesh.hb88@gmail.com"
+                  style={{
+                    color: "#f97316",
+                    textDecoration: "none",
+                  }}
+                >
+                  rakesh.hb88@gmail.com
+                </a>
+              </div>
+
+              <div>
+                <strong>Phone:</strong>{" "}
+                <a
+                  href="tel:+919611761243"
+                  style={{
+                    color: "#f97316",
+                    textDecoration: "none",
+                  }}
+                >
+                  +91 96117 61243
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

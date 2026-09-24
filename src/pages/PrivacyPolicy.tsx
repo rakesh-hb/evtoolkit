@@ -351,8 +351,33 @@ const PrivacyPolicy: React.FC = () => {
             <p>
               For questions regarding this Privacy Policy or the
               handling of your information, please contact Rocky Tales
-              through the contact details provided on the EV Toolkit
-              website.
+              using the contact details below.
+            </p>
+
+            <p>
+              <strong>Email:</strong>{" "}
+              <a
+                href="mailto:rakesh.hb88@gmail.com?subject=EV%20Toolkit%20Privacy%20Support"
+                style={{
+                  color: "#f97316",
+                  textDecoration: "none",
+                }}
+              >
+                rakesh.hb88@gmail.com
+              </a>
+            </p>
+
+            <p>
+              <strong>Phone:</strong>{" "}
+              <a
+                href="tel:+919611761243"
+                style={{
+                  color: "#f97316",
+                  textDecoration: "none",
+                }}
+              >
+                +91 96117 61243
+              </a>
             </p>
           </section>
 
@@ -363,13 +388,8 @@ const PrivacyPolicy: React.FC = () => {
               borderTop: "1px solid #2a2a2a",
             }}
           >
-            <p style={{ margin: "4px 0" }}>
-              <strong>Trade Name:</strong> Rocky Tales
-            </p>
 
-            <p style={{ margin: "4px 0" }}>
-              <strong>Product/Service:</strong> EV Toolkit
-            </p>
+
           </section>
         </div>
       </div>

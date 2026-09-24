@@ -53,11 +53,6 @@ const menu = [
         label: "Settings",
       },
       {
-        key: "about",
-        icon: "ℹ️",
-        label: "About Us",
-      },
-      {
         key: "terms",
         icon: "📄",
         label: "Terms & Conditions",
@@ -76,6 +71,11 @@ const menu = [
         key: "cancellation",
         icon: "❌",
         label: "Cancellation Policy",
+      },
+      {
+        key: "about",
+        icon: "ℹ️",
+        label: "About Us",
       },
     ],
   },
