@@ -209,7 +209,7 @@ export default function About({
           <strong>Platform</strong>
           <span>Web Application</span>
 
-          <strong>Techsmith</strong>
+          <strong>Name</strong>
           <span>Rakesh H B</span>
 
           <strong>Contact</strong>
@@ -1125,7 +1125,7 @@ export default function About({
                   Version: 1.0
                 </p>
                 <p>
-                  Techsmith: Rakesh H B
+                  Name: Rakesh H B
                 </p>
                 <p>
                   For application support, use the support contact

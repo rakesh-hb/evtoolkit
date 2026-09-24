@@ -77,7 +77,7 @@ const CancellationPolicy: React.FC = () => {
             <p>
               <strong>Email:</strong>{" "}
               <a
-                href="mailto:rakesh.hb88@gmail.com?subject=EV%20Toolkit%20Cancellation%20Request"
+                href="mailto:iamrakeshhb@gmail.com?subject=EV%20Toolkit%20Cancellation%20Request"
                 style={{ color: "#f97316", textDecoration: "none" }}
               >
                 rakesh.hb88@gmail.com
