@@ -57,10 +57,6 @@ export default function About({
           ? navigator.userAgent
           : "Not available";
 
-      const currentPage =
-        typeof window !== "undefined"
-          ? window.location.href
-          : "About page";
 
       const subject = `EV Toolkit Support - ${fullName}`;
 
