@@ -1299,6 +1299,12 @@ export default function ServiceHistory({
                   type="button"
                   className="saveButton"
                   onClick={() => setShowVehicleForm((value) => !value)}
+                  style={{
+                    height: "46px",
+                    alignSelf: "flex-start",
+                    marginTop: "6px",
+                    boxSizing: "border-box",
+                  }}
                 >
                   ＋ Or Add Custom Vehicle
                 </button>
@@ -1600,6 +1606,12 @@ export default function ServiceHistory({
                   setShowCustomServiceForm((value) => !value);
                   setCustomServiceType("");
                 }}
+                style={{
+                  height: "46px",
+                  alignSelf: "flex-start",
+                  marginTop: "6px",
+                  boxSizing: "border-box",
+                }}
               >
                 ＋ Or Add Custom Service
               </button>
@@ -1607,6 +1619,12 @@ export default function ServiceHistory({
               <button
                 type="button"
                 className="saveButton"
+                style={{
+                  height: "46px",
+                  alignSelf: "flex-start",
+                  marginTop: "6px",
+                  boxSizing: "border-box",
+                }}
                 disabled={
                   (!selectedServiceCategory && !customServiceType.trim()) ||
                   (selectedServiceCategory &&

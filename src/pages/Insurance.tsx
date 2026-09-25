@@ -5,9 +5,6 @@ import {
   useState,
 } from "react";
 
-import type {
-  KeyboardEvent as ReactKeyboardEvent,
-} from "react";
 
 import type {
   InsuranceRecord,
@@ -1655,6 +1652,9 @@ export default function Insurance({
                   }
                   style={{
                     whiteSpace: "nowrap",
+                    height: "44px",
+                    position: "relative",
+                    top: "-4px",
                   }}
                 >
                   ＋ Or Add Custom Vehicle

@@ -533,14 +533,6 @@ function Planner({
     [customChargers]
   );
 
-  const brands = useMemo(
-    () =>
-      [...new Set(allVehicles.map((v) => v.brand))].sort(
-        (a, b) => a.localeCompare(b)
-      ),
-    [allVehicles]
-  );
-
   /*
    * =========================================================
    * VEHICLE
