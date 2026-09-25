@@ -1,4172 +1,2786 @@
-import {
-  lazy,
-  Suspense,
-  useEffect,
-  useState,
-} from "react";
-
+import { useEffect, useMemo, useRef, useState } from "react";
+import { vehicles } from "../data/vehicles";
+import { chargers } from "../data/chargers";
+import { STATES } from "../data/states";
 import { supabase } from "../lib/supabase";
 import UserDetails from "../components/UserDetails";
 import {
-  getCurrentPlan,
-  type SubscriptionPlan,
-} from "../services/subscriptionService";
+  getFormDraft,
+  saveFormDraft,
+  deleteFormDraft,
+} from "../services/formDraftService";
 
-const ReportToolbar = lazy(
-  () => import("../components/reports/ReportToolbar")
-);
+/*
+ * These are representative estimated domestic electricity
+ * rates used as DEFAULTS for the Planner.
+ *
+ * They are not intended to reproduce a user's actual
+ * electricity bill. Actual rates can vary by DISCOM,
+ * consumption, subsidies, fixed charges, duties and
+ * surcharges.
+ *
+ * Data basis: FY 2026-27 representative domestic rates.
+ */
 
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-} from "recharts";
+const DEFAULT_HOME_RATES: Record<string, number> = {
+  "Andhra Pradesh": 5.3,
+  "Arunachal Pradesh": 4.2,
+  "Assam": 5.8,
+  "Bihar": 4.9,
+  "Chhattisgarh": 4.3,
+  "Goa": 3.6,
+  "Gujarat": 5.2,
+  "Haryana": 5.9,
+  "Himachal Pradesh": 3.8,
+  "Jharkhand": 5.1,
+  "Karnataka": 6.1,
+  "Kerala": 5.9,
+  "Madhya Pradesh": 5.6,
+  "Maharashtra": 8.2,
+  "Manipur": 4.6,
+  "Meghalaya": 4.8,
+  "Mizoram": 4.3,
+  "Nagaland": 4.5,
+  "Odisha": 4.8,
+  "Punjab": 5.5,
+  "Rajasthan": 5.7,
+  "Sikkim": 3.4,
+  "Tamil Nadu": 3.8,
+  "Telangana": 4.3,
+  "Tripura": 4.9,
+  "Uttar Pradesh": 5.7,
+  "Uttarakhand": 4.5,
+  "West Bengal": 7.4,
 
+  "Andaman and Nicobar Islands": 3.6,
+  "Chandigarh": 4.9,
+  "Dadra and Nagar Haveli and Daman and Diu": 3.4,
+  "Delhi": 0,
+  "Jammu and Kashmir": 3.9,
+  "Ladakh": 3.6,
+  "Lakshadweep": 3.0,
+  "Puducherry": 3.6,
+};
 
-interface Session {
+interface CustomVehicle {
   id: number;
-  user_id?: string;
-  vehicle: string;
-  charger: string;
-  energy: number;
-  cost: number;
-  station: string;
-  date: string;
+  brand: string;
+  model: string;
+  year: number;
+  country: string;
+
+  battery: number;
+  range: number;
+  efficiency: number;
+
+  batteryChemistry: string;
+  architecture: number;
+
+  acPower: number;
+  dcPower: number;
+
+  connectorAC: string;
+  connectorDC: string;
+
+  chargingPortLocation: string;
+  fastCharge10to80: number;
+
+  motorType: string;
+  drivetrain: string;
+
+  maxPower: number;
+  maxTorque: number;
+
+  acceleration0to100: number;
+  topSpeed: number;
+
+  bodyType: string;
+
+  seats: number;
+  bootSpace: number;
+  kerbWeight: number;
+  wheelbase: number;
+
+  adasLevel: string;
+
+  warrantyBattery: string;
+  warrantyVehicle: string;
 }
 
+type PlannerVehicle =
+  | (typeof vehicles)[number]
+  | CustomVehicle;
 
-interface SummaryStats {
-  sessions: number;
-  energy: number;
-  cost: number;
+interface CustomCharger {
+  id: string;
+  name: string;
+  type: "AC" | "DC";
+  power: number;
 }
 
+const emptyVehicleForm = {
+  brand: "",
+  model: "",
+  battery: "",
+  range: "",
+  efficiency: "",
+  acPower: "",
+  dcPower: "",
+  fastCharge10to80: "",
+};
 
-type ExpandedChart =
-  | "monthlySpend"
-  | "monthlyEnergy"
-  | "weeklyActivity"
-  | "chargingType"
-  | null;
+const emptyChargerForm = {
+  name: "",
+  type: "AC" as "AC" | "DC",
+  power: "",
+};
 
-
-interface AnalyticsProps {
+interface PlannerProps {
   onNavigate?: (page: string) => void;
 }
 
-
-function Analytics({
+function Planner({
   onNavigate,
-}: AnalyticsProps) {
+}: PlannerProps) {
+  /*
+   * =========================================================
+   * FORM AUTOSAVE
+   * =========================================================
+   *
+   * Planner form drafts are stored in Supabase.
+   * No user-created form data is stored in localStorage.
+   */
+  const [draftStatus, setDraftStatus] =
+    useState<"idle" | "saving" | "saved" | "error">("idle");
 
-  const [sessions, setSessions] =
-    useState<Session[]>([]);
+  const autosaveTimerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [loading, setLoading] =
-    useState(true);
+  const skipAutosaveRef =
+    useRef(false);
 
-  const [expandedChart, setExpandedChart] =
-    useState<ExpandedChart>(null);
-
-  const [subscriptionPlan, setSubscriptionPlan] =
-    useState<SubscriptionPlan>("free");
-
-  const [subscriptionLoading, setSubscriptionLoading] =
-    useState(true);
-
+  const draftLoadedRef =
+    useRef(false);
 
   /*
-   * ============================================================
-   * LOAD CHARGING SESSIONS
-   * ============================================================
+   * The Planner has no record/editing ID, so it uses
+   * one persistent unfinished-form draft per user.
    */
+  const plannerDraftKey = "planner:new";
 
-  useEffect(() => {
-    loadSessions();
-    loadSubscriptionPlan();
-  }, []);
+  function getPlannerDraftData() {
+    return {
+      selectedBrand,
+      vehicleId,
+      chargerId,
+      chargingLocation,
+      state,
+      homeRate,
+      publicRate,
+      currentSOC,
+      targetSOC,
+    };
+  }
 
-  async function loadSubscriptionPlan() {
+  async function restorePlannerDraft() {
     try {
-      const plan = await getCurrentPlan();
-      setSubscriptionPlan(plan);
+      const draft =
+        await getFormDraft<ReturnType<typeof getPlannerDraftData>>(
+          plannerDraftKey
+        );
+
+      if (!draft?.draft_data) {
+        return false;
+      }
+
+      const data = draft.draft_data;
+
+      skipAutosaveRef.current = true;
+
+      if (typeof data.selectedBrand === "string") {
+        setSelectedBrand(data.selectedBrand);
+      }
+
+      if (typeof data.vehicleId === "number") {
+        setVehicleId(data.vehicleId);
+      }
+
+      if (typeof data.chargerId === "string") {
+        setChargerId(data.chargerId);
+      }
+
+      if (
+        data.chargingLocation === "Home" ||
+        data.chargingLocation === "Public"
+      ) {
+        setChargingLocation(data.chargingLocation);
+      }
+
+      if (typeof data.state === "string") {
+        setState(data.state);
+      }
+
+      if (typeof data.homeRate === "number") {
+        setHomeRate(data.homeRate);
+      }
+
+      if (typeof data.publicRate === "number") {
+        setPublicRate(data.publicRate);
+      }
+
+      if (typeof data.currentSOC === "number") {
+        setCurrentSOC(data.currentSOC);
+      }
+
+      if (typeof data.targetSOC === "number") {
+        setTargetSOC(data.targetSOC);
+      }
+
+      setDraftStatus("saved");
+      return true;
     } catch (error) {
       console.error(
-        "Failed to load subscription plan:",
+        "Failed to restore Planner draft:",
         error
       );
-      setSubscriptionPlan("free");
-    } finally {
-      setSubscriptionLoading(false);
+
+      setDraftStatus("error");
+      return false;
     }
   }
 
+  async function autosavePlannerDraft() {
+    try {
+      setDraftStatus("saving");
 
-  async function loadSessions() {
+      await saveFormDraft(
+        plannerDraftKey,
+        getPlannerDraftData()
+      );
 
-    setLoading(true);
+      setDraftStatus("saved");
+    } catch (error) {
+      console.error(
+        "Failed to autosave Planner draft:",
+        error
+      );
+
+      setDraftStatus("error");
+    }
+  }
+
+  function handlePlannerAutosaveBlur() {
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    autosaveTimerRef.current =
+      setTimeout(() => {
+        void autosavePlannerDraft();
+      }, 1000);
+  }
+
+  async function resetPlannerForm() {
+    const confirmed =
+      window.confirm(
+        "⚠️ Reset all entered values?\n\nAll unsaved Planner information will be cleared."
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    await deleteFormDraft(plannerDraftKey);
+
+    skipAutosaveRef.current = true;
+
+    setSelectedBrand("Tata");
+    setVehicleId(defaultVehicle?.id ?? 0);
+    setChargerId(defaultCharger?.id ?? "");
+    setChargingLocation("Home");
+    setState("Karnataka");
+    setHomeRate(
+      DEFAULT_HOME_RATES["Karnataka"] ?? 5
+    );
+    setPublicRate(15);
+    setCurrentSOC(20);
+    setTargetSOC(80);
+
+    setDraftStatus("idle");
+  }
+
+  /*
+   * =========================================================
+   * CUSTOM VEHICLES / CHARGERS
+   * =========================================================
+   *
+   * Built-in vehicles and chargers continue to come from
+   * src/data/*.ts. User-created records are stored in
+   * Supabase and are therefore available across devices.
+   *
+   * No user-created Planner data is stored in localStorage.
+   * Custom vehicles and chargers are loaded directly from
+   * Supabase.
+   */
+
+  const [customVehicles, setCustomVehicles] =
+    useState<CustomVehicle[]>([]);
+
+  const [customChargers, setCustomChargers] =
+    useState<CustomCharger[]>([]);
+
+  const [customDataLoading, setCustomDataLoading] =
+    useState(true);
+
+  const [customDataError, setCustomDataError] =
+    useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCustomData() {
+      setCustomDataLoading(true);
+      setCustomDataError("");
+
+      const {
+        data: {
+          user,
+        },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        if (!cancelled) {
+          setCustomDataLoading(false);
+          setCustomDataError(
+            "Unable to identify the signed-in user."
+          );
+        }
+        return;
+      }
+
+      const [
+        vehicleResult,
+        chargerResult,
+      ] = await Promise.all([
+        supabase
+  .from("custom_vehicles")
+  .select("*")
+  .order("created_at", {
+    ascending: true,
+  }),
+
+        supabase
+          .from("custom_chargers")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", {
+            ascending: true,
+          }),
+      ]);
+
+      if (
+        vehicleResult.error ||
+        chargerResult.error
+      ) {
+        console.error(
+          "Error loading custom Planner data:",
+          vehicleResult.error ??
+            chargerResult.error
+        );
+
+        if (!cancelled) {
+          setCustomDataLoading(false);
+          setCustomDataError(
+            "Unable to load your custom vehicles or chargers."
+          );
+        }
+
+        return;
+      }
+
+      /*
+       * Convert the compact Supabase custom-vehicle record
+       * into the Planner's vehicle shape.
+       */
+      const mapVehicle = (
+        row: any
+      ): CustomVehicle => ({
+        id: Number(row.id),
+        brand: row.brand,
+        model: row.model,
+        year: new Date(
+          row.created_at ?? Date.now()
+        ).getFullYear(),
+        country: "Custom",
+
+        battery: Number(
+          row.battery ?? 0
+        ),
+        range: Number(
+          row.range_km ?? 0
+        ),
+        efficiency: Number(
+          row.efficiency ?? 0
+        ),
+
+        batteryChemistry: "Unknown",
+        architecture: 0,
+
+        acPower: Number(
+          row.ac_power ?? 0
+        ),
+        dcPower: Number(
+          row.dc_power ?? 0
+        ),
+
+        connectorAC: "Unknown",
+        connectorDC: "Unknown",
+
+        chargingPortLocation:
+          "Unknown",
+
+        fastCharge10to80: Number(
+          row.fast_charge_10_to_80 ?? 0
+        ),
+
+        motorType: "Unknown",
+        drivetrain: "Unknown",
+
+        maxPower: 0,
+        maxTorque: 0,
+
+        acceleration0to100: 0,
+        topSpeed: 0,
+
+        bodyType: "Unknown",
+
+        seats: 0,
+        bootSpace: 0,
+        kerbWeight: 0,
+        wheelbase: 0,
+
+        adasLevel: "Unknown",
+
+        warrantyBattery: "Unknown",
+        warrantyVehicle: "Unknown",
+      });
+
+      const loadedVehicles =
+        (vehicleResult.data ?? []).map(
+          mapVehicle
+        );
+
+      const loadedChargers =
+        (chargerResult.data ?? []).map(
+          (row): CustomCharger => ({
+            id: String(row.id),
+            name: row.name,
+            type:
+              row.type === "DC"
+                ? "DC"
+                : "AC",
+            power: Number(
+              row.power
+            ),
+          })
+        );
+
+      if (!cancelled) {
+        setCustomVehicles(loadedVehicles);
+        setCustomChargers(loadedChargers);
+        setCustomDataLoading(false);
+      }
+    }
+
+    void loadCustomData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /*
+   * =========================================================
+   * DATA
+   * =========================================================
+   */
+
+  const allVehicles = useMemo<PlannerVehicle[]>(
+    () => {
+      const combined = [...vehicles, ...customVehicles];
+      const seen = new Set<string>();
+
+      return combined.filter((item) => {
+        const key =
+          `${item.brand} ${item.model}`.trim().toLowerCase();
+
+        if (seen.has(key)) return false;
+
+        seen.add(key);
+        return true;
+      });
+    },
+    [customVehicles]
+  );
+
+  const allChargers = useMemo(
+    () => [...chargers, ...customChargers],
+    [customChargers]
+  );
+
+  /*
+   * =========================================================
+   * VEHICLE
+   * =========================================================
+   */
+
+  const [selectedBrand, setSelectedBrand] =
+    useState("Tata");
+
+  const [vehicleSearch, setVehicleSearch] =
+    useState("");
+
+  const [showVehicleSuggestions, setShowVehicleSuggestions] =
+    useState(false);
+
+  const vehicleDropdownRef =
+    useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function handleVehicleOutsideClick(event: MouseEvent) {
+      const target = event.target as Node;
+
+      if (
+        showVehicleSuggestions &&
+        vehicleDropdownRef.current &&
+        !vehicleDropdownRef.current.contains(target)
+      ) {
+        setShowVehicleSuggestions(false);
+        setVehicleSearch("");
+      }
+    }
+
+    function handleVehicleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setShowVehicleSuggestions(false);
+        setVehicleSearch("");
+      }
+    }
+
+    document.addEventListener("mousedown", handleVehicleOutsideClick);
+    document.addEventListener("keydown", handleVehicleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleVehicleOutsideClick);
+      document.removeEventListener("keydown", handleVehicleEscape);
+    };
+  }, [showVehicleSuggestions]);
+
+  const brandVehicles = useMemo(
+    () =>
+      allVehicles.filter(
+        (v) => v.brand === selectedBrand
+      ),
+    [allVehicles, selectedBrand]
+  );
+
+  const defaultVehicle =
+    allVehicles.find(
+      (v) =>
+        v.brand === "Tata" &&
+        v.model.toLowerCase().includes("curvv ev 55")
+    ) ??
+    allVehicles.find(
+      (v) => v.brand === "Tata"
+    ) ??
+    allVehicles[0];
+
+  const [vehicleId, setVehicleId] =
+    useState<number>(
+      defaultVehicle?.id ?? 0
+    );
+
+  useEffect(() => {
+    if (
+      brandVehicles.length > 0 &&
+      !brandVehicles.some(
+        (v) => v.id === vehicleId
+      )
+    ) {
+      setVehicleId(brandVehicles[0].id);
+    }
+  }, [brandVehicles, vehicleId]);
+
+  const vehicle = useMemo(
+    () =>
+      allVehicles.find(
+        (v) => v.id === vehicleId
+      ) ?? defaultVehicle,
+    [allVehicles, vehicleId, defaultVehicle]
+  );
+
+  const filteredVehicleOptions = useMemo(() => {
+    const query = vehicleSearch.trim().toLowerCase();
+
+    if (!query) return allVehicles;
+
+    return allVehicles.filter((item) =>
+      `${item.brand} ${item.model}`
+        .toLowerCase()
+        .includes(query)
+    );
+  }, [allVehicles, vehicleSearch]);
+
+  /*
+   * =========================================================
+   * CHARGER
+   * =========================================================
+   */
+
+  const defaultCharger =
+    allChargers.find(
+      (c) =>
+        c.type === "AC" &&
+        c.power === 3.3 &&
+        c.name.toLowerCase().includes("home")
+    ) ?? allChargers[0];
+
+  const [chargerId, setChargerId] =
+    useState<string>(
+      defaultCharger?.id ?? ""
+    );
+
+  const charger = useMemo(
+    () =>
+      allChargers.find(
+        (c) => c.id === chargerId
+      ) ?? defaultCharger,
+    [allChargers, chargerId, defaultCharger]
+  );
+
+  /*
+   * =========================================================
+   * CHARGING LOCATION
+   * =========================================================
+   */
+
+  const [chargingLocation, setChargingLocation] =
+    useState<"Home" | "Public">("Home");
+
+  /*
+   * =========================================================
+   * STATE
+   * =========================================================
+   */
+
+  const [state, setState] =
+    useState("Karnataka");
+
+  /*
+   * =========================================================
+   * ELECTRICITY / PUBLIC RATE
+   * =========================================================
+   */
+
+  const defaultHomeRate =
+    DEFAULT_HOME_RATES[state] ?? 5;
+
+  const [homeRate, setHomeRate] =
+    useState(
+      DEFAULT_HOME_RATES["Karnataka"] ?? 5
+    );
+
+  const [publicRate, setPublicRate] =
+    useState(15);
+
+  useEffect(() => {
+    setHomeRate(defaultHomeRate);
+  }, [state, defaultHomeRate]);
+
+  const activeRate =
+    chargingLocation === "Home"
+      ? homeRate
+      : publicRate;
+
+  /*
+   * =========================================================
+   * SOC
+   * =========================================================
+   */
+
+  const [currentSOC, setCurrentSOC] =
+    useState(20);
+
+  const [targetSOC, setTargetSOC] =
+    useState(80);
+
+  useEffect(() => {
+    if (targetSOC < currentSOC) {
+      setTargetSOC(currentSOC);
+    }
+  }, [currentSOC, targetSOC]);
+
+  /*
+   * =========================================================
+   * PLANNER DRAFT RESTORE + AUTOSAVE
+   * =========================================================
+   */
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function initializePlannerDraft() {
+      try {
+        await restorePlannerDraft();
+
+        if (!cancelled) {
+          draftLoadedRef.current = true;
+        }
+      } catch (error) {
+        console.error(
+          "Failed to initialize Planner draft:",
+          error
+        );
+
+        if (!cancelled) {
+          draftLoadedRef.current = true;
+          setDraftStatus("error");
+        }
+      }
+    }
+
+    void initializePlannerDraft();
+
+    return () => {
+      cancelled = true;
+
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!draftLoadedRef.current) {
+      return;
+    }
+
+    if (skipAutosaveRef.current) {
+      skipAutosaveRef.current = false;
+      return;
+    }
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    autosaveTimerRef.current =
+      setTimeout(() => {
+        void autosavePlannerDraft();
+      }, 1000);
+
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+      }
+    };
+  }, [
+    selectedBrand,
+    vehicleId,
+    chargerId,
+    chargingLocation,
+    state,
+    homeRate,
+    publicRate,
+    currentSOC,
+    targetSOC,
+  ]);
+
+  /*
+   * =========================================================
+   * CHARGER POWER
+   * =========================================================
+   */
+
+  const chargerPower = useMemo(() => {
+    if (!vehicle || !charger) {
+      return 0;
+    }
+
+    if (charger.type === "AC") {
+      if (vehicle.acPower <= 0) {
+        return 0;
+      }
+
+      return Math.min(
+        charger.power,
+        vehicle.acPower
+      );
+    }
+
+    if (vehicle.dcPower <= 0) {
+      return 0;
+    }
+
+    return Math.min(
+      charger.power,
+      vehicle.dcPower
+    );
+  }, [vehicle, charger]);
+
+  /*
+   * =========================================================
+   * ENERGY
+   * =========================================================
+   */
+
+  const socDifference = Math.max(
+    0,
+    targetSOC - currentSOC
+  );
+
+  const hasBatteryInformation =
+    !!vehicle &&
+    vehicle.battery > 0;
+
+  const energyRequired =
+    hasBatteryInformation
+      ? vehicle.battery *
+        (socDifference / 100)
+      : 0;
+
+  /*
+   * =========================================================
+   * CHARGING EFFICIENCY
+   * =========================================================
+   */
+
+  const chargingEfficiency =
+    charger?.type === "DC"
+      ? 0.95
+      : 0.92;
+
+  const energyFromGrid =
+    energyRequired > 0
+      ? energyRequired /
+        chargingEfficiency
+      : 0;
+
+  /*
+   * =========================================================
+   * CHARGING TIME
+   * =========================================================
+   */
+
+  const chargingTimeHours = useMemo(() => {
+    if (
+      !vehicle ||
+      !charger ||
+      energyRequired <= 0 ||
+      chargerPower <= 0
+    ) {
+      return 0;
+    }
+
+    /*
+     * AC
+     */
+
+    if (charger.type === "AC") {
+      return (
+        energyFromGrid /
+        chargerPower
+      );
+    }
+
+    /*
+     * DC
+     *
+     * Use manufacturer 10–80% charging
+     * time where available.
+     */
+
+    const fastChargeTime =
+  vehicle.fastCharge10to80 ?? 0;
+
+if (fastChargeTime > 0) {
+  const referenceMinutes =
+    fastChargeTime;
+
+      const referencePower =
+        (vehicle.battery * 0.7) /
+        (referenceMinutes / 60);
+
+      const powerAdjustment =
+        referencePower > chargerPower
+          ? referencePower / chargerPower
+          : 1;
+
+      const tenToEightyMinutes =
+        referenceMinutes *
+        powerAdjustment;
+
+      /*
+       * Approximate tapering:
+       *
+       * 0–10   = 15% of 10–80 time
+       * 10–80  = manufacturer's time
+       * 80–100 = 40% of 10–80 time
+       */
+
+      const zeroToTenMinutes =
+        tenToEightyMinutes * 0.15;
+
+      const eightyToHundredMinutes =
+        tenToEightyMinutes * 0.40;
+
+      if (targetSOC <= 10) {
+        return (
+          ((targetSOC - currentSOC) *
+            (zeroToTenMinutes / 10)) /
+          60
+        );
+      }
+
+      if (
+        currentSOC < 10 &&
+        targetSOC <= 80
+      ) {
+        const first =
+          (10 - currentSOC) *
+          (zeroToTenMinutes / 10);
+
+        const second =
+          (targetSOC - 10) *
+          (tenToEightyMinutes / 70);
+
+        return (first + second) / 60;
+      }
+
+      if (
+        currentSOC >= 10 &&
+        targetSOC <= 80
+      ) {
+        return (
+          ((targetSOC - currentSOC) *
+            (tenToEightyMinutes / 70)) /
+          60
+        );
+      }
+
+      if (
+        currentSOC >= 10 &&
+        currentSOC < 80 &&
+        targetSOC > 80
+      ) {
+        const first =
+          (80 - currentSOC) *
+          (tenToEightyMinutes / 70);
+
+        const second =
+          (targetSOC - 80) *
+          (eightyToHundredMinutes / 20);
+
+        return (first + second) / 60;
+      }
+
+      if (
+        currentSOC < 10 &&
+        targetSOC > 80
+      ) {
+        const first =
+          (10 - currentSOC) *
+          (zeroToTenMinutes / 10);
+
+        const second =
+          tenToEightyMinutes;
+
+        const third =
+          (targetSOC - 80) *
+          (eightyToHundredMinutes / 20);
+
+        return (
+          (first + second + third) /
+          60
+        );
+      }
+    }
+
+    /*
+     * Generic DC fallback
+     */
+
+    return (
+      energyFromGrid /
+      chargerPower
+    );
+  }, [
+    vehicle,
+    charger,
+    energyRequired,
+    energyFromGrid,
+    chargerPower,
+    currentSOC,
+    targetSOC,
+  ]);
+
+  const chargingTimeMinutes =
+    Math.round(
+      chargingTimeHours * 60
+    );
+
+  /*
+   * =========================================================
+   * COST
+   * =========================================================
+   */
+
+  const totalCost =
+    energyFromGrid *
+    Math.max(0, activeRate);
+
+  const costPerKm =
+    vehicle &&
+    vehicle.efficiency > 0 &&
+    energyRequired > 0
+      ? totalCost /
+        (energyRequired *
+          vehicle.efficiency)
+      : 0;
+
+  const rangeAdded =
+    vehicle &&
+    vehicle.efficiency > 0
+      ? energyRequired *
+        vehicle.efficiency
+      : 0;
+
+  /*
+   * =========================================================
+   * FORMAT TIME
+   * =========================================================
+   */
+
+  function formatChargingTime(
+    minutes: number
+  ) {
+    if (minutes <= 0) {
+      return "Unavailable";
+    }
+
+    const hours =
+      Math.floor(minutes / 60);
+
+    const mins =
+      minutes % 60;
+
+    if (hours === 0) {
+      return `${mins} min`;
+    }
+
+    if (mins === 0) {
+      return `${hours} hr`;
+    }
+
+    return `${hours} hr ${mins} min`;
+  }
+
+  /*
+   * =========================================================
+   * ADD VEHICLE
+   * =========================================================
+   */
+
+  const [showVehicleForm, setShowVehicleForm] =
+    useState(false);
+
+  const [newVehicle, setNewVehicle] =
+    useState(emptyVehicleForm);
+
+  async function addVehicle() {
+    const brand =
+      newVehicle.brand.trim();
+
+    const model =
+      newVehicle.model.trim();
+
+    if (!brand || !model) {
+      alert(
+        "Please enter the vehicle brand and model."
+      );
+      return;
+    }
+
+    const numberOrZero = (
+      value: string
+    ) => {
+      if (!value.trim()) {
+        return 0;
+      }
+
+      const n = Number(value);
+
+      return Number.isFinite(n) && n >= 0
+        ? n
+        : -1;
+    };
+
+    const battery =
+      numberOrZero(newVehicle.battery);
+
+    const range =
+      numberOrZero(newVehicle.range);
+
+    const efficiency =
+      numberOrZero(
+        newVehicle.efficiency
+      );
+
+    const acPower =
+      numberOrZero(
+        newVehicle.acPower
+      );
+
+    const dcPower =
+      numberOrZero(
+        newVehicle.dcPower
+      );
+
+    const fastCharge10to80 =
+      numberOrZero(
+        newVehicle.fastCharge10to80
+      );
+
+    if (
+      [
+        battery,
+        range,
+        efficiency,
+        acPower,
+        dcPower,
+        fastCharge10to80,
+      ].some((n) => n < 0)
+    ) {
+      alert(
+        "Please enter valid numbers."
+      );
+      return;
+    }
+
+    const duplicate =
+      allVehicles.some(
+        (v) =>
+          v.brand.toLowerCase() ===
+            brand.toLowerCase() &&
+          v.model.toLowerCase() ===
+            model.toLowerCase()
+      );
+
+    if (duplicate) {
+      alert(
+        "This vehicle already exists."
+      );
+      return;
+    }
+
+    const {
+      data: {
+        user,
+      },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      alert(
+        "Your session could not be verified. Please sign in again."
+      );
+      return;
+    }
+
+    const { data, error } =
+      await supabase
+        .from("custom_vehicles")
+        .insert({
+          user_id: user.id,
+          brand,
+          model,
+          battery,
+          range_km: range,
+          efficiency,
+          ac_power: acPower,
+          dc_power: dcPower,
+          fast_charge_10_to_80:
+            fastCharge10to80,
+        })
+        .select("*")
+        .single();
+
+    if (error || !data) {
+      console.error(
+        "Error adding custom vehicle:",
+        error
+      );
+
+      alert(
+        "Unable to save the vehicle. Please try again."
+      );
+      return;
+    }
+
+    const customVehicle: CustomVehicle =
+      {
+        id: Number(data.id),
+        brand: data.brand,
+        model: data.model,
+        year: new Date(
+          data.created_at ??
+            Date.now()
+        ).getFullYear(),
+        country: "Custom",
+
+        battery: Number(
+          data.battery ?? 0
+        ),
+        range: Number(
+          data.range_km ?? 0
+        ),
+        efficiency: Number(
+          data.efficiency ?? 0
+        ),
+
+        batteryChemistry: "Unknown",
+        architecture: 0,
+
+        acPower: Number(
+          data.ac_power ?? 0
+        ),
+        dcPower: Number(
+          data.dc_power ?? 0
+        ),
+
+        connectorAC: "Unknown",
+        connectorDC: "Unknown",
+
+        chargingPortLocation:
+          "Unknown",
+
+        fastCharge10to80: Number(
+          data.fast_charge_10_to_80 ??
+            0
+        ),
+
+        motorType: "Unknown",
+        drivetrain: "Unknown",
+
+        maxPower: 0,
+        maxTorque: 0,
+
+        acceleration0to100: 0,
+        topSpeed: 0,
+
+        bodyType: "Unknown",
+
+        seats: 0,
+        bootSpace: 0,
+        kerbWeight: 0,
+        wheelbase: 0,
+
+        adasLevel: "Unknown",
+
+        warrantyBattery:
+          "Unknown",
+
+        warrantyVehicle:
+          "Unknown",
+      };
+
+    setCustomVehicles((prev) => [
+      ...prev,
+      customVehicle,
+    ]);
+
+    setSelectedBrand(brand);
+    setVehicleId(customVehicle.id);
+    setVehicleSearch(
+      `${customVehicle.brand} ${customVehicle.model}`
+    );
+    setShowVehicleSuggestions(false);
+
+    setNewVehicle(
+      emptyVehicleForm
+    );
+
+    setShowVehicleForm(false);
+  }
+
+  /*
+   * =========================================================
+   * ADD CHARGER
+   * =========================================================
+   */
+
+  const [showChargerForm, setShowChargerForm] =
+    useState(false);
+
+  const [newCharger, setNewCharger] =
+    useState(emptyChargerForm);
+
+  async function addCharger() {
+    const name =
+      newCharger.name.trim();
+
+    const power =
+      Number(newCharger.power);
+
+    if (
+      !name ||
+      !Number.isFinite(power) ||
+      power <= 0
+    ) {
+      alert(
+        "Please enter a valid charger name and power."
+      );
+      return;
+    }
+
+    const normalizeName = (value: string) =>
+      value.trim().replace(/\s+/g, " ").toLowerCase();
+
+    const duplicate =
+      allChargers.some(
+        (c) =>
+          normalizeName(c.name) ===
+          normalizeName(name)
+      );
+
+    if (duplicate) {
+      alert(
+        "This charger already exists."
+      );
+      return;
+    }
+
+    const {
+      data: {
+        user,
+      },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      alert(
+        "Your session could not be verified. Please sign in again."
+      );
+      return;
+    }
 
     const {
       data,
       error,
     } = await supabase
-      .from("charging_sessions")
+      .from("custom_chargers")
+      .insert({
+        user_id: user.id,
+        name,
+        type: newCharger.type,
+        power,
+      })
       .select("*")
-      .order("date", {
-        ascending: false,
-      });
+      .single();
 
-
-    if (error) {
-
+    if (error || !data) {
       console.error(
-        "Failed to load charging sessions:",
+        "Error adding custom charger:",
         error
       );
 
-      setLoading(false);
-
+      alert(
+        "Unable to save the charger. Please try again."
+      );
       return;
     }
 
-
-    setSessions(
-      (data as Session[]) || []
-    );
-
-    setLoading(false);
-  }
-
-
-  /*
-   * ============================================================
-   * BASIC SUMMARY
-   * ============================================================
-   */
-
-  const totalSessions =
-    sessions.length;
-
-
-  const totalEnergy =
-    sessions.reduce(
-      (sum, session) =>
-        sum + session.energy,
-      0
-    );
-
-
-  const totalCost =
-    sessions.reduce(
-      (sum, session) =>
-        sum + session.cost,
-      0
-    );
-
-
-  const averageEnergy =
-    totalSessions > 0
-      ? totalEnergy / totalSessions
-      : 0;
-
-
-  const averageCost =
-    totalSessions > 0
-      ? totalCost / totalSessions
-      : 0;
-
-
-  /*
-   * ============================================================
-   * STATISTICS
-   * ============================================================
-   */
-
-  const vehicleStats:
-    Record<string, SummaryStats> =
-      {};
-
-
-  const stationStats:
-    Record<string, SummaryStats> =
-      {};
-
-
-  const monthlyStats:
-    Record<string, SummaryStats> =
-      {};
-
-
-  const yearlyStats:
-    Record<string, SummaryStats> =
-      {};
-
-
-  const chargerStats:
-    Record<string, number> =
-      {};
-
-
-  /*
-   * ============================================================
-   * WEEKLY STATISTICS
-   * ============================================================
-   */
-
-  const weeklyStats:
-    Record<string, number> = {
-
-      Sunday: 0,
-
-      Monday: 0,
-
-      Tuesday: 0,
-
-      Wednesday: 0,
-
-      Thursday: 0,
-
-      Friday: 0,
-
-      Saturday: 0,
-
-    };
-
-
-  /*
-   * ============================================================
-   * PROCESS CHARGING SESSIONS
-   * ============================================================
-   */
-
-  sessions.forEach(
-    (session) => {
-
-      /*
-       * --------------------------------------------------------
-       * VEHICLE
-       * --------------------------------------------------------
-       */
-
-      if (
-        !vehicleStats[
-          session.vehicle
-        ]
-      ) {
-
-        vehicleStats[
-          session.vehicle
-        ] = {
-
-          sessions: 0,
-
-          energy: 0,
-
-          cost: 0,
-
-        };
-
-      }
-
-
-      vehicleStats[
-        session.vehicle
-      ].sessions++;
-
-
-      vehicleStats[
-        session.vehicle
-      ].energy +=
-        session.energy;
-
-
-      vehicleStats[
-        session.vehicle
-      ].cost +=
-        session.cost;
-
-
-      /*
-       * --------------------------------------------------------
-       * STATION
-       * --------------------------------------------------------
-       */
-
-      const station =
-        session.station ||
-        "Home";
-
-
-      if (
-        !stationStats[station]
-      ) {
-
-        stationStats[station] = {
-
-          sessions: 0,
-
-          energy: 0,
-
-          cost: 0,
-
-        };
-
-      }
-
-
-      stationStats[
-        station
-      ].sessions++;
-
-
-      stationStats[
-        station
-      ].energy +=
-        session.energy;
-
-
-      stationStats[
-        station
-      ].cost +=
-        session.cost;
-
-
-      /*
-       * --------------------------------------------------------
-       * CHARGER
-       * --------------------------------------------------------
-       */
-
-      const charger =
-        session.charger ||
-        "Unknown";
-
-
-      if (
-        !chargerStats[
-          charger
-        ]
-      ) {
-
-        chargerStats[
-          charger
-        ] = 0;
-
-      }
-
-
-      chargerStats[
-        charger
-      ]++;
-
-
-      /*
-       * --------------------------------------------------------
-       * DATE
-       * --------------------------------------------------------
-       */
-
-      const date =
-        new Date(
-          session.date
-        );
-
-
-      if (
-        !Number.isNaN(
-          date.getTime()
-        )
-      ) {
-
-        /*
-         * ------------------------------------------------------
-         * MONTH
-         * ------------------------------------------------------
-         */
-
-        const month =
-          date.toLocaleString(
-            "default",
-            {
-              month: "short",
-              year: "numeric",
-            }
-          );
-
-
-        if (
-          !monthlyStats[
-            month
-          ]
-        ) {
-
-          monthlyStats[
-            month
-          ] = {
-
-            sessions: 0,
-
-            energy: 0,
-
-            cost: 0,
-
-          };
-
-        }
-
-
-        monthlyStats[
-          month
-        ].sessions++;
-
-
-        monthlyStats[
-          month
-        ].energy +=
-          session.energy;
-
-
-        monthlyStats[
-          month
-        ].cost +=
-          session.cost;
-
-
-        /*
-         * ------------------------------------------------------
-         * YEAR
-         * ------------------------------------------------------
-         */
-
-        const year =
-          String(
-            date.getFullYear()
-          );
-
-
-        if (
-          !yearlyStats[
-            year
-          ]
-        ) {
-
-          yearlyStats[
-            year
-          ] = {
-
-            sessions: 0,
-
-            energy: 0,
-
-            cost: 0,
-
-          };
-
-        }
-
-
-        yearlyStats[
-          year
-        ].sessions++;
-
-
-        yearlyStats[
-          year
-        ].energy +=
-          session.energy;
-
-
-        yearlyStats[
-          year
-        ].cost +=
-          session.cost;
-
-
-        /*
-         * ------------------------------------------------------
-         * WEEKDAY
-         * ------------------------------------------------------
-         */
-
-        const weekday =
-          date.toLocaleString(
-            "default",
-            {
-              weekday: "long",
-            }
-          );
-
-
-        if (
-          weeklyStats[
-            weekday
-          ] !== undefined
-        ) {
-
-          weeklyStats[
-            weekday
-          ]++;
-
-        }
-
-      }
-
-    }
-  );
-
-
-  /*
-   * ============================================================
-   * MONTHLY CHART DATA
-   *
-   * Newest month -> oldest month
-   * ============================================================
-   */
-
-  const monthlyChartData =
-    Object.entries(
-      monthlyStats
-    )
-      .map(
-        (
-          [
-            month,
-            stats,
-          ]
-        ) => {
-
-          const parsedDate =
-            new Date(
-              `1 ${month}`
-            );
-
-          return {
-
-            month,
-
-            sessions:
-              stats.sessions,
-
-            energy:
-              stats.energy,
-
-            cost:
-              stats.cost,
-
-            sortDate:
-              parsedDate.getTime(),
-
-          };
-
-        }
-      )
-      .sort(
-        (a, b) =>
-          b.sortDate -
-          a.sortDate
-      );
-
-
-  /*
-   * ============================================================
-   * MONTHLY SUMMARY DATA
-   * ============================================================
-   */
-
-  const monthlySummaryData =
-    [...monthlyChartData];
-
-
-  /*
-   * ============================================================
-   * YEARLY SUMMARY DATA
-   * ============================================================
-   */
-
-  const yearlySummaryData =
-    Object.entries(
-      yearlyStats
-    )
-      .map(
-        (
-          [
-            year,
-            stats,
-          ]
-        ) => ({
-
-          year,
-
-          sessions:
-            stats.sessions,
-
-          energy:
-            stats.energy,
-
-          cost:
-            stats.cost,
-
-        })
-      )
-      .sort(
-        (a, b) =>
-          Number(b.year) -
-          Number(a.year)
-      );
-
-
-  /*
-   * ============================================================
-   * CHARGING TYPE DATA
-   * ============================================================
-   */
-
-  const chargingTypeData =
-    Object.entries(
-      chargerStats
-    ).map(
-      (
-        [
-          name,
-          value,
-        ]
-      ) => ({
-
-        name,
-
-        value,
-
-      })
-    );
-
-
-  /*
-   * ============================================================
-   * RECENT SESSIONS
-   *
-   * Keep the Analytics list explicitly sorted newest -> oldest,
-   * matching the Tracker page behavior.
-   * ============================================================
-   */
-
-  const recentSessions =
-    [...sessions].sort(
-      (a, b) => {
-
-        const dateA =
-          new Date(
-            a.date
-          ).getTime();
-
-        const dateB =
-          new Date(
-            b.date
-          ).getTime();
-
-        if (
-          !Number.isNaN(
-            dateA
-          ) &&
-          !Number.isNaN(
-            dateB
-          )
-        ) {
-
-          return dateB - dateA;
-
-        }
-
-        return b.date.localeCompare(
-          a.date
-        );
-
-      }
-    );
-
-
-  /*
-   * ============================================================
-   * COLORS
-   * ============================================================
-   */
-
-  const COLORS = [
-
-    "#22c55e",
-
-    "#3b82f6",
-
-    "#f59e0b",
-
-    "#ef4444",
-
-    "#8b5cf6",
-
-    "#06b6d4",
-
-    "#a855f7",
-
-    "#84cc16",
-
-  ];
-
-
-  /*
-   * ============================================================
-   * COMMON DISPLAY COLORS
-   * ============================================================
-   */
-
-  const VALUE_ORANGE =
-    "#f97316";
-
-  const PRIMARY_TEXT =
-    "#f8fafc";
-
-  const SECONDARY_TEXT =
-    "#cbd5e1";
-
-  const MUTED_TEXT =
-    "#94a3b8";
-
-  /*
-   * ============================================================
-   * KPI CARD DISPLAY
-   * ============================================================
-   */
-
-  const KPI_CARDS = [
-    {
-      accent: "#3b82f6",
-      glow: "rgba(59,130,246,0.22)",
-      icon: "▦",
-      valueSize: "36px",
-    },
-    {
-      accent: "#22c55e",
-      glow: "rgba(34,197,94,0.22)",
-      icon: "ϟ",
-      valueSize: "34px",
-    },
-    {
-      accent: "#f59e0b",
-      glow: "rgba(245,158,11,0.22)",
-      icon: "₹",
-      valueSize: "31px",
-    },
-    {
-      accent: "#a855f7",
-      glow: "rgba(168,85,247,0.22)",
-      icon: "▥",
-      valueSize: "31px",
-    },
-    {
-      accent: "#06b6d4",
-      glow: "rgba(6,182,212,0.22)",
-      icon: "◇",
-      valueSize: "32px",
-    },
-  ];
-
-
-  /*
-   * ============================================================
-   * REPORT DATA
-   * ============================================================
-   */
-
-  const reportData = {
-
-    totalSessions,
-
-    totalEnergy,
-
-    totalCost,
-
-    averageEnergy,
-
-    averageCost,
-
-    vehicleStats,
-
-    stationStats,
-
-    monthlyStats,
-
-    yearlyStats,
-
-    weeklyStats,
-
-    sessions,
-
-  };
-
-
-  /*
-   * ============================================================
-   * CLOSE EXPANDED CHART
-   * ============================================================
-   */
-
-  function closeExpandedChart() {
-
-    setExpandedChart(null);
-
-  }
-
-
-  /*
-   * ============================================================
-   * CHART EXPAND BUTTON
-   * ============================================================
-   */
-
-  function ExpandButton({
-    chart,
-  }: {
-    chart: Exclude<
-      ExpandedChart,
-      null
-    >;
-  }) {
-
-    return (
-
-      <button
-        type="button"
-        onClick={() =>
-          setExpandedChart(chart)
-        }
-        aria-label="Expand chart"
-        title="View chart full screen"
-        style={{
-          position:
-            "absolute",
-          top:
-            "14px",
-          right:
-            "14px",
-          width:
-            "34px",
-          height:
-            "34px",
-          border:
-            "1px solid rgba(255,255,255,0.14)",
-          borderRadius:
-            "8px",
-          background:
-            "rgba(255,255,255,0.06)",
-          color:
-            PRIMARY_TEXT,
-          cursor:
-            "pointer",
-          display:
-            "flex",
-          alignItems:
-            "center",
-          justifyContent:
-            "center",
-          fontSize:
-            "18px",
-          zIndex:
-            5,
-        }}
-      >
-        ⛶
-      </button>
-
-    );
-
-  }
-
-
-  /*
-   * ============================================================
-   * MONTHLY SPEND CHART
-   * ============================================================
-   */
-
-  function MonthlySpendChart({
-    expanded = false,
-  }: {
-    expanded?: boolean;
-  }) {
-
-    return (
-
-      <ResponsiveContainer
-        width="100%"
-        height={
-          expanded
-            ? 560
-            : 320
-        }
-      >
-
-        <AreaChart
-          data={
-            monthlyChartData
-          }
-        >
-
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke="rgba(203,213,225,0.18)"
-          />
-
-
-          <XAxis
-            dataKey="month"
-            tick={{
-              fill:
-                PRIMARY_TEXT,
-              fontSize:
-                12,
-            }}
-            tickLine={{
-              stroke:
-                MUTED_TEXT,
-            }}
-            axisLine={{
-              stroke:
-                MUTED_TEXT,
-            }}
-          />
-
-
-          <YAxis
-            tick={{
-              fill:
-                PRIMARY_TEXT,
-              fontSize:
-                12,
-            }}
-            tickLine={{
-              stroke:
-                MUTED_TEXT,
-            }}
-            axisLine={{
-              stroke:
-                MUTED_TEXT,
-            }}
-          />
-
-
-          <Tooltip
-            contentStyle={{
-              background:
-                "#1e293b",
-              border:
-                "1px solid #475569",
-              borderRadius:
-                "8px",
-              color:
-                PRIMARY_TEXT,
-            }}
-            labelStyle={{
-              color:
-                PRIMARY_TEXT,
-            }}
-            itemStyle={{
-              color:
-                VALUE_ORANGE,
-            }}
-            formatter={(
-              value
-            ) =>
-              `₹${Number(
-                value
-              ).toLocaleString()}`
-            }
-          />
-
-
-          <Legend
-            wrapperStyle={{
-              color:
-                PRIMARY_TEXT,
-            }}
-          />
-
-
-          <Area
-            type="monotone"
-            dataKey="cost"
-            name="Spend"
-            stroke="#22c55e"
-            fill="#22c55e"
-            fillOpacity={0.2}
-            strokeWidth={3}
-          />
-
-        </AreaChart>
-
-      </ResponsiveContainer>
-
-    );
-
-  }
-
-
-  /*
-   * ============================================================
-   * MONTHLY ENERGY CHART
-   * ============================================================
-   */
-
-  function MonthlyEnergyChart({
-    expanded = false,
-  }: {
-    expanded?: boolean;
-  }) {
-
-    return (
-
-      <ResponsiveContainer
-        width="100%"
-        height={
-          expanded
-            ? 560
-            : 320
-        }
-      >
-
-        <LineChart
-          data={
-            monthlyChartData
-          }
-        >
-
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke="rgba(203,213,225,0.18)"
-          />
-
-
-          <XAxis
-            dataKey="month"
-            tick={{
-              fill:
-                PRIMARY_TEXT,
-              fontSize:
-                12,
-            }}
-            tickLine={{
-              stroke:
-                MUTED_TEXT,
-            }}
-            axisLine={{
-              stroke:
-                MUTED_TEXT,
-            }}
-          />
-
-
-          <YAxis
-            tick={{
-              fill:
-                PRIMARY_TEXT,
-              fontSize:
-                12,
-            }}
-            tickLine={{
-              stroke:
-                MUTED_TEXT,
-            }}
-            axisLine={{
-              stroke:
-                MUTED_TEXT,
-            }}
-          />
-
-
-          <Tooltip
-            contentStyle={{
-              background:
-                "#1e293b",
-              border:
-                "1px solid #475569",
-              borderRadius:
-                "8px",
-              color:
-                PRIMARY_TEXT,
-            }}
-            labelStyle={{
-              color:
-                PRIMARY_TEXT,
-            }}
-            itemStyle={{
-              color:
-                VALUE_ORANGE,
-            }}
-            formatter={(
-              value
-            ) =>
-              `${Number(
-                value
-              ).toFixed(1)} kWh`
-            }
-          />
-
-
-          <Legend
-            wrapperStyle={{
-              color:
-                PRIMARY_TEXT,
-            }}
-          />
-
-
-          <Line
-            type="monotone"
-            dataKey="energy"
-            name="Energy (kWh)"
-            stroke="#3b82f6"
-            strokeWidth={3}
-            dot={{
-              r: 4,
-              fill:
-                "#3b82f6",
-            }}
-            activeDot={{
-              r: 7,
-              fill:
-                "#f97316",
-            }}
-          />
-
-        </LineChart>
-
-      </ResponsiveContainer>
-
-    );
-
-  }
-
-
-  /*
-   * ============================================================
-   * WEEKLY ACTIVITY CHART
-   * ============================================================
-   */
-
-  function WeeklyActivityChart({
-    expanded = false,
-  }: {
-    expanded?: boolean;
-  }) {
-
-    const [animateExpanded, setAnimateExpanded] =
-      useState(false);
-
-    useEffect(() => {
-
-      if (!expanded) {
-
-        setAnimateExpanded(false);
-
-        return;
-
-      }
-
-      setAnimateExpanded(false);
-
-      const frame =
-        requestAnimationFrame(() => {
-          setAnimateExpanded(true);
-        });
-
-      return () =>
-        cancelAnimationFrame(frame);
-
-    }, [expanded]);
-
-
-    const orderedDays = [
-
-      "Monday",
-
-      "Tuesday",
-
-      "Wednesday",
-
-      "Thursday",
-
-      "Friday",
-
-      "Saturday",
-
-      "Sunday",
-
-    ];
-
-
-    const maxSessions =
-      Math.max(
-        ...Object.values(
-          weeklyStats
+    const customCharger: CustomCharger =
+      {
+        id: String(data.id),
+        name: data.name,
+        type:
+          data.type === "DC"
+            ? "DC"
+            : "AC",
+        power: Number(
+          data.power
         ),
-        1
-      );
+      };
 
+    setCustomChargers((prev) => [
+      ...prev,
+      customCharger,
+    ]);
 
-    return (
-
-      <div
-        style={{
-          width:
-            "100%",
-          minHeight:
-            expanded
-              ? "520px"
-              : "230px",
-          display:
-            "flex",
-          flexDirection:
-            "column",
-          justifyContent:
-            "center",
-        }}
-      >
-
-        {Object.values(
-          weeklyStats
-        ).every(
-          (value) =>
-            value === 0
-        ) ? (
-
-          <div
-            style={{
-              minHeight:
-                "220px",
-              display:
-                "flex",
-              alignItems:
-                "center",
-              justifyContent:
-                "center",
-              color:
-                SECONDARY_TEXT,
-              fontSize:
-                "14px",
-            }}
-          >
-            No weekly charging
-            activity available.
-          </div>
-
-        ) : (
-
-          <div
-            style={{
-              display:
-                "grid",
-              gridTemplateColumns:
-                "repeat(7, minmax(0, 1fr))",
-              gap:
-                expanded
-                  ? "24px"
-                  : "10px",
-              alignItems:
-                "end",
-              minHeight:
-                expanded
-                  ? "440px"
-                  : "230px",
-              padding:
-                expanded
-                  ? "20px"
-                  : "0",
-            }}
-          >
-
-            {orderedDays.map(
-              (day) => {
-
-                const daySessions =
-                  weeklyStats[
-                    day
-                  ] || 0;
-
-
-                const intensity =
-                  daySessions /
-                  maxSessions;
-
-
-                const barHeight =
-                  daySessions ===
-                  0
-                    ? 12
-                    : 35 +
-                      intensity *
-                        (
-                          expanded
-                            ? 300
-                            : 130
-                        );
-
-
-                return (
-
-                  <div
-                    key={day}
-                    title={`${day}: ${daySessions} charging ${
-                      daySessions === 1
-                        ? "session"
-                        : "sessions"
-                    }`}
-                    style={{
-                      display:
-                        "flex",
-                      flexDirection:
-                        "column",
-                      alignItems:
-                        "center",
-                      justifyContent:
-                        "flex-end",
-                      height:
-                        expanded
-                          ? "400px"
-                          : "210px",
-                    }}
-                  >
-
-                    {/* Session count */}
-
-                    <div
-                      style={{
-                        fontSize:
-                          expanded
-                            ? "20px"
-                            : "15px",
-                        fontWeight:
-                          400,
-                        color:
-                          VALUE_ORANGE,
-                        marginBottom:
-                          "8px",
-                        opacity:
-                          expanded && !animateExpanded
-                            ? 0
-                            : 1,
-                        transform:
-                          expanded && !animateExpanded
-                            ? "translateY(8px)"
-                            : "translateY(0)",
-                        transition:
-                          expanded
-                            ? "opacity 0.45s ease 0.15s, transform 0.45s ease 0.15s"
-                            : "none",
-                      }}
-                    >
-                      {
-                        daySessions
-                      }
-                    </div>
-
-
-                    {/* Activity bar */}
-
-                    <div
-                      style={{
-                        width:
-                          "100%",
-                        maxWidth:
-                          expanded
-                            ? "90px"
-                            : "58px",
-                        height:
-                          `${
-                            expanded && !animateExpanded
-                              ? 12
-                              : barHeight
-                          }px`,
-                        minHeight:
-                          "12px",
-                        borderRadius:
-                          "16px 16px 8px 8px",
-                        background:
-                          daySessions ===
-                          0
-                            ? "#64748b"
-                            : "linear-gradient(180deg, #4ade80 0%, #16a34a 100%)",
-                        boxShadow:
-                          daySessions >
-                          0
-                            ? "0 6px 18px rgba(34,197,94,0.20)"
-                            : "none",
-                        transition:
-                          expanded
-                            ? "height 0.65s cubic-bezier(0.22, 1, 0.36, 1)"
-                            : "height 0.3s ease",
-                      }}
-                    />
-
-
-                    {/* Day */}
-
-                    <div
-                      style={{
-                        marginTop:
-                          "10px",
-                        fontSize:
-                          expanded
-                            ? "15px"
-                            : "13px",
-                        fontWeight:
-                          400,
-                        color:
-                          PRIMARY_TEXT,
-                        textAlign:
-                          "center",
-                      }}
-                    >
-                      {day.slice(
-                        0,
-                        3
-                      )}
-                    </div>
-
-                  </div>
-
-                );
-
-              }
-            )}
-
-          </div>
-
-        )}
-
-
-        {/* Legend */}
-
-        <div
-          style={{
-            display:
-              "flex",
-            alignItems:
-              "center",
-            justifyContent:
-              "center",
-            gap:
-              "8px",
-            marginTop:
-              "16px",
-            fontSize:
-              "12px",
-            color:
-              SECONDARY_TEXT,
-            fontWeight:
-              400,
-          }}
-        >
-
-          <span
-            style={{
-              width:
-                "9px",
-              height:
-                "9px",
-              borderRadius:
-                "50%",
-              background:
-                "#64748b",
-              display:
-                "inline-block",
-            }}
-          />
-
-          No charging
-
-
-          <span
-            style={{
-              width:
-                "9px",
-              height:
-                "9px",
-              borderRadius:
-                "50%",
-              background:
-                "#22c55e",
-              display:
-                "inline-block",
-              marginLeft:
-                "8px",
-            }}
-          />
-
-          Charging activity
-
-        </div>
-
-      </div>
-
+    setChargerId(
+      customCharger.id
     );
 
-  }
+    setNewCharger(
+      emptyChargerForm
+    );
 
+    setShowChargerForm(false);
+  }
 
   /*
-   * ============================================================
-   * CHARGING TYPE DONUT
-   * ============================================================
-   */
-
-  function ChargingTypeChart({
-    expanded = false,
-  }: {
-    expanded?: boolean;
-  }) {
-    if (chargingTypeData.length === 0) {
-      return (
-        <div
-          style={{
-            minHeight: expanded ? "600px" : "350px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: SECONDARY_TEXT,
-            fontSize: "14px",
-          }}
-        >
-          No charging type data available.
-        </div>
-      );
-    }
-
-    const isMobileViewport =
-      typeof window !== "undefined" &&
-      window.innerWidth <= 768;
-
-    const chartHeight = expanded
-      ? isMobileViewport ? 560 : 680
-      : isMobileViewport ? 330 : 390;
-
-    const chartCenterX = expanded
-      ? isMobileViewport ? "50%" : "42%"
-      : isMobileViewport ? "50%" : "40%";
-
-    const chartCenterY = expanded
-      ? isMobileViewport ? "44%" : "46%"
-      : isMobileViewport ? "43%" : "40%";
-
-    const innerRadius = expanded
-      ? isMobileViewport ? 92 : 175
-      : isMobileViewport ? 62 : 78;
-
-    const outerRadius = expanded
-      ? isMobileViewport ? 150 : 275
-      : isMobileViewport ? 100 : 125;
-
-    return (
-      <div
-        className={
-          expanded
-            ? "analyticsChargingTypeChart analyticsChargingTypeChartExpanded"
-            : "analyticsChargingTypeChart"
-        }
-        style={{
-          position: "relative",
-          width: "100%",
-          height: `${chartHeight}px`,
-          boxSizing: "border-box",
-          overflow: "visible",
-        }}
-      >
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={chargingTypeData}
-              dataKey="value"
-              nameKey="name"
-              isAnimationActive={true}
-              animationBegin={0}
-              animationDuration={expanded ? 900 : 700}
-              animationEasing="ease-out"
-              cx={chartCenterX}
-              cy={chartCenterY}
-              innerRadius={innerRadius}
-              outerRadius={outerRadius}
-              paddingAngle={3}
-              cornerRadius={6}
-              labelLine={{ stroke: SECONDARY_TEXT }}
-              label={{
-                fill: VALUE_ORANGE,
-                fontSize: expanded ? 16 : 13,
-              }}
-            >
-              {chargingTypeData.map((_, index) => (
-                <Cell
-                  key={index}
-                  fill={COLORS[index % COLORS.length]}
-                />
-              ))}
-            </Pie>
-
-            <Tooltip
-              contentStyle={{
-                background: "#1e293b",
-                border: "1px solid #475569",
-                borderRadius: "8px",
-                color: PRIMARY_TEXT,
-              }}
-              labelStyle={{ color: PRIMARY_TEXT }}
-              itemStyle={{ color: VALUE_ORANGE }}
-            />
-
-            <Legend
-              verticalAlign="bottom"
-              wrapperStyle={{
-                color: PRIMARY_TEXT,
-                fontSize: expanded ? "14px" : "12px",
-                paddingTop: "4px",
-              }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-
-        <div
-          className="analyticsChargingTypeSummary"
-          style={{
-            position: "absolute",
-            left: chartCenterX,
-            top: chartCenterY,
-            transform: "translate(-50%, -50%)",
-            width: expanded
-              ? isMobileViewport ? "150px" : "220px"
-              : isMobileViewport ? "110px" : "150px",
-            textAlign: "center",
-            pointerEvents: "none",
-            zIndex: 3,
-          }}
-        >
-          <div
-            style={{
-              fontSize: expanded ? "15px" : "11px",
-              fontWeight: 700,
-              color: VALUE_ORANGE,
-              letterSpacing: "0.4px",
-              lineHeight: 1.2,
-              whiteSpace: "normal",
-            }}
-          >
-            TOTAL SESSIONS
-          </div>
-
-          <div
-            style={{
-              marginTop: "4px",
-              fontSize: expanded
-                ? isMobileViewport ? "38px" : "42px"
-                : isMobileViewport ? "22px" : "26px",
-              fontWeight: 700,
-              color: VALUE_ORANGE,
-              lineHeight: 1,
-            }}
-          >
-            {totalSessions}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-
-  function ExpandedChartModal() {
-
-    if (
-      !expandedChart
-    ) {
-
-      return null;
-
-    }
-
-
-    let title =
-      "";
-
-
-    let content:
-      React.ReactNode =
-      null;
-
-
-    if (
-      expandedChart ===
-      "monthlySpend"
-    ) {
-
-      title =
-        "💰 Monthly Spend Trend";
-
-      content =
-        <MonthlySpendChart
-          expanded
-        />;
-
-    }
-
-
-    if (
-      expandedChart ===
-      "monthlyEnergy"
-    ) {
-
-      title =
-        "⚡ Monthly Energy Trend";
-
-      content =
-        <MonthlyEnergyChart
-          expanded
-        />;
-
-    }
-
-
-    if (
-      expandedChart ===
-      "weeklyActivity"
-    ) {
-
-      title =
-        "⚡ Weekly Charging Activity";
-
-      content =
-        <WeeklyActivityChart
-          expanded
-        />;
-
-    }
-
-
-    if (
-      expandedChart ===
-      "chargingType"
-    ) {
-
-      title =
-        "🔌 Charging Type Distribution";
-
-      content =
-        <ChargingTypeChart
-          expanded
-        />;
-
-    }
-
-
-    return (
-
-      <div
-        role="dialog"
-        aria-modal="true"
-        style={{
-          position:
-            "fixed",
-          inset:
-            0,
-          zIndex:
-            9999,
-          background:
-            "rgba(2,6,23,0.88)",
-          display:
-            "flex",
-          alignItems:
-            "center",
-          justifyContent:
-            "center",
-          padding:
-            "24px",
-        }}
-        onMouseDown={(event) => {
-
-          if (
-            event.target ===
-            event.currentTarget
-          ) {
-
-            closeExpandedChart();
-
-          }
-
-        }}
-      >
-
-        <div
-          className="analyticsExpandedChartModal"
-          style={{
-            width:
-              "calc(100vw - 24px)",
-            maxWidth:
-              "1200px",
-            maxHeight:
-              "calc(100vh - 24px)",
-            overflow:
-              "auto",
-            boxSizing:
-              "border-box",
-            background:
-              "#1e293b",
-            border:
-              "1px solid rgba(255,255,255,0.12)",
-            borderRadius:
-              "18px",
-            boxShadow:
-              "0 24px 80px rgba(0,0,0,0.45)",
-            padding:
-              "16px",
-          }}
-        >
-
-          {/* Modal header */}
-
-          <div
-            style={{
-              display:
-                "flex",
-              justifyContent:
-                "space-between",
-              alignItems:
-                "center",
-              gap:
-                "16px",
-              marginBottom:
-                "12px",
-            }}
-          >
-
-            <h2
-              style={{
-                margin:
-                  0,
-                color:
-                  PRIMARY_TEXT,
-                fontSize:
-                  "18px",
-                fontWeight:
-                  400,
-              }}
-            >
-              {title}
-            </h2>
-
-
-            <button
-              type="button"
-              onClick={
-                closeExpandedChart
-              }
-              aria-label="Close chart"
-              title="Close"
-              style={{
-                width:
-                  "38px",
-                height:
-                  "38px",
-                border:
-                  "1px solid rgba(255,255,255,0.14)",
-                borderRadius:
-                  "9px",
-                background:
-                  "rgba(255,255,255,0.06)",
-                color:
-                  PRIMARY_TEXT,
-                cursor:
-                  "pointer",
-                fontSize:
-                  "19px",
-                display:
-                  "flex",
-                alignItems:
-                  "center",
-                justifyContent:
-                  "center",
-              }}
-            >
-              ✕
-            </button>
-
-          </div>
-
-
-          {content}
-
-        </div>
-
-      </div>
-
-    );
-
-  }
-
-
-  /*
-   * ============================================================
-   * LOADING
-   * ============================================================
-   */
-
-  if (loading) {
-
-    return (
-
-      <div className="welcome">
-
-        <h2>
-          Loading analytics...
-        </h2>
-
-      </div>
-
-    );
-
-  }
-
-
-  /*
-   * ============================================================
+   * =========================================================
    * RENDER
-   * ============================================================
+   * =========================================================
    */
 
   return (
-
     <>
-
-      <style>{`
-        .analyticsChargingTypeChart {
-          box-sizing: border-box;
-          width: 100%;
-          overflow: visible;
-        }
-
-        .analyticsChargingTypeChart .recharts-responsive-container {
-          overflow: visible;
-        }
-
-        .analyticsChargingTypeSummary {
-          box-sizing: border-box;
-        }
-
-        .analyticsExpandedChartModal .analyticsChargingTypeChartExpanded {
-          min-height: 0;
-        }
-
-        @media (max-width: 768px) {
-          .analyticsChargingTypeChart {
-            height: 330px !important;
-            overflow: visible !important;
-          }
-
-          .analyticsChargingTypeChartExpanded {
-            height: 560px !important;
-            overflow: visible !important;
-          }
-
-          .analyticsChargingTypeChart .recharts-wrapper,
-          .analyticsChargingTypeChart .recharts-surface {
-            overflow: visible !important;
-          }
-
-          .analyticsChargingTypeChart .recharts-legend-wrapper {
-            width: 100% !important;
-            left: 0 !important;
-            bottom: 0 !important;
-            line-height: 1.25 !important;
-          }
-
-          .analyticsExpandedChartModal {
-            width: calc(100vw - 20px) !important;
-            max-width: calc(100vw - 20px) !important;
-            max-height: calc(100vh - 20px) !important;
-            padding: 12px !important;
-            border-radius: 16px !important;
-            overflow-x: hidden !important;
-            overflow-y: auto !important;
-          }
-
-          .analyticsExpandedChartModal .analyticsChargingTypeChartExpanded {
-            height: 560px !important;
-          }
-        }
-      `}</style>
-
-      <div id="analyticsDashboard">
-
-      {/* ==================================================
-          DASHBOARD HEADER
-          ================================================== */}
+      <div
+        style={{
+          position: "relative",
+          minHeight: 52,
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "flex-end",
+        }}
+      >
+        <UserDetails
+          onClick={() => {
+            onNavigate?.("profile");
+          }}
+        />
+      </div>
 
       <div className="welcome">
+        <h2>
+          ⚡ Charge Planner
+        </h2>
+
+        <p>
+          Estimate charging time
+          and charging cost.
+        </p>
+      </div>
+
+      {/* =====================================================
+          CUSTOM DATA STATUS
+          ===================================================== */}
+
+      {customDataLoading && (
+        <div
+          className="card"
+          style={{
+            marginBottom: 16,
+            color: "#64748b",
+            fontSize: 13,
+          }}
+        >
+          Loading your custom vehicles and chargers...
+        </div>
+      )}
+
+      {customDataError && (
+        <div
+          className="card"
+          style={{
+            marginBottom: 16,
+            color: "#b45309",
+            fontSize: 13,
+          }}
+        >
+          {customDataError}
+        </div>
+      )}
+
+      {/* =====================================================
+          MAIN SETUP CARD
+          ===================================================== */}
+
+      <div className="card">
+
+        <h3>
+          Vehicle & Charging Setup
+        </h3>
+
+        <label>
+          Vehicle
+        </label>
 
         <div
+          ref={vehicleDropdownRef}
           style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            alignItems: "center",
-            marginBottom: "12px",
+            position: "relative",
             width: "100%",
           }}
         >
-          <UserDetails
-            onClick={() => {
-              onNavigate?.("profile");
+          <input
+            type="text"
+            placeholder="Type vehicle name to search..."
+            value={
+              showVehicleSuggestions
+                ? vehicleSearch
+                : vehicle
+                  ? `${vehicle.brand} ${vehicle.model}`
+                  : ""
+            }
+            onFocus={() => {
+              setShowVehicleSuggestions(true);
+            }}
+            onChange={(e) => {
+              const value = e.target.value;
+              setVehicleSearch(value);
+              setShowVehicleSuggestions(true);
+            }}
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              paddingRight: "44px",
             }}
           />
-        </div>
 
+          <button
+            type="button"
+            aria-label="Show vehicle list"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              setShowVehicleSuggestions((open) => !open);
 
-        <h2
-          style={{
-            margin: 0,
-          }}
-        >
-          📊 Analytics Dashboard
-        </h2>
+              if (!showVehicleSuggestions) {
+                setVehicleSearch("");
+              }
+            }}
+            style={{
+              position: "absolute",
+              right: "6px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              width: "32px",
+              height: "32px",
+              border: "none",
+              borderRadius: "6px",
+              background: "#374151",
+              color: "#f9fafb",
+              cursor: "pointer",
+              fontSize: "18px",
+              lineHeight: 1,
+              padding: 0,
+            }}
+          >
+            ▾
+          </button>
 
-
-        <p>
-          Family-wide insights into
-          your EV charging history.
-        </p>
-
-
-        <div
-          style={{
-            marginTop:
-              "16px",
-          }}
-        >
-
-          {subscriptionLoading ? (
+          {showVehicleSuggestions && (
             <div
               style={{
-                padding:
-                  "12px",
+                position: "relative",
+                width: "100%",
+                zIndex: 100,
+                background: "#1f2937",
+                border: "1px solid #374151",
+                borderRadius: "8px",
+                maxHeight: "220px",
+                overflowY: "auto",
+                boxShadow: "0 8px 20px rgba(0,0,0,0.35)",
               }}
             >
-              Loading report tools...
-            </div>
-          ) : subscriptionPlan === "free" ? (
-            <div
-              style={{
-                padding:
-                  "12px 14px",
-                border:
-                  "1px solid rgba(220,38,38,0.30)",
-                borderRadius:
-                  "10px",
-                background:
-                  "rgba(220,38,38,0.08)",
-                color:
-                  "#cbd5e1",
-                fontSize:
-                  "13px",
-              }}
-            >
-              📄 Analytics PDF Export is available with Premium and Premium Plus.
-              Premium is ₹69 one-time.
-            </div>
-          ) : (
-            <Suspense
-              fallback={
+              {filteredVehicleOptions.length > 0 ? (
+                filteredVehicleOptions.map((item) => (
+                  <button
+                    key={`${item.brand}-${item.model}-${item.id}`}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setSelectedBrand(item.brand);
+                      setVehicleId(item.id);
+                      setVehicleSearch(
+                        `${item.brand} ${item.model}`
+                      );
+                      setShowVehicleSuggestions(false);
+                    }}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      textAlign: "left",
+                      border: "none",
+                      borderBottom: "1px solid #374151",
+                      background: "transparent",
+                      color: "#f9fafb",
+                      padding: "10px 12px",
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#374151";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "transparent";
+                    }}
+                  >
+                    {item.brand} {item.model}
+                  </button>
+                ))
+              ) : (
                 <div
                   style={{
-                    padding:
-                      "12px",
+                    padding: "10px 12px",
+                    color: "#9ca3af",
+                    fontSize: "13px",
                   }}
                 >
-                  Loading report tools...
+                  No matching vehicle found. Use ＋ Or Add Custom Vehicle to create one.
                 </div>
-              }
-            >
-              <ReportToolbar
-                reportData={
-                  reportData
-                }
-              />
-            </Suspense>
+              )}
+            </div>
           )}
-
         </div>
 
-      </div>
-
-
-      {/* ==================================================
-          KPI CARDS
-          ================================================== */}
-
-      <div
-        className="statsGrid"
-        style={{
-          gap: "14px",
-        }}
-      >
-
-        <div
-          className="statCard"
+        <button
+          type="button"
+          className="saveButton"
+          onClick={() => {
+            setShowVehicleForm(
+              !showVehicleForm
+            );
+            setShowChargerForm(false);
+          }}
           style={{
-            background:
-              "linear-gradient(145deg, rgba(30,64,175,0.30), rgba(15,23,42,0.96))",
-            border:
-              "1px solid rgba(59,130,246,0.48)",
-            borderRadius:
-              "16px",
-            boxShadow:
-              `0 8px 24px ${KPI_CARDS[0].glow}`,
-            minHeight:
-              "138px",
-            minWidth:
-              0,
-            padding:
-              "16px 10px",
-            overflow:
-              "hidden",
+            marginTop: 8,
+            marginBottom: 16,
           }}
         >
+          ＋ Or Add Custom Vehicle
+        </button>
+
+      {showVehicleForm && (
+        <div className="card">
+
+          <h3>
+            🚗 Add Vehicle
+          </h3>
+
+          <p
+            style={{
+              color: "#94a3b8",
+              fontSize: 13,
+            }}
+          >
+            Enter the information
+            you know. Optional
+            specifications can be
+            left blank.
+          </p>
+
+          <label>
+            Brand *
+          </label>
+
+          <input
+            value={newVehicle.brand}
+            onChange={(e) =>
+              setNewVehicle({
+                ...newVehicle,
+                brand:
+                  e.target.value,
+              })
+            }
+            placeholder="e.g. Tata"
+          />
+
+          <label>
+            Model *
+          </label>
+
+          <input
+            value={newVehicle.model}
+            onChange={(e) =>
+              setNewVehicle({
+                ...newVehicle,
+                model:
+                  e.target.value,
+              })
+            }
+            placeholder="e.g. Curvv EV 55"
+          />
+
+          <label>
+            Battery Capacity (kWh)
+          </label>
+
+          <input
+            type="number"
+            min="0"
+            step="0.1"
+            value={
+              newVehicle.battery
+            }
+            onChange={(e) =>
+              setNewVehicle({
+                ...newVehicle,
+                battery:
+                  e.target.value,
+              })
+            }
+            placeholder="Optional"
+          />
 
           <div
             style={{
-              display:
-                "flex",
-              alignItems:
-                "center",
-              justifyContent:
-                "center",
-              gap:
-                "7px",
-              marginBottom:
-                "9px",
-              minWidth:
-                0,
+              marginTop: 16,
+              padding: 12,
+              borderRadius: 8,
+              background:
+                "rgba(255,255,255,.04)",
             }}
           >
-
-            <div
-              style={{
-                width:
-                  "34px",
-                height:
-                  "34px",
-                borderRadius:
-                  "50%",
-                display:
-                  "flex",
-                alignItems:
-                  "center",
-                justifyContent:
-                  "center",
-                background:
-                  `linear-gradient(145deg, ${KPI_CARDS[0].accent}, #2563eb)`,
-                color:
-                  "#ffffff",
-                fontSize:
-                  "20px",
-                fontWeight:
-                  800,
-                boxShadow:
-                  `0 0 18px ${KPI_CARDS[0].glow}`,
-                flexShrink:
-                  0,
-              }}
-            >
-              {KPI_CARDS[0].icon}
-            </div>
-
-            <h3
-              style={{
-                margin:
-                  0,
-                color:
-                  PRIMARY_TEXT,
-                fontFamily:
-                  '"Inter", "Segoe UI", Arial, sans-serif',
-                fontSize:
-                  "12px",
-                fontWeight:
-                  750,
-                lineHeight:
-                  1.15,
-                textAlign:
-                  "center",
-                whiteSpace:
-                  "normal",
-                overflowWrap:
-                  "anywhere",
-                minWidth:
-                  0,
-                flex:
-                  "1 1 auto",
-              }}
-            >
-              Total Sessions
-            </h3>
-
-          </div>
-
-          <h1
-            style={{
-              margin:
-                0,
-              color:
-                "#38bdf8",
-              fontFamily:
-                '"Inter", "Segoe UI", Arial, sans-serif',
-              fontSize:
-                "32px",
-              lineHeight:
-                1.05,
-              fontWeight:
-                800,
-              letterSpacing:
-                "-0.03em",
-              textAlign:
-                "center",
-              maxWidth:
-                "100%",
-              overflowWrap:
-                "anywhere",
-              textShadow:
-                `0 0 18px ${KPI_CARDS[0].glow}`,
-            }}
-          >
-            {totalSessions}
-          </h1>
-
-        </div>
-
-
-        <div
-          className="statCard"
-          style={{
-            background:
-              "linear-gradient(145deg, rgba(6,95,70,0.34), rgba(15,23,42,0.96))",
-            border:
-              "1px solid rgba(34,197,94,0.48)",
-            borderRadius:
-              "16px",
-            boxShadow:
-              `0 8px 24px ${KPI_CARDS[1].glow}`,
-            minHeight:
-              "138px",
-            minWidth:
-              0,
-            padding:
-              "16px 10px",
-            overflow:
-              "hidden",
-          }}
-        >
-
-          <div
-            style={{
-              display:
-                "flex",
-              alignItems:
-                "center",
-              justifyContent:
-                "center",
-              gap:
-                "7px",
-              marginBottom:
-                "9px",
-              minWidth:
-                0,
-            }}
-          >
-
-            <div
-              style={{
-                width:
-                  "34px",
-                height:
-                  "34px",
-                borderRadius:
-                  "50%",
-                display:
-                  "flex",
-                alignItems:
-                  "center",
-                justifyContent:
-                  "center",
-                background:
-                  "linear-gradient(145deg, #22c55e, #16a34a)",
-                color:
-                  "#ffffff",
-                fontSize:
-                  "22px",
-                fontWeight:
-                  800,
-                boxShadow:
-                  `0 0 18px ${KPI_CARDS[1].glow}`,
-                flexShrink:
-                  0,
-              }}
-            >
-              {KPI_CARDS[1].icon}
-            </div>
-
-            <h3
-              style={{
-                margin:
-                  0,
-                color:
-                  PRIMARY_TEXT,
-                fontFamily:
-                  '"Inter", "Segoe UI", Arial, sans-serif',
-                fontSize:
-                  "12px",
-                fontWeight:
-                  750,
-                lineHeight:
-                  1.15,
-                textAlign:
-                  "center",
-                whiteSpace:
-                  "normal",
-                overflowWrap:
-                  "anywhere",
-                minWidth:
-                  0,
-                flex:
-                  "1 1 auto",
-              }}
-            >
-              Total Energy
-            </h3>
-
-          </div>
-
-          <h1
-            style={{
-              margin:
-                0,
-              color:
-                "#4ade80",
-              fontFamily:
-                '"Inter", "Segoe UI", Arial, sans-serif',
-              fontSize:
-                "27px",
-              lineHeight:
-                1.05,
-              fontWeight:
-                800,
-              letterSpacing:
-                "-0.03em",
-              textAlign:
-                "center",
-              maxWidth:
-                "100%",
-              overflowWrap:
-                "anywhere",
-              textShadow:
-                `0 0 18px ${KPI_CARDS[1].glow}`,
-              whiteSpace:
-                "nowrap",
-            }}
-          >
-            {totalEnergy.toFixed(1)}{" "}
-            <span
-              style={{
-                fontSize:
-                  "0.68em",
-                whiteSpace:
-                  "nowrap",
-              }}
-            >
-              kWh
-            </span>
-          </h1>
-
-        </div>
-
-
-        <div
-          className="statCard"
-          style={{
-            background:
-              "linear-gradient(145deg, rgba(120,53,15,0.34), rgba(15,23,42,0.96))",
-            border:
-              "1px solid rgba(245,158,11,0.48)",
-            borderRadius:
-              "16px",
-            boxShadow:
-              `0 8px 24px ${KPI_CARDS[2].glow}`,
-            minHeight:
-              "138px",
-            minWidth:
-              0,
-            padding:
-              "16px 10px",
-            overflow:
-              "hidden",
-          }}
-        >
-
-          <div
-            style={{
-              display:
-                "flex",
-              alignItems:
-                "center",
-              justifyContent:
-                "center",
-              gap:
-                "7px",
-              marginBottom:
-                "9px",
-              minWidth:
-                0,
-            }}
-          >
-
-            <div
-              style={{
-                width:
-                  "34px",
-                height:
-                  "34px",
-                borderRadius:
-                  "50%",
-                display:
-                  "flex",
-                alignItems:
-                  "center",
-                justifyContent:
-                  "center",
-                background:
-                  "linear-gradient(145deg, #f59e0b, #d97706)",
-                color:
-                  "#ffffff",
-                fontSize:
-                  "18px",
-                fontWeight:
-                  800,
-                boxShadow:
-                  `0 0 18px ${KPI_CARDS[2].glow}`,
-                flexShrink:
-                  0,
-              }}
-            >
-              {KPI_CARDS[2].icon}
-            </div>
-
-            <h3
-              style={{
-                margin:
-                  0,
-                color:
-                  PRIMARY_TEXT,
-                fontFamily:
-                  '"Inter", "Segoe UI", Arial, sans-serif',
-                fontSize:
-                  "12px",
-                fontWeight:
-                  750,
-                lineHeight:
-                  1.15,
-                textAlign:
-                  "center",
-                whiteSpace:
-                  "normal",
-                overflowWrap:
-                  "anywhere",
-                minWidth:
-                  0,
-                flex:
-                  "1 1 auto",
-              }}
-            >
-              Total Spend
-            </h3>
-
-          </div>
-
-          <h1
-            style={{
-              margin:
-                0,
-              color:
-                "#fbbf24",
-              fontFamily:
-                '"Inter", "Segoe UI", Arial, sans-serif',
-              fontSize:
-                "23px",
-              lineHeight:
-                1.05,
-              fontWeight:
-                800,
-              letterSpacing:
-                "-0.035em",
-              textAlign:
-                "center",
-              maxWidth:
-                "100%",
-              overflowWrap:
-                "anywhere",
-              textShadow:
-                `0 0 18px ${KPI_CARDS[2].glow}`,
-              whiteSpace:
-                "nowrap",
-            }}
-          >
-            ₹{totalCost.toLocaleString(
-              undefined,
-              {
-                minimumFractionDigits:
-                  2,
-                maximumFractionDigits:
-                  2,
-              }
-            )}
-          </h1>
-
-        </div>
-
-
-        <div
-          className="statCard"
-          style={{
-            background:
-              "linear-gradient(145deg, rgba(88,28,135,0.34), rgba(15,23,42,0.96))",
-            border:
-              "1px solid rgba(168,85,247,0.48)",
-            borderRadius:
-              "16px",
-            boxShadow:
-              `0 8px 24px ${KPI_CARDS[3].glow}`,
-            minHeight:
-              "138px",
-            minWidth:
-              0,
-            padding:
-              "16px 10px",
-            overflow:
-              "hidden",
-          }}
-        >
-
-          <div
-            style={{
-              display:
-                "flex",
-              alignItems:
-                "center",
-              justifyContent:
-                "center",
-              gap:
-                "7px",
-              marginBottom:
-                "9px",
-              minWidth:
-                0,
-            }}
-          >
-
-            <div
-              style={{
-                width:
-                  "34px",
-                height:
-                  "34px",
-                borderRadius:
-                  "50%",
-                display:
-                  "flex",
-                alignItems:
-                  "center",
-                justifyContent:
-                  "center",
-                background:
-                  "linear-gradient(145deg, #a855f7, #7e22ce)",
-                color:
-                  "#ffffff",
-                fontSize:
-                  "20px",
-                fontWeight:
-                  800,
-                boxShadow:
-                  `0 0 18px ${KPI_CARDS[3].glow}`,
-                flexShrink:
-                  0,
-              }}
-            >
-              {KPI_CARDS[3].icon}
-            </div>
-
-            <h3
-              style={{
-                margin:
-                  0,
-                color:
-                  PRIMARY_TEXT,
-                fontFamily:
-                  '"Inter", "Segoe UI", Arial, sans-serif',
-                fontSize:
-                  "12px",
-                fontWeight:
-                  750,
-                lineHeight:
-                  1.15,
-                textAlign:
-                  "center",
-                whiteSpace:
-                  "normal",
-                overflowWrap:
-                  "anywhere",
-                minWidth:
-                  0,
-                flex:
-                  "1 1 auto",
-              }}
-            >
-              Avg. Cost / Session
-            </h3>
-
-          </div>
-
-          <h1
-            style={{
-              margin:
-                0,
-              color:
-                "#d8b4fe",
-              fontFamily:
-                '"Inter", "Segoe UI", Arial, sans-serif',
-              fontSize:
-                "23px",
-              lineHeight:
-                1.05,
-              fontWeight:
-                800,
-              letterSpacing:
-                "-0.035em",
-              textAlign:
-                "center",
-              maxWidth:
-                "100%",
-              overflowWrap:
-                "anywhere",
-              textShadow:
-                `0 0 18px ${KPI_CARDS[3].glow}`,
-              whiteSpace:
-                "nowrap",
-            }}
-          >
-            ₹{averageCost.toFixed(2)}
-          </h1>
-
-        </div>
-
-
-        <div
-          className="statCard"
-          style={{
-            background:
-              "linear-gradient(145deg, rgba(8,80,92,0.34), rgba(15,23,42,0.96))",
-            border:
-              "1px solid rgba(6,182,212,0.48)",
-            borderRadius:
-              "16px",
-            boxShadow:
-              `0 8px 24px ${KPI_CARDS[4].glow}`,
-            minHeight:
-              "138px",
-            minWidth:
-              0,
-            padding:
-              "16px 10px",
-            overflow:
-              "hidden",
-          }}
-        >
-
-          <div
-            style={{
-              display:
-                "flex",
-              alignItems:
-                "center",
-              justifyContent:
-                "center",
-              gap:
-                "7px",
-              marginBottom:
-                "9px",
-              minWidth:
-                0,
-            }}
-          >
-
-            <div
-              style={{
-                width:
-                  "34px",
-                height:
-                  "34px",
-                borderRadius:
-                  "50%",
-                display:
-                  "flex",
-                alignItems:
-                  "center",
-                justifyContent:
-                  "center",
-                background:
-                  "linear-gradient(145deg, #06b6d4, #0891b2)",
-                color:
-                  "#ffffff",
-                fontSize:
-                  "21px",
-                fontWeight:
-                  800,
-                boxShadow:
-                  `0 0 18px ${KPI_CARDS[4].glow}`,
-                flexShrink:
-                  0,
-              }}
-            >
-              {KPI_CARDS[4].icon}
-            </div>
-
-            <h3
-              style={{
-                margin:
-                  0,
-                color:
-                  PRIMARY_TEXT,
-                fontFamily:
-                  '"Inter", "Segoe UI", Arial, sans-serif',
-                fontSize:
-                  "12px",
-                fontWeight:
-                  750,
-                lineHeight:
-                  1.15,
-                textAlign:
-                  "center",
-                whiteSpace:
-                  "normal",
-                overflowWrap:
-                  "anywhere",
-                minWidth:
-                  0,
-                flex:
-                  "1 1 auto",
-              }}
-            >
-              Avg. Energy / Session
-            </h3>
-
-          </div>
-
-          <h1
-            style={{
-              margin:
-                0,
-              color:
-                "#22d3ee",
-              fontFamily:
-                '"Inter", "Segoe UI", Arial, sans-serif',
-              fontSize:
-                "25px",
-              lineHeight:
-                1.05,
-              fontWeight:
-                800,
-              letterSpacing:
-                "-0.03em",
-              textAlign:
-                "center",
-              maxWidth:
-                "100%",
-              overflowWrap:
-                "anywhere",
-              textShadow:
-                `0 0 18px ${KPI_CARDS[4].glow}`,
-              whiteSpace:
-                "nowrap",
-            }}
-          >
-            {averageEnergy.toFixed(1)}{" "}
-            <span
-              style={{
-                fontSize:
-                  "0.68em",
-                whiteSpace:
-                  "nowrap",
-              }}
-            >
-              kWh
-            </span>
-          </h1>
-
-        </div>
-
-      </div>
-
-
-      {/* ==================================================
-          MONTHLY SPEND
-          ================================================== */}
-
-      <div
-        id="monthlySpendChart"
-        className="card"
-        style={{
-          position:
-            "relative",
-        }}
-      >
-
-        <ExpandButton
-          chart="monthlySpend"
-        />
-
-
-        <h3>
-          💰 Monthly Spend Trend
-        </h3>
-
-
-        <p
-          style={{
-            marginTop:
-              "-6px",
-            marginBottom:
-              "10px",
-            fontSize:
-              "13px",
-            color:
-              SECONDARY_TEXT,
-          }}
-        >
-          Latest month first
-        </p>
-
-
-        <MonthlySpendChart />
-
-      </div>
-
-
-      {/* ==================================================
-          MONTHLY ENERGY
-          ================================================== */}
-
-      <div
-        id="monthlyEnergyChart"
-        className="card"
-        style={{
-          position:
-            "relative",
-        }}
-      >
-
-        <ExpandButton
-          chart="monthlyEnergy"
-        />
-
-
-        <h3>
-          ⚡ Monthly Energy Trend
-        </h3>
-
-
-        <p
-          style={{
-            marginTop:
-              "-6px",
-            marginBottom:
-              "10px",
-            fontSize:
-              "13px",
-            color:
-              SECONDARY_TEXT,
-          }}
-        >
-          Latest month first
-        </p>
-
-
-        <MonthlyEnergyChart />
-
-      </div>
-
-
-      {/* ==================================================
-          WEEKLY CHARGING ACTIVITY
-          ================================================== */}
-
-      <div
-        id="weeklySessionsChart"
-        className="card"
-        style={{
-          position:
-            "relative",
-        }}
-      >
-
-        <ExpandButton
-          chart="weeklyActivity"
-        />
-
-
-        <div
-          style={{
-            display:
-              "flex",
-            justifyContent:
-              "space-between",
-            alignItems:
-              "center",
-            gap:
-              "12px",
-            marginBottom:
-              "18px",
-            paddingRight:
-              "48px",
-            flexWrap:
-              "wrap",
-          }}
-        >
-
-          <div>
-
-            <h3
-              style={{
-                marginBottom:
-                  "4px",
-              }}
-            >
-              ⚡ Weekly Charging Activity
-            </h3>
-
+            <strong>
+              Optional specifications
+            </strong>
 
             <p
               style={{
-                margin:
-                  0,
-                fontSize:
-                  "13px",
-                color:
-                  SECONDARY_TEXT,
+                color: "#94a3b8",
+                fontSize: 12,
+                marginBottom: 0,
               }}
             >
-              Your charging rhythm
-              across the week
+              Leave these blank if
+              you don't know them.
             </p>
-
           </div>
 
+          <label>
+            Claimed Range (km)
+          </label>
+
+          <input
+            type="number"
+            min="0"
+            value={
+              newVehicle.range
+            }
+            onChange={(e) =>
+              setNewVehicle({
+                ...newVehicle,
+                range:
+                  e.target.value,
+              })
+            }
+            placeholder="Optional"
+          />
+
+          <label>
+            Efficiency (km/kWh)
+          </label>
+
+          <input
+            type="number"
+            min="0"
+            step="0.1"
+            value={
+              newVehicle.efficiency
+            }
+            onChange={(e) =>
+              setNewVehicle({
+                ...newVehicle,
+                efficiency:
+                  e.target.value,
+              })
+            }
+            placeholder="Optional"
+          />
+
+          <label>
+            AC Charging Limit (kW)
+          </label>
+
+          <input
+            type="number"
+            min="0"
+            step="0.1"
+            value={
+              newVehicle.acPower
+            }
+            onChange={(e) =>
+              setNewVehicle({
+                ...newVehicle,
+                acPower:
+                  e.target.value,
+              })
+            }
+            placeholder="Optional"
+          />
+
+          <label>
+            DC Charging Limit (kW)
+          </label>
+
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={
+              newVehicle.dcPower
+            }
+            onChange={(e) =>
+              setNewVehicle({
+                ...newVehicle,
+                dcPower:
+                  e.target.value,
+              })
+            }
+            placeholder="Optional"
+          />
+
+          <label>
+            DC 10–80% Charging Time
+            (minutes)
+          </label>
+
+          <input
+            type="number"
+            min="0"
+            value={
+              newVehicle
+                .fastCharge10to80
+            }
+            onChange={(e) =>
+              setNewVehicle({
+                ...newVehicle,
+                fastCharge10to80:
+                  e.target.value,
+              })
+            }
+            placeholder="Optional"
+          />
 
           <div
             style={{
-              fontSize:
-                "15px",
-              fontWeight:
-                400,
-              color:
-                VALUE_ORANGE,
+              display: "flex",
+              gap: 8,
+              marginTop: 18,
             }}
           >
+            <button
+              type="button"
+              className="saveButton"
+              onClick={addVehicle}
+            >
+              Add Vehicle
+            </button>
 
-            {Object.values(
-              weeklyStats
-            ).reduce(
-              (
-                sum,
-                value
-              ) =>
-                sum + value,
-              0
-            )}{" "}
-
-            sessions
-
+            <button
+              type="button"
+              className="deleteButton"
+              onClick={() => {
+                setShowVehicleForm(false);
+                setNewVehicle(
+                  emptyVehicleForm
+                );
+              }}
+            >
+              Cancel
+            </button>
           </div>
 
         </div>
-
-
-        <WeeklyActivityChart />
-
-      </div>
-
-
-      {/* ==================================================
-          WEEKLY SUMMARY
-          ================================================== */}
-
-      <div className="card">
-
-        <h3>
-          Weekly Summary
-        </h3>
-
-
-        <div className="tableContainer">
-
-          <table className="table">
-
-            <thead>
-
-              <tr>
-
-                <th
-                  style={{
-                    color:
-                      PRIMARY_TEXT,
-                    textAlign:
-                      "left",
-                  }}
-                >
-                  Day
-                </th>
-
-                <th
-                  style={{
-                    color:
-                      PRIMARY_TEXT,
-                    textAlign:
-                      "right",
-                  }}
-                >
-                  Sessions
-                </th>
-
-              </tr>
-
-            </thead>
-
-
-            <tbody>
-
-              {[
-                "Monday",
-                "Tuesday",
-                "Wednesday",
-                "Thursday",
-                "Friday",
-                "Saturday",
-                "Sunday",
-              ].map(
-                (day) => (
-
-                  <tr
-                    key={day}
-                  >
-
-                    <td
-                      style={{
-                        color:
-                          PRIMARY_TEXT,
-                        fontWeight:
-                          400,
-                    textAlign:
-                      "left",
-                      }}
-                    >
-                      {day}
-                    </td>
-
-                    <td
-                      style={{
-                        color:
-                          VALUE_ORANGE,
-                        fontWeight:
-                          400,
-                    textAlign:
-                      "right",
-                      }}
-                    >
-                      {
-                        weeklyStats[
-                          day
-                        ]
-                      }
-                    </td>
-
-                  </tr>
-
-                )
-              )}
-
-            </tbody>
-
-          </table>
-
-        </div>
-
-      </div>
-
-
-      {/* ==================================================
-          MONTHLY SUMMARY
-          ================================================== */}
-
-      <div className="card">
-
-        <h3>
-          Monthly Summary
-        </h3>
-
-
-        <div className="tableContainer">
-
-          <table className="table">
-
-            <thead>
-
-              <tr>
-
-                <th
-                  style={{
-                    color:
-                      PRIMARY_TEXT,
-                    textAlign:
-                      "left",
-                  }}
-                >
-                  Month
-                </th>
-
-                <th
-                  style={{
-                    color:
-                      PRIMARY_TEXT,
-                    textAlign:
-                      "right",
-                  }}
-                >
-                  Sessions
-                </th>
-
-                <th
-                  style={{
-                    color:
-                      PRIMARY_TEXT,
-                    textAlign:
-                      "right",
-                  }}
-                >
-                  Energy
-                </th>
-
-                <th
-                  style={{
-                    color:
-                      PRIMARY_TEXT,
-                    textAlign:
-                      "right",
-                  }}
-                >
-                  Spend
-                </th>
-
-              </tr>
-
-            </thead>
-
-
-            <tbody>
-
-              {monthlySummaryData.map(
-                (stats) => (
-
-                  <tr
-                    key={
-                      stats.month
-                    }
-                  >
-
-                    <td
-                      style={{
-                        color:
-                          PRIMARY_TEXT,
-                        fontWeight:
-                          400,
-                    textAlign:
-                      "left",
-                      }}
-                    >
-                      {
-                        stats.month
-                      }
-                    </td>
-
-                    <td
-                      style={{
-                        color:
-                          VALUE_ORANGE,
-                        fontWeight:
-                          400,
-                    textAlign:
-                      "right",
-                      }}
-                    >
-                      {
-                        stats.sessions
-                      }
-                    </td>
-
-                    <td
-                      style={{
-                        color:
-                          VALUE_ORANGE,
-                        fontWeight:
-                          400,
-                    textAlign:
-                      "right",
-                      }}
-                    >
-
-                      {stats.energy.toFixed(
-                        1
-                      )}{" "}
-
-                      kWh
-
-                    </td>
-
-                    <td
-                      style={{
-                        color:
-                          VALUE_ORANGE,
-                        fontWeight:
-                          400,
-                    textAlign:
-                      "right",
-                      }}
-                    >
-
-                      ₹
-                      {stats.cost.toLocaleString(
-                        undefined,
-                        {
-                          minimumFractionDigits:
-                            2,
-                          maximumFractionDigits:
-                            2,
-                        }
-                      )}
-
-                    </td>
-
-                  </tr>
-
-                )
-              )}
-
-            </tbody>
-
-          </table>
-
-        </div>
-
-      </div>
-
-
-      {/* ==================================================
-          VEHICLE STATISTICS
-          ================================================== */}
-
-      <div className="card">
-
-        <h3>
-          🚗 Vehicle Statistics
-        </h3>
-
-
-        {Object.keys(
-          vehicleStats
-        ).length === 0 ? (
-
-          <p
-            style={{
-              color:
-                SECONDARY_TEXT,
-            }}
-          >
-            No charging data
-            available.
-          </p>
-
-        ) : (
-
-          <div className="tableContainer">
-
-            <table className="table">
-
-              <thead>
-
-                <tr>
-
-                  <th
-                    style={{
-                      color:
-                        PRIMARY_TEXT,
-                    textAlign:
-                      "left",
-                    }}
-                  >
-                    Vehicle
-                  </th>
-
-                  <th
-                    style={{
-                      color:
-                        PRIMARY_TEXT,
-                    textAlign:
-                      "right",
-                    }}
-                  >
-                    Sessions
-                  </th>
-
-                  <th
-                    style={{
-                      color:
-                        PRIMARY_TEXT,
-                    textAlign:
-                      "right",
-                    }}
-                  >
-                    Energy
-                  </th>
-
-                  <th
-                    style={{
-                      color:
-                        PRIMARY_TEXT,
-                    textAlign:
-                      "right",
-                    }}
-                  >
-                    Spend
-                  </th>
-
-                </tr>
-
-              </thead>
-
-
-              <tbody>
-
-                {Object.entries(
-                  vehicleStats
-                ).map(
-                  (
-                    [
-                      vehicle,
-                      stats,
-                    ]
-                  ) => (
-
-                    <tr
-                      key={
-                        vehicle
-                      }
-                    >
-
-                      <td
-                        style={{
-                          color:
-                            PRIMARY_TEXT,
-                          fontWeight:
-                            400,
-                    textAlign:
-                      "left",
-                        }}
-                      >
-                        {vehicle}
-                      </td>
-
-                      <td
-                        style={{
-                          color:
-                            VALUE_ORANGE,
-                          fontWeight:
-                            400,
-                    textAlign:
-                      "right",
-                        }}
-                      >
-                        {
-                          stats.sessions
-                        }
-                      </td>
-
-                      <td
-                        style={{
-                          color:
-                            VALUE_ORANGE,
-                          fontWeight:
-                            400,
-                    textAlign:
-                      "right",
-                        }}
-                      >
-
-                        {stats.energy.toFixed(
-                          1
-                        )}{" "}
-
-                        kWh
-
-                      </td>
-
-                      <td
-                        style={{
-                          color:
-                            VALUE_ORANGE,
-                          fontWeight:
-                            400,
-                    textAlign:
-                      "right",
-                        }}
-                      >
-
-                        ₹
-                        {stats.cost.toLocaleString(
-                          undefined,
-                          {
-                            minimumFractionDigits:
-                              2,
-                            maximumFractionDigits:
-                              2,
-                          }
-                        )}
-
-                      </td>
-
-                    </tr>
-
-                  )
-                )}
-
-              </tbody>
-
-            </table>
-
-          </div>
-
-        )}
-
-      </div>
-
-
-      {/* ==================================================
-          STATION STATISTICS
-          ================================================== */}
-
-      <div className="card">
-
-        <h3>
-          🏢 Charging Station
-          Statistics
-        </h3>
-
-
-        {Object.keys(
-          stationStats
-        ).length === 0 ? (
-
-          <p
-            style={{
-              color:
-                SECONDARY_TEXT,
-            }}
-          >
-            No charging station
-            data available.
-          </p>
-
-        ) : (
-
-          <div className="tableContainer">
-
-            <table className="table">
-
-              <thead>
-
-                <tr>
-
-                  <th
-                    style={{
-                      color:
-                        PRIMARY_TEXT,
-                    textAlign:
-                      "left",
-                    }}
-                  >
-                    Station
-                  </th>
-
-                  <th
-                    style={{
-                      color:
-                        PRIMARY_TEXT,
-                    textAlign:
-                      "right",
-                    }}
-                  >
-                    Sessions
-                  </th>
-
-                  <th
-                    style={{
-                      color:
-                        PRIMARY_TEXT,
-                    textAlign:
-                      "right",
-                    }}
-                  >
-                    Energy
-                  </th>
-
-                  <th
-                    style={{
-                      color:
-                        PRIMARY_TEXT,
-                    textAlign:
-                      "right",
-                    }}
-                  >
-                    Spend
-                  </th>
-
-                </tr>
-
-              </thead>
-
-
-              <tbody>
-
-                {Object.entries(
-                  stationStats
-                ).map(
-                  (
-                    [
-                      station,
-                      stats,
-                    ]
-                  ) => (
-
-                    <tr
-                      key={
-                        station
-                      }
-                    >
-
-                      <td
-                        style={{
-                          color:
-                            PRIMARY_TEXT,
-                          fontWeight:
-                            400,
-                    textAlign:
-                      "left",
-                        }}
-                      >
-                        {station}
-                      </td>
-
-                      <td
-                        style={{
-                          color:
-                            VALUE_ORANGE,
-                          fontWeight:
-                            400,
-                    textAlign:
-                      "right",
-                        }}
-                      >
-                        {
-                          stats.sessions
-                        }
-                      </td>
-
-                      <td
-                        style={{
-                          color:
-                            VALUE_ORANGE,
-                          fontWeight:
-                            400,
-                    textAlign:
-                      "right",
-                        }}
-                      >
-
-                        {stats.energy.toFixed(
-                          1
-                        )}{" "}
-
-                        kWh
-
-                      </td>
-
-                      <td
-                        style={{
-                          color:
-                            VALUE_ORANGE,
-                          fontWeight:
-                            400,
-                    textAlign:
-                      "right",
-                        }}
-                      >
-
-                        ₹
-                        {stats.cost.toLocaleString(
-                          undefined,
-                          {
-                            minimumFractionDigits:
-                              2,
-                            maximumFractionDigits:
-                              2,
-                          }
-                        )}
-
-                      </td>
-
-                    </tr>
-
-                  )
-                )}
-
-              </tbody>
-
-            </table>
-
-          </div>
-
-        )}
-
-      </div>
-
-
-      {/* ==================================================
-          CHARGING TYPE DISTRIBUTION
-          ================================================== */}
-
-      <div
-        id="chargingTypeChart"
-        className="card"
-        style={{
-          position:
-            "relative",
-        }}
-      >
-
-        <ExpandButton
-          chart="chargingType"
-        />
-
-
-        <div
+      )}
+
+
+
+        <label>
+          Charging Location
+        </label>
+
+        <select
+          value={chargingLocation}
+          onChange={(e) =>
+            setChargingLocation(
+              e.target.value as
+                | "Home"
+                | "Public"
+            )
+          }
+          onBlur={handlePlannerAutosaveBlur}
+        >
+          <option value="Home">
+            🏠 Home
+          </option>
+
+          <option value="Public">
+            ⚡ Public Charging
+          </option>
+        </select>
+
+        <label>
+          Charging Type
+        </label>
+
+        <select
+          value={chargerId}
+          onChange={(e) =>
+            setChargerId(
+              e.target.value
+            )
+          }
+          onBlur={handlePlannerAutosaveBlur}
+        >
+          {allChargers.map(
+            (c) => (
+              <option
+                key={c.id}
+                value={c.id}
+              >
+                {c.name}
+              </option>
+            )
+          )}
+        </select>
+
+        <button
+          type="button"
+          className="saveButton"
+          onClick={() => {
+            setShowChargerForm(
+              !showChargerForm
+            );
+            setShowVehicleForm(false);
+          }}
           style={{
-            paddingRight:
-              "48px",
+            marginTop: 8,
+            marginBottom: 16,
           }}
         >
+          ＋ Or Add Custom Station
+        </button>
 
-          <h3
-            style={{
-              marginBottom:
-                "4px",
-            }}
-          >
-            🔌 Charging Type
-            Distribution
+      {showChargerForm && (
+        <div className="card">
+
+          <h3>
+            ⚡ Add Charger
           </h3>
 
-
           <p
             style={{
-              margin:
-                0,
-              fontSize:
-                "13px",
-              color:
-                SECONDARY_TEXT,
+              color: "#94a3b8",
+              fontSize: 13,
             }}
           >
-            Sessions by charger type
+            Add a charging setup
+            that isn't available
+            in the list.
           </p>
 
-        </div>
+          <label>
+            Charger Name
+          </label>
 
+          <input
+            value={
+              newCharger.name
+            }
+            onChange={(e) =>
+              setNewCharger({
+                ...newCharger,
+                name:
+                  e.target.value,
+              })
+            }
+            placeholder="e.g. Home Wallbox"
+          />
 
-        <ChargingTypeChart />
+          <label>
+            Charging Type
+          </label>
 
-      </div>
+          <select
+            value={
+              newCharger.type
+            }
+            onChange={(e) =>
+              setNewCharger({
+                ...newCharger,
+                type:
+                  e.target.value as
+                    | "AC"
+                    | "DC",
+              })
+            }
+          >
+            <option value="AC">
+              AC
+            </option>
 
+            <option value="DC">
+              DC
+            </option>
+          </select>
 
-      {/* ==================================================
-          YEARLY SUMMARY
-          ================================================== */}
+          <label>
+            Charging Power (kW)
+          </label>
 
-      <div className="card">
+          <input
+            type="number"
+            min="0"
+            step="0.1"
+            value={
+              newCharger.power
+            }
+            onChange={(e) =>
+              setNewCharger({
+                ...newCharger,
+                power:
+                  e.target.value,
+              })
+            }
+            placeholder="e.g. 7.2"
+          />
 
-        <h3>
-          📅 Yearly Summary
-        </h3>
-
-
-        <div className="tableContainer">
-
-          <table className="table">
-
-            <thead>
-
-              <tr>
-
-                <th
-                  style={{
-                    color:
-                      PRIMARY_TEXT,
-                    textAlign:
-                      "left",
-                  }}
-                >
-                  Year
-                </th>
-
-                <th
-                  style={{
-                    color:
-                      PRIMARY_TEXT,
-                    textAlign:
-                      "right",
-                  }}
-                >
-                  Sessions
-                </th>
-
-                <th
-                  style={{
-                    color:
-                      PRIMARY_TEXT,
-                    textAlign:
-                      "right",
-                  }}
-                >
-                  Energy
-                </th>
-
-                <th
-                  style={{
-                    color:
-                      PRIMARY_TEXT,
-                    textAlign:
-                      "right",
-                  }}
-                >
-                  Spend
-                </th>
-
-              </tr>
-
-            </thead>
-
-
-            <tbody>
-
-              {yearlySummaryData.map(
-                (stats) => (
-
-                  <tr
-                    key={
-                      stats.year
-                    }
-                  >
-
-                    <td
-                      style={{
-                        color:
-                          PRIMARY_TEXT,
-                        fontWeight:
-                          400,
-                    textAlign:
-                      "left",
-                      }}
-                    >
-                      {stats.year}
-                    </td>
-
-                    <td
-                      style={{
-                        color:
-                          VALUE_ORANGE,
-                        fontWeight:
-                          400,
-                    textAlign:
-                      "right",
-                      }}
-                    >
-                      {
-                        stats.sessions
-                      }
-                    </td>
-
-                    <td
-                      style={{
-                        color:
-                          VALUE_ORANGE,
-                        fontWeight:
-                          400,
-                    textAlign:
-                      "right",
-                      }}
-                    >
-
-                      {stats.energy.toFixed(
-                        1
-                      )}{" "}
-
-                      kWh
-
-                    </td>
-
-                    <td
-                      style={{
-                        color:
-                          VALUE_ORANGE,
-                        fontWeight:
-                          400,
-                    textAlign:
-                      "right",
-                      }}
-                    >
-
-                      ₹
-                      {stats.cost.toLocaleString(
-                        undefined,
-                        {
-                          minimumFractionDigits:
-                            2,
-                          maximumFractionDigits:
-                            2,
-                        }
-                      )}
-
-                    </td>
-
-                  </tr>
-
-                )
-              )}
-
-            </tbody>
-
-          </table>
-
-        </div>
-
-      </div>
-
-
-      {/* ==================================================
-          RECENT SESSIONS
-          ================================================== */}
-
-      <div className="card">
-
-        <h3>
-          📝 Recent Charging
-          Sessions
-        </h3>
-
-
-        {sessions.length ===
-        0 ? (
-
-          <p
+          <div
             style={{
-              color:
-                SECONDARY_TEXT,
+              display: "flex",
+              gap: 8,
+              marginTop: 18,
             }}
           >
-            No charging sessions
-            found.
-          </p>
+            <button
+              type="button"
+              className="saveButton"
+              onClick={addCharger}
+            >
+              Add Charger
+            </button>
 
-        ) : (
-
-          <div className="tableContainer">
-
-            <table className="table">
-
-              <thead>
-
-                <tr>
-
-                  <th
-                    style={{
-                      color:
-                        PRIMARY_TEXT,
-                    textAlign:
-                      "right",
-                    }}
-                  >
-                    No.
-                  </th>
-
-                  <th
-                    style={{
-                      color:
-                        PRIMARY_TEXT,
-                    textAlign:
-                      "left",
-                    }}
-                  >
-                    Date
-                  </th>
-
-                  <th
-                    style={{
-                      color:
-                        PRIMARY_TEXT,
-                    textAlign:
-                      "left",
-                    }}
-                  >
-                    Vehicle
-                  </th>
-
-                  <th
-                    style={{
-                      color:
-                        PRIMARY_TEXT,
-                    textAlign:
-                      "left",
-                    }}
-                  >
-                    Station
-                  </th>
-
-                  <th
-                    style={{
-                      color:
-                        PRIMARY_TEXT,
-                    textAlign:
-                      "left",
-                    }}
-                  >
-                    Type
-                  </th>
-
-                  <th
-                    style={{
-                      color:
-                        PRIMARY_TEXT,
-                    textAlign:
-                      "right",
-                    }}
-                  >
-                    Energy
-                  </th>
-
-                  <th
-                    style={{
-                      color:
-                        PRIMARY_TEXT,
-                    textAlign:
-                      "right",
-                    }}
-                  >
-                    Cost
-                  </th>
-
-                </tr>
-
-              </thead>
-
-
-              <tbody>
-
-                {recentSessions
-                  .map(
-                    (
-                      session,
-                      index
-                    ) => (
-
-                      <tr
-                        key={
-                          session.id
-                        }
-                      >
-
-                        <td
-                          style={{
-                            color:
-                              VALUE_ORANGE,
-                            fontWeight:
-                              400,
-                    textAlign:
-                      "left",
-                          }}
-                        >
-                          {index + 1}
-                        </td>
-
-
-                        <td
-                          style={{
-                            color:
-                              PRIMARY_TEXT,
-                            fontWeight:
-                              400,
-                    textAlign:
-                      "right",
-                          }}
-                        >
-                          {
-                            session.date
-                          }
-                        </td>
-
-
-                        <td
-                          style={{
-                            color:
-                              PRIMARY_TEXT,
-                            fontWeight:
-                              400,
-                    textAlign:
-                      "right",
-                          }}
-                        >
-                          {
-                            session.vehicle
-                          }
-                        </td>
-
-
-                        <td
-                          style={{
-                            color:
-                              PRIMARY_TEXT,
-                            fontWeight:
-                              400,
-                    textAlign:
-                      "right",
-                          }}
-                        >
-                          {
-                            session.station ||
-                            "-"
-                          }
-                        </td>
-
-
-                        <td
-                          style={{
-                            color:
-                              PRIMARY_TEXT,
-                            fontWeight:
-                              400,
-                    textAlign:
-                      "right",
-                          }}
-                        >
-                          {
-                            session.charger
-                          }
-                        </td>
-
-
-                        <td
-                          style={{
-                            color:
-                              VALUE_ORANGE,
-                            fontWeight:
-                              400,
-                    textAlign:
-                      "right",
-                          }}
-                        >
-
-                          {session.energy.toFixed(
-                            1
-                          )}{" "}
-
-                          kWh
-
-                        </td>
-
-
-                        <td
-                          style={{
-                            color:
-                              VALUE_ORANGE,
-                            fontWeight:
-                              400,
-                    textAlign:
-                      "right",
-                          }}
-                        >
-
-                          ₹
-                          {session.cost.toLocaleString(
-                            undefined,
-                            {
-                              minimumFractionDigits:
-                                2,
-                              maximumFractionDigits:
-                                2,
-                            }
-                          )}
-
-                        </td>
-
-                      </tr>
-
-                    )
-                  )}
-
-              </tbody>
-
-            </table>
-
+            <button
+              type="button"
+              className="deleteButton"
+              onClick={() => {
+                setShowChargerForm(false);
+                setNewCharger(
+                  emptyChargerForm
+                );
+              }}
+            >
+              Cancel
+            </button>
           </div>
 
+        </div>
+      )}
+
+
+
+        {chargingLocation === "Home" && (
+          <>
+            <label>
+              State
+            </label>
+
+            <select
+              value={state}
+              onChange={(e) =>
+                setState(
+                  e.target.value
+                )
+              }
+              onBlur={handlePlannerAutosaveBlur}
+            >
+              {STATES.map(
+                (item) => (
+                  <option
+                    key={item}
+                    value={item}
+                  >
+                    {item}
+                  </option>
+                )
+              )}
+            </select>
+
+            <label>
+              Electricity Rate
+              (₹/kWh)
+            </label>
+
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={homeRate}
+              onChange={(e) =>
+                setHomeRate(
+                  Number(e.target.value)
+                )
+              }
+              onBlur={handlePlannerAutosaveBlur}
+            />
+
+            <p
+              style={{
+                color: "#94a3b8",
+                fontSize: 12,
+              }}
+            >
+              Default estimate for{" "}
+              {state}: ₹
+              {defaultHomeRate.toFixed(
+                2
+              )}
+              /kWh. You can change
+              this to match your
+              electricity bill.
+            </p>
+          </>
+        )}
+
+        {chargingLocation === "Public" && (
+          <>
+            <label>
+              Charging Station Rate
+              (₹/kWh)
+            </label>
+
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={publicRate}
+              onChange={(e) =>
+                setPublicRate(
+                  Number(e.target.value)
+                )
+              }
+              onBlur={handlePlannerAutosaveBlur}
+            />
+
+            <p
+              style={{
+                color: "#94a3b8",
+                fontSize: 12,
+              }}
+            >
+              Enter the rate shown by
+              the charging station or
+              charging network.
+            </p>
+          </>
+        )}
+
+        <label>
+          Current Battery (%)
+        </label>
+
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value={currentSOC}
+          onChange={(e) =>
+            setCurrentSOC(
+              Number(e.target.value)
+            )
+          }
+          onBlur={handlePlannerAutosaveBlur}
+        />
+
+        <p>
+          {currentSOC}%
+        </p>
+
+        <label>
+          Target Battery (%)
+        </label>
+
+        <input
+          type="range"
+          min={currentSOC}
+          max="100"
+          value={targetSOC}
+          onChange={(e) =>
+            setTargetSOC(
+              Number(e.target.value)
+            )
+          }
+          onBlur={handlePlannerAutosaveBlur}
+        />
+
+        <p>
+          {targetSOC}%
+        </p>
+
+        <div
+          className="buttonGroup"
+          style={{
+            marginTop: 16,
+          }}
+        >
+          <button
+            type="button"
+            className="dangerButton"
+            onClick={() =>
+              void resetPlannerForm()
+            }
+          >
+            🔄 Reset Planner
+          </button>
+        </div>
+
+        {draftStatus !== "idle" && (
+          <div
+            style={{
+              marginTop: "10px",
+              textAlign: "right",
+              fontSize: "13px",
+              color:
+                draftStatus === "error"
+                  ? "#dc2626"
+                  : "#6b7280",
+            }}
+          >
+            {draftStatus === "saving" &&
+              "Saving…"}
+
+            {draftStatus === "saved" &&
+              "✓ Saved"}
+
+            {draftStatus === "error" &&
+              "⚠ Draft save failed"}
+          </div>
         )}
 
       </div>
 
+      {/* =====================================================
+          ADD VEHICLE CARD
+          ===================================================== */}
 
-      {/* ==================================================
-          EXPANDED CHART MODAL
-          ================================================== */}
+      {/* =====================================================
+          ADD CHARGER CARD
+          ===================================================== */}
 
-      <ExpandedChartModal />
+      {/* =====================================================
+          KPIs
+          ===================================================== */}
+
+      <div className="kpiGrid">
+
+        <div className="kpiCard">
+          <h3>
+            Energy Required
+          </h3>
+
+          <h2>
+            {hasBatteryInformation
+              ? `${energyRequired.toFixed(
+                  1
+                )} kWh`
+              : "Unavailable"}
+          </h2>
+        </div>
+
+        <div className="kpiCard">
+          <h3>
+            Grid Energy
+          </h3>
+
+          <h2>
+            {hasBatteryInformation &&
+            chargerPower > 0
+              ? `${energyFromGrid.toFixed(
+                  1
+                )} kWh`
+              : "Unavailable"}
+          </h2>
+        </div>
+
+        <div className="kpiCard">
+          <h3>
+            Charging Efficiency
+          </h3>
+
+          <h2>
+            {hasBatteryInformation
+              ? `${(
+                  chargingEfficiency *
+                  100
+                ).toFixed(0)}%`
+              : "—"}
+          </h2>
+        </div>
+
+        <div className="kpiCard">
+          <h3>
+            Estimated Charging Time
+          </h3>
+
+          <h2>
+            {formatChargingTime(
+              chargingTimeMinutes
+            )}
+          </h2>
+        </div>
+
+        <div className="kpiCard">
+          <h3>
+            Rate
+          </h3>
+
+          <h2>
+            ₹
+            {activeRate.toFixed(2)}
+            /kWh
+          </h2>
+        </div>
+
+        <div className="kpiCard">
+          <h3>
+            Range Added
+          </h3>
+
+          <h2>
+            {vehicle &&
+            vehicle.efficiency > 0
+              ? `${rangeAdded.toFixed(
+                  0
+                )} km`
+              : "Unavailable"}
+          </h2>
+        </div>
+
+      </div>
+
+      <div
+        style={{
+          fontSize: "12px",
+          color: "#6b7280",
+          marginTop: "10px",
+          marginBottom: "30px",
+        }}
+      >
+        Charging time is an estimate based on the selected
+        vehicle, charger, battery level and available
+        manufacturer charging data. Actual charging time
+        can vary with battery temperature, charger conditions,
+        vehicle software, electrical supply and charging
+        taper at higher battery levels.
+      </div>
+
+      {/* =====================================================
+          COST
+          ===================================================== */}
+
+      <div className="card">
+
+        <h3>
+          Charging Cost
+        </h3>
+
+        <table className="table">
+
+          <tbody>
+
+            <tr>
+              <td>
+                Charging Location
+              </td>
+
+              <td>
+                {chargingLocation ===
+                "Home"
+                  ? "🏠 Home"
+                  : "⚡ Public"}
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                Rate Used
+              </td>
+
+              <td>
+                ₹
+                {activeRate.toFixed(
+                  2
+                )}
+                /kWh
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                Grid Energy Used
+              </td>
+
+              <td>
+                {hasBatteryInformation
+                  ? `${energyFromGrid.toFixed(
+                      1
+                    )} kWh`
+                  : "Unavailable"}
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                Energy Cost
+              </td>
+
+              <td>
+                {hasBatteryInformation
+                  ? `₹${totalCost.toFixed(
+                      2
+                    )}`
+                  : "Unavailable"}
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                Total Payable
+              </td>
+
+              <td>
+                {hasBatteryInformation ? (
+                  <strong>
+                    ₹
+                    {totalCost.toFixed(
+                      2
+                    )}
+                  </strong>
+                ) : (
+                  "Unavailable"
+                )}
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                Cost / km
+              </td>
+
+              <td>
+                {costPerKm > 0
+                  ? `₹${costPerKm.toFixed(
+                      2
+                    )}`
+                  : "Unavailable"}
+              </td>
+            </tr>
+
+          </tbody>
+
+        </table>
+
+        <p
+          style={{
+            color: "#64748b",
+            fontSize: 12,
+            marginTop: 12,
+          }}
+        >
+          {chargingLocation ===
+          "Home"
+            ? "Home charging uses the selected state's representative default rate. Your actual electricity bill may differ."
+            : "Public charging uses the station rate entered above. Check the station/network for the actual applicable price."}
+        </p>
+
+      </div>
+
+      {/* =====================================================
+          CHARGING SUMMARY
+          ===================================================== */}
+
+      <div className="card">
+
+        <h3>
+          Charging Summary
+        </h3>
+
+        <table className="table">
+
+          <tbody>
+
+            <tr>
+              <td>
+                Vehicle
+              </td>
+
+              <td>
+                {vehicle?.brand}{" "}
+                {vehicle?.model}
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                Battery Charge
+              </td>
+
+              <td>
+                {currentSOC}% →{" "}
+                {targetSOC}%
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                Charging Location
+              </td>
+
+              <td>
+                {chargingLocation}
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                Selected Charger
+              </td>
+
+              <td>
+                {charger?.name}
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                Effective Charging Speed
+              </td>
+
+              <td>
+                {chargerPower > 0
+                  ? `${chargerPower.toFixed(
+                      1
+                    )} kW`
+                  : "Unavailable"}
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                Energy Required
+              </td>
+
+              <td>
+                {hasBatteryInformation
+                  ? `${energyRequired.toFixed(
+                      1
+                    )} kWh`
+                  : "Unavailable"}
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                Energy From Grid
+              </td>
+
+              <td>
+                {hasBatteryInformation
+                  ? `${energyFromGrid.toFixed(
+                      1
+                    )} kWh`
+                  : "Unavailable"}
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                Charging Time
+              </td>
+
+              <td>
+                {formatChargingTime(
+                  chargingTimeMinutes
+                )}
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                Estimated Range Added
+              </td>
+
+              <td>
+                {vehicle &&
+                vehicle.efficiency > 0
+                  ? `${rangeAdded.toFixed(
+                      0
+                    )} km`
+                  : "Unavailable"}
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                Total Cost
+              </td>
+
+              <td>
+                {hasBatteryInformation
+                  ? `₹${totalCost.toFixed(
+                      2
+                    )}`
+                  : "Unavailable"}
+              </td>
+            </tr>
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+      {/* =====================================================
+          VEHICLE SPECIFICATIONS
+          ===================================================== */}
+
+      <div className="card">
+
+        <h3>
+          Selected Vehicle Specifications
+        </h3>
+
+        <div className="tableContainer">
+
+        <table className="table">
+
+          <tbody>
+
+            <tr>
+              <td>
+                Vehicle
+              </td>
+
+              <td>
+                {vehicle?.brand}{" "}
+                {vehicle?.model}
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                Battery Capacity
+              </td>
+
+              <td>
+                {vehicle?.battery > 0
+                  ? `${vehicle.battery} kWh`
+                  : "Not available"}
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                Efficiency
+              </td>
+
+              <td>
+                {vehicle?.efficiency > 0
+                  ? `${vehicle.efficiency} km/kWh`
+                  : "Not available"}
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                Claimed Range
+              </td>
+
+              <td>
+                {vehicle?.range > 0
+                  ? `${vehicle.range} km`
+                  : "Not available"}
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                AC Charging Limit
+              </td>
+
+              <td>
+                {vehicle?.acPower > 0
+                  ? `${vehicle.acPower} kW`
+                  : "Not available"}
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                DC Charging Limit
+              </td>
+
+              <td>
+                {vehicle?.dcPower > 0
+                  ? `${vehicle.dcPower} kW`
+                  : "Not available"}
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                DC 10–80% Charging Time
+              </td>
+
+              <td>
+              {(vehicle.fastCharge10to80 ?? 0) > 0
+  ? `${vehicle.fastCharge10to80} min`
+  : "Not available"}
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                Selected Charger
+              </td>
+
+              <td>
+                {charger?.name}
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                Charger Power
+              </td>
+
+              <td>
+                {charger?.power} kW
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                Effective Charging Speed
+              </td>
+
+              <td>
+                {chargerPower > 0
+                  ? `${chargerPower.toFixed(
+                      1
+                    )} kW`
+                  : "Not available"}
+              </td>
+            </tr>
+
+          </tbody>
+
+        </table>
+
+        </div>
 
       </div>
 
     </>
-
   );
-
 }
 
-
-export default Analytics;
+export default Planner;
