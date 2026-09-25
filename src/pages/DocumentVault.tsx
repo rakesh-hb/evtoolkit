@@ -163,6 +163,10 @@ export default function DocumentVault({
     setSavingVehicle,
   ] = useState(false);
 
+  const [vehicleSearch, setVehicleSearch] = useState("");
+  const [showVehicleSuggestions, setShowVehicleSuggestions] = useState(false);
+  const vehicleDropdownRef = useRef<HTMLDivElement | null>(null);
+
 
   /* =========================================================
      CUSTOM CATEGORIES
@@ -187,6 +191,50 @@ export default function DocumentVault({
     savingCategory,
     setSavingCategory,
   ] = useState(false);
+
+  const [categorySearch, setCategorySearch] = useState("");
+  const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
+  const categoryDropdownRef = useRef<HTMLDivElement | null>(null);
+
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      const target = event.target as Node;
+
+      if (
+        vehicleDropdownRef.current &&
+        !vehicleDropdownRef.current.contains(target)
+      ) {
+        setShowVehicleSuggestions(false);
+        setVehicleSearch("");
+      }
+
+      if (
+        categoryDropdownRef.current &&
+        !categoryDropdownRef.current.contains(target)
+      ) {
+        setShowCategorySuggestions(false);
+        setCategorySearch("");
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setShowVehicleSuggestions(false);
+        setShowCategorySuggestions(false);
+        setVehicleSearch("");
+        setCategorySearch("");
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
 
 
   /* =========================================================
@@ -420,6 +468,27 @@ export default function DocumentVault({
     ]);
 
 
+  const filteredVehicleOptions = useMemo(() => {
+    const query = vehicleSearch.trim().toLowerCase();
+
+    if (!query) return allVehicles;
+
+    return allVehicles.filter((vehicle) =>
+      vehicle.label.toLowerCase().includes(query)
+    );
+  }, [allVehicles, vehicleSearch]);
+
+  const filteredCategoryOptions = useMemo(() => {
+    const query = categorySearch.trim().toLowerCase();
+
+    if (!query) return allCategories;
+
+    return allCategories.filter((category) =>
+      category.toLowerCase().includes(query)
+    );
+  }, [allCategories, categorySearch]);
+
+
   /* =========================================================
      ADD CUSTOM VEHICLE
      ========================================================= */
@@ -486,6 +555,9 @@ export default function DocumentVault({
             vehicleName,
         })
       );
+
+      setVehicleSearch(vehicleName);
+      setShowVehicleSuggestions(false);
 
       setVehicleBrand(
         ""
@@ -580,6 +652,9 @@ export default function DocumentVault({
             created.name,
         })
       );
+
+      setCategorySearch(created.name);
+      setShowCategorySuggestions(false);
 
       setCategoryName(
         ""
@@ -1006,6 +1081,22 @@ export default function DocumentVault({
 
   return (
     <>
+      <style>{`
+        .documentVaultFileUpload input[type="file"]::file-selector-button {
+          background: #16a34a;
+          color: #ffffff;
+          border: none;
+          border-radius: 6px;
+          padding: 8px 14px;
+          margin-right: 10px;
+          cursor: pointer;
+          font-weight: 600;
+        }
+
+        .documentVaultFileUpload input[type="file"]::file-selector-button:hover {
+          background: #15803d;
+        }
+      `}</style>
       {subscriptionPlanLoading ? (
         <div
           style={{
@@ -1082,66 +1173,134 @@ export default function DocumentVault({
               style={{
                 display: "flex",
                 gap: "8px",
-                alignItems: "center",
+                alignItems: "flex-start",
               }}
             >
-
-              <select
-                value={
-                  form.vehicle
-                }
-                onBlur={handleAutosaveBlur}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    vehicle:
-                      e.target.value,
-                  })
-                }
-                style={{
-                  flex: 1,
-                }}
+              <div
+                ref={vehicleDropdownRef}
+                style={{ position: "relative", flex: 1 }}
               >
+                <input
+                  type="text"
+                  placeholder="Type vehicle name to search..."
+                  value={showVehicleSuggestions ? vehicleSearch : form.vehicle}
+                  onFocus={() => {
+                    setShowVehicleSuggestions(true);
+                    if (!vehicleSearch) setVehicleSearch(form.vehicle);
+                  }}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setVehicleSearch(value);
+                    setShowVehicleSuggestions(true);
+                    setForm((previous) => ({
+                      ...previous,
+                      vehicle: value,
+                    }));
+                  }}
+                  onBlur={handleAutosaveBlur}
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    paddingRight: "44px",
+                  }}
+                />
 
-                <option value="">
-                  Select Vehicle
-                </option>
+                <button
+                  type="button"
+                  aria-label="Show vehicle list"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setShowVehicleSuggestions((open) => !open);
+                    if (!showVehicleSuggestions) setVehicleSearch("");
+                  }}
+                  style={{
+                    position: "absolute",
+                    right: "6px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    width: "32px",
+                    height: "32px",
+                    border: "none",
+                    borderRadius: "6px",
+                    background: "#374151",
+                    color: "#f9fafb",
+                    cursor: "pointer",
+                    fontSize: "18px",
+                    lineHeight: 1,
+                    padding: 0,
+                  }}
+                >
+                  ▾
+                </button>
 
-                {allVehicles.map(
-                  (vehicle) => (
-                    <option
-                      key={
-                        vehicle.value
-                      }
-                      value={
-                        vehicle.value
-                      }
-                    >
-                      {
-                        vehicle.label
-                      }
-                    </option>
-                  )
+                {showVehicleSuggestions && (
+                  <div
+                    style={{
+                      marginTop: "4px",
+                      width: "100%",
+                      boxSizing: "border-box",
+                      background: "#1f2937",
+                      border: "1px solid #374151",
+                      borderRadius: "8px",
+                      maxHeight: "220px",
+                      overflowY: "auto",
+                      boxShadow: "0 8px 20px rgba(0,0,0,0.35)",
+                      zIndex: 100,
+                    }}
+                  >
+                    {filteredVehicleOptions.length > 0 ? (
+                      filteredVehicleOptions.map((vehicle) => (
+                        <button
+                          key={vehicle.value}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setForm((previous) => ({
+                              ...previous,
+                              vehicle: vehicle.value,
+                            }));
+                            setVehicleSearch(vehicle.value);
+                            setShowVehicleSuggestions(false);
+                          }}
+                          style={{
+                            display: "block",
+                            width: "100%",
+                            textAlign: "left",
+                            border: "none",
+                            borderBottom: "1px solid #374151",
+                            background: "transparent",
+                            color: "#f9fafb",
+                            padding: "10px 12px",
+                            cursor: "pointer",
+                          }}
+                        >
+                          {vehicle.label}
+                        </button>
+                      ))
+                    ) : (
+                      <div style={{ padding: "10px 12px", color: "#9ca3af", fontSize: "13px" }}>
+                        No matching vehicle found. Use ＋ Or Add Custom Vehicle to create one.
+                      </div>
+                    )}
+                  </div>
                 )}
-
-              </select>
-
+              </div>
 
               <button
                 type="button"
                 className="saveButton"
-                onClick={() =>
-                  setShowVehicleForm(
-                    (value) =>
-                      !value
-                  )
-                }
+                onClick={() => setShowVehicleForm((value) => !value)}
+                style={{
+                  whiteSpace: "nowrap",
+                  height: "44px",
+                  minHeight: "44px",
+                  boxSizing: "border-box",
+                  transform: "translateY(6px)",
+                }}
               >
-                ＋ Add Vehicle
+                ＋ Or Add Custom Vehicle
               </button>
-
             </div>
-
 
             {showVehicleForm && (
               <div
@@ -1254,66 +1413,134 @@ export default function DocumentVault({
               style={{
                 display: "flex",
                 gap: "8px",
-                alignItems: "center",
+                alignItems: "flex-start",
               }}
             >
-
-              <select
-                value={
-                  form.category
-                }
-                onBlur={handleAutosaveBlur}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    category:
-                      e.target.value,
-                  })
-                }
-                style={{
-                  flex: 1,
-                }}
+              <div
+                ref={categoryDropdownRef}
+                style={{ position: "relative", flex: 1 }}
               >
+                <input
+                  type="text"
+                  placeholder="Type category to search..."
+                  value={showCategorySuggestions ? categorySearch : form.category}
+                  onFocus={() => {
+                    setShowCategorySuggestions(true);
+                    if (!categorySearch) setCategorySearch(form.category);
+                  }}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setCategorySearch(value);
+                    setShowCategorySuggestions(true);
+                    setForm((previous) => ({
+                      ...previous,
+                      category: value,
+                    }));
+                  }}
+                  onBlur={handleAutosaveBlur}
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    paddingRight: "44px",
+                  }}
+                />
 
-                <option value="">
-                  Select Category
-                </option>
+                <button
+                  type="button"
+                  aria-label="Show category list"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setShowCategorySuggestions((open) => !open);
+                    if (!showCategorySuggestions) setCategorySearch("");
+                  }}
+                  style={{
+                    position: "absolute",
+                    right: "6px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    width: "32px",
+                    height: "32px",
+                    border: "none",
+                    borderRadius: "6px",
+                    background: "#374151",
+                    color: "#f9fafb",
+                    cursor: "pointer",
+                    fontSize: "18px",
+                    lineHeight: 1,
+                    padding: 0,
+                  }}
+                >
+                  ▾
+                </button>
 
-                {allCategories.map(
-                  (category) => (
-                    <option
-                      key={
-                        category
-                      }
-                      value={
-                        category
-                      }
-                    >
-                      {
-                        category
-                      }
-                    </option>
-                  )
+                {showCategorySuggestions && (
+                  <div
+                    style={{
+                      marginTop: "4px",
+                      width: "100%",
+                      boxSizing: "border-box",
+                      background: "#1f2937",
+                      border: "1px solid #374151",
+                      borderRadius: "8px",
+                      maxHeight: "220px",
+                      overflowY: "auto",
+                      boxShadow: "0 8px 20px rgba(0,0,0,0.35)",
+                      zIndex: 100,
+                    }}
+                  >
+                    {filteredCategoryOptions.length > 0 ? (
+                      filteredCategoryOptions.map((category) => (
+                        <button
+                          key={category}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setForm((previous) => ({
+                              ...previous,
+                              category,
+                            }));
+                            setCategorySearch(category);
+                            setShowCategorySuggestions(false);
+                          }}
+                          style={{
+                            display: "block",
+                            width: "100%",
+                            textAlign: "left",
+                            border: "none",
+                            borderBottom: "1px solid #374151",
+                            background: "transparent",
+                            color: "#f9fafb",
+                            padding: "10px 12px",
+                            cursor: "pointer",
+                          }}
+                        >
+                          {category}
+                        </button>
+                      ))
+                    ) : (
+                      <div style={{ padding: "10px 12px", color: "#9ca3af", fontSize: "13px" }}>
+                        No matching category found. Use ＋ Or Add Custom Category to create one.
+                      </div>
+                    )}
+                  </div>
                 )}
-
-              </select>
-
+              </div>
 
               <button
                 type="button"
                 className="saveButton"
-                onClick={() =>
-                  setShowCategoryForm(
-                    (value) =>
-                      !value
-                  )
-                }
+                onClick={() => setShowCategoryForm((value) => !value)}
+                style={{
+                  whiteSpace: "nowrap",
+                  height: "44px",
+                  minHeight: "44px",
+                  boxSizing: "border-box",
+                  transform: "translateY(6px)",
+                }}
               >
-                ＋ Create Category
+                ＋ Or Add Custom Category
               </button>
-
             </div>
-
 
             {showCategoryForm && (
               <div
@@ -1462,10 +1689,11 @@ export default function DocumentVault({
 
 
         <textarea
-          rows={3}
+          rows={4}
           value={
             form.notes
           }
+          placeholder="If you want to add a note, write it here..."
           onBlur={handleAutosaveBlur}
           onChange={(e) =>
             setForm({
@@ -1474,6 +1702,12 @@ export default function DocumentVault({
                 e.target.value,
             })
           }
+          style={{
+            width: "100%",
+            minHeight: "110px",
+            resize: "vertical",
+            boxSizing: "border-box",
+          }}
         />
 
 
@@ -1486,24 +1720,26 @@ export default function DocumentVault({
 
         {canUseFileUploads(subscriptionPlan) ? (
           <>
-            <ReceiptUploader
-              value={form.file}
-              fileName={form.attachment_name}
-              onChange={(file) => {
-                setForm({
-                  ...form,
-                  file,
-                });
-                handleAutosaveBlur();
-              }}
-              onFileNameChange={(attachment_name) => {
-                setForm({
-                  ...form,
-                  attachment_name,
-                });
-                handleAutosaveBlur();
-              }}
-            />
+            <div className="documentVaultFileUpload">
+              <ReceiptUploader
+                value={form.file}
+                fileName={form.attachment_name}
+                onChange={(file) => {
+                  setForm({
+                    ...form,
+                    file,
+                  });
+                  handleAutosaveBlur();
+                }}
+                onFileNameChange={(attachment_name) => {
+                  setForm({
+                    ...form,
+                    attachment_name,
+                  });
+                  handleAutosaveBlur();
+                }}
+              />
+            </div>
 
             <p
               style={{

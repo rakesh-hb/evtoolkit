@@ -727,6 +727,23 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
 
   return (
     <>
+      <style>{`
+        .tyreHistoryFileUpload input[type="file"]::file-selector-button {
+          background: #16a34a;
+          color: #ffffff;
+          border: none;
+          border-radius: 6px;
+          padding: 8px 14px;
+          margin-right: 10px;
+          cursor: pointer;
+          font-weight: 600;
+        }
+
+        .tyreHistoryFileUpload input[type="file"]::file-selector-button:hover {
+          background: #15803d;
+        }
+      `}</style>
+
       <div
         style={{
           position: "relative",
@@ -1004,10 +1021,11 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
 
 
         <textarea
-          rows={3}
+          rows={4}
           value={
             form.notes
           }
+          placeholder="If you want to add a note, write it here..."
           onBlur={handleAutosaveBlur}
           onChange={(e) =>
             setForm({
@@ -1016,6 +1034,12 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
                 e.target.value,
             })
           }
+          style={{
+            width: "100%",
+            minHeight: "110px",
+            resize: "vertical",
+            boxSizing: "border-box",
+          }}
         />
 
 
@@ -1028,24 +1052,26 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
 
         {canUseFileUploads(subscriptionPlan) ? (
           <>
-            <ReceiptUploader
-              value={form.receipt}
-              fileName={form.attachment_name}
-              onChange={(receipt) => {
-                setForm({
-                  ...form,
-                  receipt,
-                });
-                handleAutosaveBlur();
-              }}
-              onFileNameChange={(attachment_name) => {
-                setForm({
-                  ...form,
-                  attachment_name,
-                });
-                handleAutosaveBlur();
-              }}
-            />
+            <div className="tyreHistoryFileUpload">
+              <ReceiptUploader
+                value={form.receipt}
+                fileName={form.attachment_name}
+                onChange={(receipt) => {
+                  setForm({
+                    ...form,
+                    receipt,
+                  });
+                  handleAutosaveBlur();
+                }}
+                onFileNameChange={(attachment_name) => {
+                  setForm({
+                    ...form,
+                    attachment_name,
+                  });
+                  handleAutosaveBlur();
+                }}
+              />
+            </div>
 
             <p
               style={{

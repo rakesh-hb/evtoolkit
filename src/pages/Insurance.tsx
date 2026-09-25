@@ -6,6 +6,10 @@ import {
 } from "react";
 
 import type {
+  KeyboardEvent as ReactKeyboardEvent,
+} from "react";
+
+import type {
   InsuranceRecord,
 } from "../types/insurance";
 
@@ -179,6 +183,228 @@ const INSURANCE_ADDONS = [
 ];
 
 
+interface SearchableDropdownOption {
+  value: string;
+  label: string;
+}
+
+interface SearchableDropdownProps {
+  value: string;
+  options: SearchableDropdownOption[];
+  placeholder: string;
+  disabled?: boolean;
+  allowCustom?: boolean;
+  customLabel?: string;
+  onChange: (value: string) => void;
+}
+
+function SearchableDropdown({
+  value,
+  options,
+  placeholder,
+  disabled = false,
+  allowCustom = false,
+  customLabel = "Add custom value",
+  onChange,
+}: SearchableDropdownProps) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false);
+        setQuery("");
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+        setQuery("");
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+      return options;
+    }
+
+    return options.filter((option) =>
+      option.label.toLowerCase().includes(normalizedQuery)
+    );
+  }, [options, query]);
+
+  const hasExactMatch = options.some(
+    (option) =>
+      option.value.trim().toLowerCase() === query.trim().toLowerCase()
+  );
+
+  function openDropdown() {
+    if (disabled) return;
+
+    setOpen(true);
+
+    // Only clear the search when opening a closed dropdown.
+    // Re-clicking the field while it is already open must not erase
+    // the text the user is currently searching for.
+    if (!open) {
+      setQuery("");
+    }
+  }
+
+  function selectValue(nextValue: string) {
+    onChange(nextValue);
+    setQuery("");
+    setOpen(false);
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        position: "relative",
+        flex: 1,
+        minWidth: 0,
+      }}
+    >
+      <div style={{ position: "relative" }}>
+        <input
+          type="text"
+          value={open ? query : value}
+          placeholder={placeholder}
+          disabled={disabled}
+          onFocus={openDropdown}
+          onClick={openDropdown}
+          onChange={(event) => {
+            const nextValue = event.target.value;
+            setQuery(nextValue);
+            setOpen(true);
+            onChange("");
+          }}
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            paddingRight: "34px",
+          }}
+        />
+
+        {!disabled && (
+          <button
+            type="button"
+            aria-label="Open vehicle list"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={openDropdown}
+            style={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              width: "34px",
+              height: "100%",
+              border: "none",
+              background: "transparent",
+              color: "#6b7280",
+              cursor: "pointer",
+              fontSize: "12px",
+            }}
+          >
+            ▾
+          </button>
+        )}
+      </div>
+
+      {!disabled && open && (
+        <div
+          style={{
+            marginTop: "4px",
+            width: "100%",
+            boxSizing: "border-box",
+            background: "#1f2937",
+            border: "1px solid #374151",
+            borderRadius: "8px",
+            maxHeight: "220px",
+            overflowY: "auto",
+            boxShadow: "0 8px 20px rgba(0,0,0,0.35)",
+          }}
+        >
+          {filteredOptions.length > 0 ? (
+            filteredOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => selectValue(option.value)}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  border: "none",
+                  borderBottom: "1px solid #374151",
+                  background: "transparent",
+                  color: "#f9fafb",
+                  padding: "10px 12px",
+                  cursor: "pointer",
+                }}
+                onMouseEnter={(event) => {
+                  event.currentTarget.style.background = "#374151";
+                }}
+                onMouseLeave={(event) => {
+                  event.currentTarget.style.background = "transparent";
+                }}
+              >
+                {option.label}
+              </button>
+            ))
+          ) : allowCustom && query.trim() && !hasExactMatch ? (
+            <button
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => selectValue(query.trim())}
+              style={{
+                display: "block",
+                width: "100%",
+                textAlign: "left",
+                border: "none",
+                background: "transparent",
+                color: "#f9fafb",
+                padding: "10px 12px",
+                cursor: "pointer",
+              }}
+            >
+              ＋ {customLabel}: {query.trim()}
+            </button>
+          ) : (
+            <div
+              style={{
+                padding: "10px 12px",
+                color: "#9ca3af",
+                fontSize: "13px",
+              }}
+            >
+              No matching value found.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface InsuranceProps {
   onNavigate?: (page: string) => void;
 }
@@ -243,6 +469,47 @@ export default function Insurance({
     setAddingVehicle,
   ] = useState(false);
 
+  const [
+    vehicleSearch,
+    setVehicleSearch,
+  ] = useState("");
+
+  const [
+    showVehicleSuggestions,
+    setShowVehicleSuggestions,
+  ] = useState(false);
+
+  const vehicleDropdownRef =
+    useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      const target = event.target as Node;
+
+      if (
+        showVehicleSuggestions &&
+        vehicleDropdownRef.current &&
+        !vehicleDropdownRef.current.contains(target)
+      ) {
+        setShowVehicleSuggestions(false);
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setShowVehicleSuggestions(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [showVehicleSuggestions]);
+
   /*
    * =========================================================
    * AUTOSAVE
@@ -255,6 +522,8 @@ export default function Insurance({
   const autosaveTimerRef =
     useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Prevent an older save request from writing a stale draft after
+  // the user has already cleared the form.
   const skipAutosaveRef =
     useRef(true);
 
@@ -265,6 +534,31 @@ export default function Insurance({
     editingId !== null
       ? `insurance:${editingId}`
       : "insurance:new";
+
+  /*
+   * Do not try to persist an untouched Insurance form.
+   * Some Insurance form fields call the blur autosave handler even when
+   * the user has only clicked into and then out of an empty field.
+   * Service History tolerates that case, but Insurance draft persistence
+   * can reject an entirely empty draft. Once the user enters any actual
+   * value, normal autosave behavior applies.
+   */
+  function hasInsuranceDraftContent(draft: InsuranceRecord = form) {
+    return Boolean(
+      draft.vehicle.trim() ||
+      draft.company.trim() ||
+      draft.policy_number.trim() ||
+      draft.start_date.trim() ||
+      draft.expiry_date.trim() ||
+      draft.premium !== 0 ||
+      draft.idv !== 0 ||
+      draft.addons.trim() ||
+      draft.agent.trim() ||
+      draft.contact_number.trim() ||
+      draft.notes.trim() ||
+      draft.attachment_name.trim()
+    );
+  }
 
   /*
    * =========================================================
@@ -392,18 +686,14 @@ export default function Insurance({
         attachment: "",
       };
 
-      void saveFormDraft(
-        getDraftKey(),
-        draftData
-      )
-        .then(() => {
-          setDraftStatus("saved");
-        })
+      const savePromise = hasInsuranceDraftContent(draftData)
+        ? saveFormDraft(getDraftKey(), draftData)
+        : deleteFormDraft(getDraftKey());
+
+      void savePromise
+        .then(() => setDraftStatus("saved"))
         .catch((err) => {
-          console.error(
-            "Failed to autosave insurance draft:",
-            err
-          );
+          console.error("Failed to autosave insurance draft:", err);
           setDraftStatus("error");
         });
     }, 1000);
@@ -473,27 +763,67 @@ export default function Insurance({
    */
 
   const vehicleOptions = useMemo(() => {
-    const builtIn = vehicles.map(
-      (vehicle) => ({
-        key: `${vehicle.country}-${vehicle.id}`,
-        value: `${vehicle.brand} ${vehicle.model}`,
-        label: `${vehicle.brand} ${vehicle.model}`,
-      })
-    );
+    const builtInVehicles =
+      vehicles.map(
+        (vehicle) => ({
+          value:
+            `${vehicle.brand} ${vehicle.model}`,
+          label:
+            `${vehicle.brand} ${vehicle.model}`,
+        })
+      );
 
-    const custom = customVehicles.map(
-      (vehicle) => ({
-        key: `custom-${vehicle.id}`,
-        value: `${vehicle.brand} ${vehicle.model}`,
-        label: `${vehicle.brand} ${vehicle.model} (Custom)`,
-      })
-    );
+    const custom =
+      customVehicles.map(
+        (vehicle) => ({
+          value:
+            `${vehicle.brand} ${vehicle.model}`,
+          label:
+            `${vehicle.brand} ${vehicle.model}`,
+        })
+      );
 
-    return [
-      ...builtIn,
+    const combined = [
+      ...builtInVehicles,
       ...custom,
     ];
-  }, [customVehicles]);
+
+    const seen =
+      new Set<string>();
+
+    return combined.filter(
+      (vehicle) => {
+        const key =
+          vehicle.value
+            .trim()
+            .toLowerCase();
+
+        if (seen.has(key)) {
+          return false;
+        }
+
+        seen.add(key);
+
+        return true;
+      }
+    );
+  }, [
+    customVehicles,
+  ]);
+
+  const filteredVehicleOptions = useMemo(() => {
+    const query =
+      vehicleSearch.trim().toLowerCase();
+
+    if (!query) return vehicleOptions;
+
+    return vehicleOptions.filter((vehicle) =>
+      vehicle.label.toLowerCase().includes(query)
+    );
+  }, [
+    vehicleOptions,
+    vehicleSearch,
+  ]);
 
 
   /*
@@ -561,6 +891,14 @@ export default function Insurance({
           vehicle:
             vehicleName,
         })
+      );
+
+      setVehicleSearch(
+        vehicleName
+      );
+
+      setShowVehicleSuggestions(
+        false
       );
 
       setNewVehicle(
@@ -819,7 +1157,11 @@ export default function Insurance({
 
     const current = getSelectedAddons();
 
-    if (current.some((item) => item.toLowerCase() === addon.toLowerCase())) {
+    if (
+      current.some(
+        (item) => item.toLowerCase() === addon.toLowerCase()
+      )
+    ) {
       return;
     }
 
@@ -856,7 +1198,9 @@ export default function Insurance({
 
     if (autosaveTimerRef.current) {
       clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
     }
+
 
     skipAutosaveRef.current = true;
     draftLoadedRef.current = false;
@@ -873,6 +1217,8 @@ export default function Insurance({
     setSelectedAddon("");
     setShowAddVehicle(false);
     setNewVehicle({ ...emptyVehicleForm });
+    setVehicleSearch("");
+    setShowVehicleSuggestions(false);
     setDraftStatus("idle");
 
     window.setTimeout(() => {
@@ -889,10 +1235,7 @@ export default function Insurance({
    */
 
   function handleAutosaveBlur() {
-    if (
-      !draftLoadedRef.current ||
-      skipAutosaveRef.current
-    ) {
+    if (!draftLoadedRef.current || skipAutosaveRef.current) {
       return;
     }
 
@@ -900,25 +1243,21 @@ export default function Insurance({
       clearTimeout(autosaveTimerRef.current);
     }
 
+    setDraftStatus("saving");
+
     const draftData: InsuranceRecord = {
       ...form,
       attachment: "",
     };
 
-    setDraftStatus("saving");
+    const savePromise = hasInsuranceDraftContent(draftData)
+      ? saveFormDraft(getDraftKey(), draftData)
+      : deleteFormDraft(getDraftKey());
 
-    void saveFormDraft(
-      getDraftKey(),
-      draftData
-    )
-      .then(() => {
-        setDraftStatus("saved");
-      })
+    void savePromise
+      .then(() => setDraftStatus("saved"))
       .catch((err) => {
-        console.error(
-          "Failed to autosave insurance draft:",
-          err
-        );
+        console.error("Failed to autosave insurance draft:", err);
         setDraftStatus("error");
       });
   }
@@ -1056,6 +1395,10 @@ export default function Insurance({
       );
 
       setSelectedAddon("");
+      setVehicleSearch("");
+      setShowVehicleSuggestions(false);
+      setShowAddVehicle(false);
+      setNewVehicle({ ...emptyVehicleForm });
 
       setDraftStatus("idle");
 
@@ -1143,48 +1486,163 @@ export default function Insurance({
               }}
             >
 
-              <select
-                value={
-                  form.vehicle
-                }
-                onBlur={handleAutosaveBlur}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    vehicle:
-                      e.target.value,
-                  })
-                }
-                disabled={
-                  editingId !== null
-                }
-                style={{
-                  flex: 1,
-                }}
+              <div
+                ref={vehicleDropdownRef}
+                style={{ position: "relative", flex: 1 }}
               >
+                <input
+                  type="text"
+                  placeholder="Type vehicle name to search..."
+                  value={
+                    editingId !== null
+                      ? form.vehicle
+                      : vehicleSearch
+                  }
+                  disabled={editingId !== null}
+                  onFocus={() => {
+                    if (editingId === null) {
+                      setShowVehicleSuggestions(true);
+                    }
+                  }}
+                  onChange={(e) => {
+                    const value = e.target.value;
 
-                <option value="">
-                  Select Vehicle
-                </option>
+                    setVehicleSearch(value);
+                    setShowVehicleSuggestions(true);
 
-                {vehicleOptions.map(
-                  (vehicle) => (
-                    <option
-                      key={
-                        vehicle.key
-                      }
-                      value={
-                        vehicle.value
-                      }
+                    setForm((previous) => ({
+                      ...previous,
+                      vehicle: "",
+                    }));
+                  }}
+                  onBlur={(e) => {
+                    handleAutosaveBlur();
+
+                    const next =
+                      e.relatedTarget as Node | null;
+
+                    if (
+                      !next ||
+                      !vehicleDropdownRef.current?.contains(next)
+                    ) {
+                      setShowVehicleSuggestions(false);
+                    }
+                  }}
+                  style={{ paddingRight: "44px" }}
+                />
+
+                <button
+                  type="button"
+                  aria-label="Show vehicle list"
+                  disabled={editingId !== null}
+                  onClick={() => {
+                    if (editingId === null) {
+                      setShowVehicleSuggestions(
+                        (open) => !open
+                      );
+                    }
+                  }}
+                  style={{
+                    position: "absolute",
+                    right: "6px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    width: "32px",
+                    height: "32px",
+                    border: "none",
+                    borderRadius: "6px",
+                    background: "#374151",
+                    color: "#f9fafb",
+                    cursor:
+                      editingId === null
+                        ? "pointer"
+                        : "not-allowed",
+                    fontSize: "18px",
+                    lineHeight: 1,
+                    padding: 0,
+                  }}
+                >
+                  ▾
+                </button>
+
+                {editingId === null &&
+                  showVehicleSuggestions && (
+                    <div
+                      style={{
+                        position: "relative",
+                        width: "100%",
+                        zIndex: 100,
+                        background: "#1f2937",
+                        border: "1px solid #374151",
+                        borderRadius: "8px",
+                        maxHeight: "220px",
+                        overflowY: "auto",
+                        boxShadow:
+                          "0 8px 20px rgba(0,0,0,0.35)",
+                      }}
                     >
-                      {
-                        vehicle.label
-                      }
-                    </option>
-                  )
-                )}
+                      {filteredVehicleOptions.length > 0 ? (
+                        filteredVehicleOptions.map(
+                          (vehicle) => (
+                            <button
+                              key={vehicle.value}
+                              type="button"
+                              onClick={() => {
+                                setForm(
+                                  (previous) => ({
+                                    ...previous,
+                                    vehicle:
+                                      vehicle.value,
+                                  })
+                                );
 
-              </select>
+                                setVehicleSearch(
+                                  vehicle.value
+                                );
+
+                                setShowVehicleSuggestions(
+                                  false
+                                );
+                              }}
+                              style={{
+                                display: "block",
+                                width: "100%",
+                                textAlign: "left",
+                                border: "none",
+                                borderBottom:
+                                  "1px solid #374151",
+                                background: "transparent",
+                                color: "#f9fafb",
+                                padding: "10px 12px",
+                                cursor: "pointer",
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background =
+                                  "#374151";
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background =
+                                  "transparent";
+                              }}
+                            >
+                              {vehicle.label}
+                            </button>
+                          )
+                        )
+                      ) : (
+                        <div
+                          style={{
+                            padding: "10px 12px",
+                            color: "#9ca3af",
+                            fontSize: "13px",
+                          }}
+                        >
+                          No matching vehicle found. Use ＋ Or Add Custom Vehicle to create one.
+                        </div>
+                      )}
+                    </div>
+                  )}
+              </div>
 
               {editingId === null && (
                 <button
@@ -1192,132 +1650,84 @@ export default function Insurance({
                   className="saveButton"
                   onClick={() =>
                     setShowAddVehicle(
-                      (current) =>
-                        !current
+                      (value) => !value
                     )
                   }
                   style={{
-                    whiteSpace:
-                      "nowrap",
+                    whiteSpace: "nowrap",
                   }}
                 >
-                  ＋ Add Vehicle
+                  ＋ Or Add Custom Vehicle
                 </button>
               )}
 
             </div>
 
-
-            {/* ===============================================
-                ADD VEHICLE FORM
-                =============================================== */}
+            {editingId !== null && form.vehicle && (
+              <p
+                style={{
+                  fontSize: "12px",
+                  color: "#6b7280",
+                  marginTop: "6px",
+                }}
+              >
+                Selected vehicle: {form.vehicle}
+              </p>
+            )}
 
             {showAddVehicle &&
               editingId === null && (
-
                 <div
                   style={{
-                    marginTop:
-                      "12px",
-                    padding:
-                      "14px",
-                    border:
-                      "1px solid #e5e7eb",
-                    borderRadius:
-                      "8px",
-                    background:
-                      "#f8fafc",
+                    marginTop: "10px",
+                    padding: "12px",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "8px",
                   }}
                 >
-
-                  <strong>
-                    Add Custom Vehicle
-                  </strong>
-
                   <div
                     style={{
-                      display:
-                        "grid",
-                      gridTemplateColumns:
-                        "1fr 1fr",
-                      gap:
-                        "10px",
-                      marginTop:
-                        "12px",
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "8px",
                     }}
                   >
+                    <input
+                      type="text"
+                      placeholder="Brand"
+                      value={newVehicle.brand}
+                      onChange={(e) =>
+                        setNewVehicle({
+                          ...newVehicle,
+                          brand: e.target.value,
+                        })
+                      }
+                    />
 
-                    <div>
-                      <label>
-                        Brand
-                      </label>
-
-                      <input
-                        type="text"
-                        value={
-                          newVehicle.brand
-                        }
-                        placeholder="Tata"
-                        disabled={
-                          addingVehicle
-                        }
-                        onChange={(e) =>
-                          setNewVehicle({
-                            ...newVehicle,
-                            brand:
-                              e.target
-                                .value,
-                          })
-                        }
-                      />
-                    </div>
-
-
-                    <div>
-                      <label>
-                        Model
-                      </label>
-
-                      <input
-                        type="text"
-                        value={
-                          newVehicle.model
-                        }
-                        placeholder="Curvv EV"
-                        disabled={
-                          addingVehicle
-                        }
-                        onChange={(e) =>
-                          setNewVehicle({
-                            ...newVehicle,
-                            model:
-                              e.target
-                                .value,
-                          })
-                        }
-                      />
-                    </div>
-
+                    <input
+                      type="text"
+                      placeholder="Model"
+                      value={newVehicle.model}
+                      onChange={(e) =>
+                        setNewVehicle({
+                          ...newVehicle,
+                          model: e.target.value,
+                        })
+                      }
+                    />
                   </div>
 
-
                   <div
                     style={{
-                      display:
-                        "flex",
-                      gap:
-                        "8px",
-                      marginTop:
-                        "12px",
+                      display: "flex",
+                      gap: "8px",
+                      marginTop: "10px",
                     }}
                   >
-
                     <button
                       type="button"
                       className="saveButton"
-                      disabled={
-                        addingVehicle
-                      }
+                      disabled={addingVehicle}
                       onClick={() =>
                         void handleAddVehicle()
                       }
@@ -1327,28 +1737,27 @@ export default function Insurance({
                         : "Save Vehicle"}
                     </button>
 
-
                     <button
                       type="button"
-                      className="restoreButton"
-                      disabled={
-                        addingVehicle
-                      }
                       onClick={() => {
-                        setShowAddVehicle(
-                          false
-                        );
-
+                        setShowAddVehicle(false);
                         setNewVehicle(
                           emptyVehicleForm
                         );
                       }}
+                      style={{
+                        background: "#dc2626",
+                        color: "#ffffff",
+                        border: "none",
+                        borderRadius: "6px",
+                        padding: "10px 14px",
+                        cursor: "pointer",
+                        fontWeight: 600,
+                      }}
                     >
                       Cancel
                     </button>
-
                   </div>
-
                 </div>
               )}
 
@@ -1572,28 +1981,18 @@ export default function Insurance({
                 alignItems: "center",
               }}
             >
-              <select
-                value={selectedAddon}
-                onChange={(e) =>
-                  setSelectedAddon(e.target.value)
-                }
-                style={{
-                  flex: 1,
-                }}
-              >
-                <option value="">
-                  Select an add-on
-                </option>
 
-                {INSURANCE_ADDONS.map((addon) => (
-                  <option
-                    key={addon}
-                    value={addon}
-                  >
-                    {addon}
-                  </option>
-                ))}
-              </select>
+              <SearchableDropdown
+                value={selectedAddon}
+                placeholder="Select or type an add-on"
+                allowCustom
+                customLabel="Add custom add-on"
+                options={INSURANCE_ADDONS.map((addon) => ({
+                  value: addon,
+                  label: addon,
+                }))}
+                onChange={setSelectedAddon}
+              />
 
               <button
                 type="button"
@@ -1604,6 +2003,7 @@ export default function Insurance({
                 ＋ Add
               </button>
             </div>
+
 
             {getSelectedAddons().length > 0 && (
               <div
@@ -1716,10 +2116,11 @@ export default function Insurance({
         </label>
 
         <textarea
-          rows={3}
+          rows={4}
           value={
             form.notes
           }
+          placeholder="If you want to add a note, write it here..."
           onBlur={handleAutosaveBlur}
           onChange={(e) =>
             setForm({
@@ -1728,6 +2129,12 @@ export default function Insurance({
                 e.target.value,
             })
           }
+          style={{
+            width: "100%",
+            minHeight: "110px",
+            resize: "vertical",
+            boxSizing: "border-box",
+          }}
         />
 
 
@@ -1740,24 +2147,48 @@ export default function Insurance({
 
         {canUseFileUploads(subscriptionPlan) ? (
           <>
-            <ReceiptUploader
-              value={form.attachment}
-              fileName={form.attachment_name}
-              onChange={(attachment) => {
-                setForm({
-                  ...form,
-                  attachment,
-                });
-                handleAutosaveBlur();
-              }}
-              onFileNameChange={(attachment_name) => {
-                setForm({
-                  ...form,
-                  attachment_name,
-                });
-                handleAutosaveBlur();
-              }}
-            />
+            <style>{`
+              .insuranceFileUpload input[type="file"]::file-selector-button {
+                background: #16a34a;
+                color: #ffffff;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 14px;
+                margin-right: 10px;
+                cursor: pointer;
+                font-weight: 600;
+              }
+
+              .insuranceFileUpload input[type="file"]::file-selector-button:hover {
+                background: #15803d;
+              }
+
+              .insuranceFileUpload input[type="file"] {
+                cursor: pointer;
+              }
+            `}</style>
+            <div className="insuranceFileUpload">
+              <ReceiptUploader
+                value={form.attachment}
+                fileName={form.attachment_name}
+                onChange={(attachment) => {
+                  const nextForm = {
+                    ...form,
+                    attachment,
+                  };
+                  setForm(nextForm);
+                  handleAutosaveBlur();
+                }}
+                onFileNameChange={(attachment_name) => {
+                  const nextForm = {
+                    ...form,
+                    attachment_name,
+                  };
+                  setForm(nextForm);
+                  handleAutosaveBlur();
+                }}
+              />
+            </div>
 
             <p
               style={{

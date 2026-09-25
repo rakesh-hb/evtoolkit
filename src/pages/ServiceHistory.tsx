@@ -100,6 +100,12 @@ export default function ServiceHistory({
   const [showVehicleForm, setShowVehicleForm] =
     useState(false);
 
+  const [vehicleSearch, setVehicleSearch] =
+    useState("");
+
+  const [showVehicleSuggestions, setShowVehicleSuggestions] =
+    useState(false);
+
   const [vehicleBrand, setVehicleBrand] =
     useState("");
 
@@ -108,6 +114,61 @@ export default function ServiceHistory({
 
   const [savingVehicle, setSavingVehicle] =
     useState(false);
+
+  const [customServiceType, setCustomServiceType] =
+    useState("");
+
+  const [serviceSearch, setServiceSearch] =
+    useState("");
+
+  const [showServiceSuggestions, setShowServiceSuggestions] =
+    useState(false);
+
+  const [showCustomServiceForm, setShowCustomServiceForm] =
+    useState(false);
+
+  const vehicleDropdownRef =
+    useRef<HTMLDivElement | null>(null);
+
+  const serviceDropdownRef =
+    useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      const target = event.target as Node;
+
+      if (
+        showVehicleSuggestions &&
+        vehicleDropdownRef.current &&
+        !vehicleDropdownRef.current.contains(target)
+      ) {
+        setShowVehicleSuggestions(false);
+      }
+
+      if (
+        showServiceSuggestions &&
+        serviceDropdownRef.current &&
+        !serviceDropdownRef.current.contains(target)
+      ) {
+        setShowServiceSuggestions(false);
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+
+      setShowVehicleSuggestions(false);
+      setShowServiceSuggestions(false);
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [showVehicleSuggestions, showServiceSuggestions]);
 
 
   /* ============================================================
@@ -376,6 +437,17 @@ export default function ServiceHistory({
     ]);
 
 
+  const filteredVehicleOptions = useMemo(() => {
+    const query = vehicleSearch.trim().toLowerCase();
+
+    if (!query) return allVehicles;
+
+    return allVehicles.filter((vehicle) =>
+      vehicle.label.toLowerCase().includes(query)
+    );
+  }, [allVehicles, vehicleSearch]);
+
+
   /* ============================================================
      SERVICE OPTIONS
      ============================================================ */
@@ -452,6 +524,16 @@ export default function ServiceHistory({
     ? serviceOptions[selectedServiceCategory]
     : [];
 
+  const filteredServiceOptions = useMemo(() => {
+    const query = serviceSearch.trim().toLowerCase();
+
+    if (!query) return availableServices;
+
+    return availableServices.filter((service) =>
+      service.toLowerCase().includes(query)
+    );
+  }, [availableServices, serviceSearch]);
+
   /* ============================================================
      ADD CUSTOM VEHICLE
      ============================================================ */
@@ -490,6 +572,8 @@ export default function ServiceHistory({
         ...previous,
         vehicle: createdVehicle,
       }));
+      setVehicleSearch(createdVehicle);
+      setShowVehicleSuggestions(false);
 
       setVehicleBrand("");
       setVehicleModel("");
@@ -525,21 +609,24 @@ export default function ServiceHistory({
   function addServiceToForm() {
     const selectedService = selectedServiceToAdd.trim();
     const customDetail = otherServiceDetail.trim();
+    const customService = customServiceType.trim();
 
-    if (!selectedServiceCategory) return;
+    if (!selectedServiceCategory && !customService) return;
 
     const isOtherCategory = selectedServiceCategory === "Other Service";
 
     const service =
-      isOtherCategory
-        ? customDetail
-          ? `Other Service - ${customDetail}`
-          : ""
-        : selectedService === "Other"
+      customService
+        ? customService
+        : isOtherCategory
           ? customDetail
-            ? `${selectedServiceCategory} - Other - ${customDetail}`
+            ? `Other Service - ${customDetail}`
             : ""
-          : selectedService;
+          : selectedService === "Other"
+            ? customDetail
+              ? `${selectedServiceCategory} - Other - ${customDetail}`
+              : ""
+            : selectedService;
 
     if (!service) {
       alert("Please enter the custom service detail.");
@@ -559,6 +646,7 @@ export default function ServiceHistory({
 
     setSelectedServiceToAdd("");
     setOtherServiceDetail("");
+    setCustomServiceType("");
   }
 
   function removeServiceFromForm(serviceToRemove: string) {
@@ -636,9 +724,13 @@ export default function ServiceHistory({
     setVehicleModel("");
     setSelectedServiceToAdd("");
     setSelectedServiceCategory("");
-    setSelectedServiceCategory("");
-    setSelectedServiceToAdd("");
     setOtherServiceDetail("");
+    setCustomServiceType("");
+    setServiceSearch("");
+    setShowServiceSuggestions(false);
+    setShowCustomServiceForm(false);
+    setVehicleSearch("");
+    setShowVehicleSuggestions(false);
     setDraftStatus("idle");
 
     window.setTimeout(() => {
@@ -833,10 +925,17 @@ export default function ServiceHistory({
       setForm(
         emptyRecord
       );
+      setVehicleSearch("");
+      setShowVehicleSuggestions(false);
 
       setSelectedServiceCategory("");
       setSelectedServiceToAdd("");
       setOtherServiceDetail("");
+      setCustomServiceType("");
+      setServiceSearch("");
+      setShowServiceSuggestions(false);
+      setShowCustomServiceForm(false);
+      setVehicleSearch("");
       setDraftStatus("idle");
 
       window.setTimeout(() => {
@@ -1062,180 +1161,226 @@ export default function ServiceHistory({
 
             <div
               style={{
-                display:
-                  "flex",
-                gap:
-                  "8px",
-                alignItems:
-                  "center",
+                display: "flex",
+                gap: "8px",
+                alignItems: "center",
               }}
             >
 
-              <select
-                value={
-                  form.vehicle
-                }
-                onBlur={handleAutosaveBlur}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    vehicle:
-                      e.target.value,
-                  })
-                }
-                disabled={
-                  editingId !== null
-                }
-                style={{
-                  flex: 1,
-                }}
+              <div
+                ref={vehicleDropdownRef}
+                style={{ position: "relative", flex: 1 }}
               >
+                <input
+                  type="text"
+                  placeholder="Type vehicle name to search..."
+                  value={editingId !== null ? form.vehicle : vehicleSearch}
+                  disabled={editingId !== null}
+                  onFocus={() => {
+                    if (editingId === null) {
+                      setShowVehicleSuggestions(true);
+                    }
+                  }}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setVehicleSearch(value);
+                    setShowVehicleSuggestions(true);
 
-                <option value="">
-                  Select Vehicle
-                </option>
+                    setForm((previous) => ({
+                      ...previous,
+                      vehicle: "",
+                    }));
+                  }}
+                  onBlur={(e) => {
+                    handleAutosaveBlur();
+                    const next = e.relatedTarget as Node | null;
+                    if (!next || !vehicleDropdownRef.current?.contains(next)) {
+                      setShowVehicleSuggestions(false);
+                    }
+                  }}
+                  style={{ paddingRight: "44px" }}
+                />
 
-                {allVehicles.map(
-                  (vehicle) => (
-                    <option
-                      key={
-                        vehicle.value
-                      }
-                      value={
-                        vehicle.value
-                      }
+                <button
+                  type="button"
+                  aria-label="Show vehicle list"
+                  disabled={editingId !== null}
+                  onClick={() => {
+                    if (editingId === null) {
+                      setShowVehicleSuggestions((open) => !open);
+                    }
+                  }}
+                  style={{
+                    position: "absolute",
+                    right: "6px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    width: "32px",
+                    height: "32px",
+                    border: "none",
+                    borderRadius: "6px",
+                    background: "#374151",
+                    color: "#f9fafb",
+                    cursor: editingId === null ? "pointer" : "not-allowed",
+                    fontSize: "18px",
+                    lineHeight: 1,
+                    padding: 0,
+                  }}
+                >
+                  ▾
+                </button>
+
+                {editingId === null &&
+                  showVehicleSuggestions && (
+                    <div
+                      style={{
+                        position: "relative",
+                        width: "100%",
+                        zIndex: 100,
+                        background: "#1f2937",
+                        border: "1px solid #374151",
+                        borderRadius: "8px",
+                        maxHeight: "220px",
+                        overflowY: "auto",
+                        boxShadow: "0 8px 20px rgba(0,0,0,0.35)",
+                      }}
                     >
-                      {
-                        vehicle.label
-                      }
-                    </option>
-                  )
-                )}
-
-              </select>
-
+                      {filteredVehicleOptions.length > 0 ? (
+                        filteredVehicleOptions.map((vehicle) => (
+                          <button
+                            key={vehicle.value}
+                            type="button"
+                            onClick={() => {
+                              setForm((previous) => ({
+                                ...previous,
+                                vehicle: vehicle.value,
+                              }));
+                              setVehicleSearch(vehicle.value);
+                              setShowVehicleSuggestions(false);
+                            }}
+                            style={{
+                              display: "block",
+                              width: "100%",
+                              textAlign: "left",
+                              border: "none",
+                              borderBottom: "1px solid #374151",
+                              background: "transparent",
+                              color: "#f9fafb",
+                              padding: "10px 12px",
+                              cursor: "pointer",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = "#374151";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = "transparent";
+                            }}
+                          >
+                            {vehicle.label}
+                          </button>
+                        ))
+                      ) : (
+                        <div
+                          style={{
+                            padding: "10px 12px",
+                            color: "#9ca3af",
+                            fontSize: "13px",
+                          }}
+                        >
+                          No matching vehicle found. Use ＋ Or Add Custom Vehicle to create one.
+                        </div>
+                      )}
+                    </div>
+                  )}
+              </div>
 
               {editingId === null && (
                 <button
                   type="button"
                   className="saveButton"
-                  onClick={() =>
-                    setShowVehicleForm(
-                      (value) =>
-                        !value
-                    )
-                  }
+                  onClick={() => setShowVehicleForm((value) => !value)}
                 >
-                  ＋ Add Vehicle
+                  ＋ Or Add Custom Vehicle
                 </button>
               )}
 
             </div>
 
+            {editingId !== null && form.vehicle && (
+              <p style={{ fontSize: "12px", color: "#6b7280", marginTop: "6px" }}>
+                Selected vehicle: {form.vehicle}
+              </p>
+            )}
 
-            {showVehicleForm &&
-              editingId === null && (
+            {showVehicleForm && editingId === null && (
+              <div
+                style={{
+                  marginTop: "10px",
+                  padding: "12px",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "8px",
+                }}
+              >
                 <div
                   style={{
-                    marginTop:
-                      "10px",
-                    padding:
-                      "12px",
-                    border:
-                      "1px solid #e5e7eb",
-                    borderRadius:
-                      "8px",
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "8px",
                   }}
                 >
+                  <input
+                    type="text"
+                    placeholder="Brand"
+                    value={vehicleBrand}
+                    onChange={(e) => setVehicleBrand(e.target.value)}
+                  />
 
-                  <div
-                    style={{
-                      display:
-                        "grid",
-                      gridTemplateColumns:
-                        "1fr 1fr",
-                      gap:
-                        "8px",
-                    }}
-                  >
-
-                    <input
-                      type="text"
-                      placeholder="Brand"
-                      value={
-                        vehicleBrand
-                      }
-                      onChange={(e) =>
-                        setVehicleBrand(
-                          e.target.value
-                        )
-                      }
-                    />
-
-                    <input
-                      type="text"
-                      placeholder="Model"
-                      value={
-                        vehicleModel
-                      }
-                      onChange={(e) =>
-                        setVehicleModel(
-                          e.target.value
-                        )
-                      }
-                    />
-
-                  </div>
-
-
-                  <div
-                    style={{
-                      display:
-                        "flex",
-                      gap:
-                        "8px",
-                      marginTop:
-                        "10px",
-                    }}
-                  >
-
-                    <button
-                      type="button"
-                      className="saveButton"
-                      disabled={
-                        savingVehicle
-                      }
-                      onClick={() =>
-                        void handleAddVehicle()
-                      }
-                    >
-                      {savingVehicle
-                        ? "Saving..."
-                        : "Save Vehicle"}
-                    </button>
-
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowVehicleForm(
-                          false
-                        );
-                        setVehicleBrand(
-                          ""
-                        );
-                        setVehicleModel(
-                          ""
-                        );
-                      }}
-                    >
-                      Cancel
-                    </button>
-
-                  </div>
-
+                  <input
+                    type="text"
+                    placeholder="Model"
+                    value={vehicleModel}
+                    onChange={(e) => setVehicleModel(e.target.value)}
+                  />
                 </div>
-              )}
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    marginTop: "10px",
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="saveButton"
+                    disabled={savingVehicle}
+                    onClick={() => void handleAddVehicle()}
+                  >
+                    {savingVehicle ? "Saving..." : "Save Vehicle"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowVehicleForm(false);
+                      setVehicleBrand("");
+                      setVehicleModel("");
+                    }}
+                    style={{
+                      background: "#dc2626",
+                      color: "#ffffff",
+                      border: "none",
+                      borderRadius: "6px",
+                      padding: "10px 14px",
+                      cursor: "pointer",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
 
           </div>
 
@@ -1290,9 +1435,13 @@ export default function ServiceHistory({
               <select
                 value={selectedServiceCategory}
                 onChange={(e) => {
-                  setSelectedServiceCategory(e.target.value as keyof typeof serviceOptions | "");
+                  const category =
+                    e.target.value as keyof typeof serviceOptions | "";
+                  setSelectedServiceCategory(category);
                   setSelectedServiceToAdd("");
                   setOtherServiceDetail("");
+                  setServiceSearch("");
+                  setShowServiceSuggestions(false);
                 }}
                 onBlur={handleAutosaveBlur}
                 style={{ flex: 1 }}
@@ -1304,21 +1453,132 @@ export default function ServiceHistory({
               </select>
 
               {selectedServiceCategory !== "Other Service" && (
-                <select
-                  value={selectedServiceToAdd}
-                  onChange={(e) => {
-                    setSelectedServiceToAdd(e.target.value);
-                    if (e.target.value !== "Other") setOtherServiceDetail("");
-                  }}
-                  onBlur={handleAutosaveBlur}
-                  disabled={!selectedServiceCategory}
-                  style={{ flex: 1 }}
+                <div
+                  ref={serviceDropdownRef}
+                  style={{ position: "relative", flex: 1 }}
                 >
-                  <option value="">Select Service</option>
-                  {availableServices.map((service) => (
-                    <option key={service} value={service}>{service}</option>
-                  ))}
-                </select>
+                  <input
+                    type="text"
+                    placeholder={
+                      selectedServiceCategory
+                        ? "Type service name to search..."
+                        : "Select service type first"
+                    }
+                    value={serviceSearch}
+                    disabled={!selectedServiceCategory}
+                    onFocus={() => {
+                      if (selectedServiceCategory) {
+                        setShowServiceSuggestions(true);
+                      }
+                    }}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setServiceSearch(value);
+                      setSelectedServiceToAdd("");
+                      setShowServiceSuggestions(true);
+                    }}
+                    onBlur={(e) => {
+                      handleAutosaveBlur();
+                      const next = e.relatedTarget as Node | null;
+                      if (!next || !serviceDropdownRef.current?.contains(next)) {
+                        setShowServiceSuggestions(false);
+                      }
+                    }}
+                    style={{ paddingRight: "44px" }}
+                  />
+
+                  <button
+                    type="button"
+                    aria-label="Show service list"
+                    disabled={!selectedServiceCategory}
+                    onClick={() => {
+                      if (selectedServiceCategory) {
+                        setShowServiceSuggestions((open) => !open);
+                      }
+                    }}
+                    style={{
+                      position: "absolute",
+                      right: "6px",
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      width: "32px",
+                      height: "32px",
+                      border: "none",
+                      borderRadius: "6px",
+                      background: "#374151",
+                      color: "#f9fafb",
+                      cursor: selectedServiceCategory ? "pointer" : "not-allowed",
+                      fontSize: "18px",
+                      lineHeight: 1,
+                      padding: 0,
+                    }}
+                  >
+                    ▾
+                  </button>
+
+                  {selectedServiceCategory &&
+                    showServiceSuggestions && (
+                      <div
+                        style={{
+                          position: "relative",
+                          width: "100%",
+                          zIndex: 100,
+                          background: "#1f2937",
+                          border: "1px solid #374151",
+                          borderRadius: "8px",
+                          maxHeight: "220px",
+                          overflowY: "auto",
+                          boxShadow: "0 8px 20px rgba(0,0,0,0.35)",
+                        }}
+                      >
+                        {filteredServiceOptions.length > 0 ? (
+                          filteredServiceOptions.map((service) => (
+                            <button
+                              key={service}
+                              type="button"
+                              onClick={() => {
+                                setSelectedServiceToAdd(service);
+                                setServiceSearch(service);
+                                setShowServiceSuggestions(false);
+                                if (service !== "Other") {
+                                  setOtherServiceDetail("");
+                                }
+                              }}
+                              style={{
+                                display: "block",
+                                width: "100%",
+                                textAlign: "left",
+                                border: "none",
+                                borderBottom: "1px solid #374151",
+                                background: "transparent",
+                                color: "#f9fafb",
+                                padding: "10px 12px",
+                                cursor: "pointer",
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = "#374151";
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = "transparent";
+                              }}
+                            >
+                              {service}
+                            </button>
+                          ))
+                        ) : (
+                          <div
+                            style={{
+                              padding: "10px 12px",
+                              color: "#9ca3af",
+                              fontSize: "13px",
+                            }}
+                          >
+                            No matching service found. Use ＋ Or Add Custom Service.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                </div>
               )}
 
               {(selectedServiceCategory === "Other Service" || selectedServiceToAdd === "Other") && (
@@ -1336,17 +1596,93 @@ export default function ServiceHistory({
               <button
                 type="button"
                 className="saveButton"
+                onClick={() => {
+                  setShowCustomServiceForm((value) => !value);
+                  setCustomServiceType("");
+                }}
+              >
+                ＋ Or Add Custom Service
+              </button>
+
+              <button
+                type="button"
+                className="saveButton"
                 disabled={
-                  !selectedServiceCategory ||
-                  (selectedServiceCategory !== "Other Service" && !selectedServiceToAdd) ||
-                  ((selectedServiceCategory === "Other Service" || selectedServiceToAdd === "Other") &&
-                    !otherServiceDetail.trim())
+                  (!selectedServiceCategory && !customServiceType.trim()) ||
+                  (selectedServiceCategory &&
+                    selectedServiceCategory !== "Other Service" &&
+                    !selectedServiceToAdd &&
+                    !customServiceType.trim()) ||
+                  ((selectedServiceCategory === "Other Service" ||
+                    selectedServiceToAdd === "Other") &&
+                    !otherServiceDetail.trim() &&
+                    !customServiceType.trim())
                 }
                 onClick={addServiceToForm}
               >
                 ＋ Add
               </button>
             </div>
+
+            {showCustomServiceForm && (
+              <div
+                style={{
+                  marginTop: "10px",
+                  padding: "12px",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "8px",
+                }}
+              >
+                <input
+                  type="text"
+                  value={customServiceType}
+                  onChange={(e) => setCustomServiceType(e.target.value)}
+                  onBlur={handleAutosaveBlur}
+                  placeholder="Enter custom service name"
+                  aria-label="Custom service name"
+                  style={{ width: "100%" }}
+                />
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    marginTop: "10px",
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="saveButton"
+                    disabled={!customServiceType.trim()}
+                    onClick={() => {
+                      addServiceToForm();
+                      setShowCustomServiceForm(false);
+                    }}
+                  >
+                    Save Custom Service
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCustomServiceForm(false);
+                      setCustomServiceType("");
+                    }}
+                    style={{
+                      background: "#dc2626",
+                      color: "#ffffff",
+                      border: "none",
+                      borderRadius: "6px",
+                      padding: "10px 14px",
+                      cursor: "pointer",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
 
             {selectedServiceTypes.length > 0 && (
               <div
@@ -1479,10 +1815,11 @@ export default function ServiceHistory({
         </label>
 
         <textarea
-          rows={3}
+          rows={4}
           value={
             form.notes
           }
+          placeholder="If you want to add a note, write it here..."
           onBlur={handleAutosaveBlur}
           onChange={(e) =>
             setForm({
@@ -1491,6 +1828,12 @@ export default function ServiceHistory({
                 e.target.value,
             })
           }
+          style={{
+            width: "100%",
+            minHeight: "110px",
+            resize: "vertical",
+            boxSizing: "border-box",
+          }}
         />
 
 
@@ -1507,7 +1850,24 @@ export default function ServiceHistory({
 
         {canUseFileUploads(subscriptionPlan) ? (
           <>
-            <ReceiptUploader
+            <style>{`
+              .serviceHistoryFileUpload input[type="file"]::file-selector-button {
+                background: #16a34a;
+                color: #ffffff;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 14px;
+                margin-right: 10px;
+                cursor: pointer;
+                font-weight: 600;
+              }
+
+              .serviceHistoryFileUpload input[type="file"]::file-selector-button:hover {
+                background: #15803d;
+              }
+            `}</style>
+            <div className="serviceHistoryFileUpload">
+              <ReceiptUploader
               value={form.attachment}
               fileName={form.attachment_name}
               onChange={(attachment) => {
@@ -1525,6 +1885,7 @@ export default function ServiceHistory({
                 handleAutosaveBlur();
               }}
             />
+            </div>
 
             <p
               style={{

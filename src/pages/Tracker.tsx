@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   getChargingSessions,
@@ -19,6 +19,11 @@ import {
 } from "../services/formDraftService";
 
 import { vehicles } from "../data/vehicles";
+import {
+  getCustomVehicles,
+  addCustomVehicle,
+  type CustomVehicleRecord,
+} from "../services/customVehicleService";
 import ReceiptUploader from "../components/ReceiptUploader";
 import UserDetails from "../components/UserDetails";
 import {
@@ -200,6 +205,75 @@ function Tracker({ onNavigate }: TrackerProps) {
   const [savingStation, setSavingStation] =
     useState(false);
 
+  /* =========================================================
+   * SEARCHABLE VEHICLE / STATION DROPDOWNS
+   * ========================================================= */
+  const [customVehicles, setCustomVehicles] =
+    useState<CustomVehicleRecord[]>([]);
+
+  const [vehicleSearch, setVehicleSearch] =
+    useState("");
+  const [showVehicleSuggestions, setShowVehicleSuggestions] =
+    useState(false);
+  const vehicleDropdownRef =
+    useRef<HTMLDivElement | null>(null);
+
+  const [showVehicleForm, setShowVehicleForm] =
+    useState(false);
+  const [vehicleBrand, setVehicleBrand] =
+    useState("");
+  const [vehicleModel, setVehicleModel] =
+    useState("");
+  const [savingVehicle, setSavingVehicle] =
+    useState(false);
+
+  const [stationSearch, setStationSearch] =
+    useState("");
+  const [showStationSuggestions, setShowStationSuggestions] =
+    useState(false);
+  const stationDropdownRef =
+    useRef<HTMLDivElement | null>(null);
+
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      const target = event.target as Node;
+
+      if (
+        vehicleDropdownRef.current &&
+        !vehicleDropdownRef.current.contains(target)
+      ) {
+        setShowVehicleSuggestions(false);
+        setVehicleSearch("");
+      }
+
+      if (
+        stationDropdownRef.current &&
+        !stationDropdownRef.current.contains(target)
+      ) {
+        setShowStationSuggestions(false);
+        setStationSearch("");
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setShowVehicleSuggestions(false);
+        setShowStationSuggestions(false);
+        setVehicleSearch("");
+        setStationSearch("");
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
+
 
   /*
    * =========================================================
@@ -322,6 +396,7 @@ function Tracker({ onNavigate }: TrackerProps) {
 
         await loadSessions();
         await loadStations();
+        await loadCustomVehicles();
 
         await restoreDraft(
           "charging-session:new"
@@ -515,6 +590,17 @@ function Tracker({ onNavigate }: TrackerProps) {
   }
 
 
+  async function loadCustomVehicles() {
+    try {
+      const data = await getCustomVehicles();
+      setCustomVehicles(data);
+    } catch (error) {
+      console.error("Failed to load custom vehicles:", error);
+      alert("Failed to load custom vehicles.");
+    }
+  }
+
+
   async function loadStations() {
     try {
       const data =
@@ -530,57 +616,124 @@ function Tracker({ onNavigate }: TrackerProps) {
   }
 
 
+  async function handleAddVehicle() {
+    const brand = vehicleBrand.trim();
+    const model = vehicleModel.trim();
+
+    if (!brand || !model) {
+      alert("Please enter the vehicle brand and model.");
+      return;
+    }
+
+    const vehicleName = `${brand} ${model}`.trim();
+    const duplicate = allVehicles.some(
+      (item) =>
+        item.value.trim().toLowerCase() === vehicleName.toLowerCase()
+    );
+
+    if (duplicate) {
+      alert("This vehicle already exists.");
+      return;
+    }
+
+    try {
+      setSavingVehicle(true);
+
+      const created = await addCustomVehicle({
+        brand,
+        model,
+      });
+
+      setCustomVehicles((current) => [...current, created]);
+
+      const createdName = `${created.brand} ${created.model}`;
+
+      setVehicle(createdName);
+      setVehicleSearch(createdName);
+      setShowVehicleSuggestions(false);
+
+      setVehicleBrand("");
+      setVehicleModel("");
+      setShowVehicleForm(false);
+
+      alert("Vehicle added successfully.");
+    } catch (error: any) {
+      console.error(error);
+
+      if (
+        error?.code === "23505" ||
+        error?.message?.toLowerCase?.().includes("duplicate")
+      ) {
+        alert("This vehicle already exists.");
+      } else {
+        alert(
+          error?.message ||
+            "Failed to add vehicle."
+        );
+      }
+    } finally {
+      setSavingVehicle(false);
+    }
+  }
+
+
   async function handleAddStation() {
-    const name =
-      newStationName.trim();
+    const name = newStationName.trim();
 
     if (!name) {
-      alert(
-        "Please enter a charging station name."
-      );
+      alert("Please enter a charging station name.");
+      return;
+    }
 
+    const normalizedName = name.toLowerCase();
+
+    const duplicate = allStationOptions.some(
+      (item) =>
+        item.name.trim().toLowerCase() === normalizedName
+    );
+
+    if (duplicate) {
+      alert("This charging station already exists.");
       return;
     }
 
     try {
       setSavingStation(true);
 
-      const newStation =
-        await addChargingStation(
-          name,
-          newStationCategory
+      const newStation = await addChargingStation(
+        name,
+        newStationCategory
+      );
+
+      setCustomStations((current) => {
+        const alreadyExists = current.some(
+          (item) =>
+            item.name.trim().toLowerCase() ===
+            newStation.name.trim().toLowerCase()
         );
 
-      setCustomStations(
-        (current) => [
-          ...current,
-          newStation,
-        ]
-      );
+        return alreadyExists
+          ? current
+          : [...current, newStation];
+      });
 
-      setStation(
-        newStation.name
-      );
+      setStation(newStation.name);
+      setStationSearch(newStation.name);
+      setShowStationSuggestions(false);
 
       setNewStationName("");
       setNewStationCategory("Other");
       setShowAddStation(false);
 
-      alert(
-        "Charging station added successfully."
-      );
+      alert("Charging station added successfully.");
     } catch (error: any) {
       console.error(error);
 
       if (
         error?.code === "23505" ||
-        error?.message?.includes(
-          "duplicate"
-        )
+        error?.message?.toLowerCase?.().includes("duplicate")
       ) {
-        alert(
-          "This charging station already exists."
-        );
+        alert("This charging station already exists.");
       } else {
         alert(
           error?.message ||
@@ -591,6 +744,63 @@ function Tracker({ onNavigate }: TrackerProps) {
       setSavingStation(false);
     }
   }
+
+
+  const allVehicles = useMemo(() => {
+    const builtIn = vehicles.map((item) => ({
+      value: `${item.brand} ${item.model}`,
+      label: `${item.brand} ${item.model}`,
+    }));
+
+    const custom = customVehicles.map((item) => ({
+      value: `${item.brand} ${item.model}`,
+      label: `${item.brand} ${item.model}`,
+    }));
+
+    const seen = new Set<string>();
+
+    return [...builtIn, ...custom].filter((item) => {
+      const key = item.value.trim().toLowerCase();
+
+      if (seen.has(key)) return false;
+
+      seen.add(key);
+      return true;
+    });
+  }, [customVehicles]);
+
+  const filteredVehicleOptions = useMemo(() => {
+    const query = vehicleSearch.trim().toLowerCase();
+
+    if (!query) return allVehicles;
+
+    return allVehicles.filter((item) =>
+      item.label.toLowerCase().includes(query)
+    );
+  }, [allVehicles, vehicleSearch]);
+
+  const allStationOptions = useMemo(() => {
+    const seen = new Set<string>();
+
+    return [...chargingStations, ...customStations].filter((item) => {
+      const key = item.name.trim().toLowerCase();
+
+      if (seen.has(key)) return false;
+
+      seen.add(key);
+      return true;
+    });
+  }, [customStations]);
+
+  const filteredStationOptions = useMemo(() => {
+    const query = stationSearch.trim().toLowerCase();
+
+    if (!query) return allStationOptions;
+
+    return allStationOptions.filter((item) =>
+      item.name.toLowerCase().includes(query)
+    );
+  }, [allStationOptions, stationSearch]);
 
 
   async function saveSession() {
@@ -766,9 +976,14 @@ function Tracker({ onNavigate }: TrackerProps) {
 
     setEditingId(null);
 
-    setVehicle(
-      `${defaultVehicle.brand} ${defaultVehicle.model}`
-    );
+    const resetVehicle =
+      `${defaultVehicle.brand} ${defaultVehicle.model}`;
+
+    setVehicle(resetVehicle);
+    setVehicleSearch("");
+    setShowVehicleSuggestions(false);
+    setStationSearch("");
+    setShowStationSuggestions(false);
 
     setCharger("DC Fast");
     setEnergy("");
@@ -809,6 +1024,22 @@ function Tracker({ onNavigate }: TrackerProps) {
 
   return (
     <>
+      <style>{`
+        .trackerFileUpload input[type="file"]::file-selector-button {
+          background: #16a34a;
+          color: #ffffff;
+          border: none;
+          border-radius: 6px;
+          padding: 8px 14px;
+          margin-right: 10px;
+          cursor: pointer;
+          font-weight: 600;
+        }
+
+        .trackerFileUpload input[type="file"]::file-selector-button:hover {
+          background: #15803d;
+        }
+      `}</style>
       <div
         style={{
           position: "relative",
@@ -849,30 +1080,219 @@ function Tracker({ onNavigate }: TrackerProps) {
           Vehicle
         </label>
 
-        <select
-          value={vehicle}
-          disabled={
-            editingId !== null
-          }
-          onChange={(e) =>
-            setVehicle(
-              e.target.value
-            )
-          }
-          onBlur={
-            handleAutosaveBlur
-          }
+        <div
+          style={{
+            display: "flex",
+            gap: "8px",
+            alignItems: "flex-start",
+          }}
         >
-          {vehicles.map((v) => (
-            <option
-              key={v.id}
-              value={`${v.brand} ${v.model}`}
-            >
-              {v.brand} {v.model}
-            </option>
-          ))}
-        </select>
+          <div
+            ref={vehicleDropdownRef}
+            style={{
+              position: "relative",
+              flex: 1,
+              minWidth: 0,
+            }}
+          >
+            <input
+              type="text"
+              placeholder="Type vehicle name to search..."
+              value={
+                showVehicleSuggestions
+                  ? vehicleSearch
+                  : vehicle
+              }
+              disabled={editingId !== null}
+              onFocus={() => {
+                if (editingId !== null) return;
 
+                setShowVehicleSuggestions(true);
+                if (!vehicleSearch) {
+                  setVehicleSearch("");
+                }
+              }}
+              onChange={(e) => {
+                const value = e.target.value;
+                setVehicleSearch(value);
+                setShowVehicleSuggestions(true);
+              }}
+              onBlur={handleAutosaveBlur}
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                paddingRight: "44px",
+              }}
+            />
+
+            <button
+              type="button"
+              aria-label="Open vehicle list"
+              disabled={editingId !== null}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                if (editingId !== null) return;
+
+                if (showVehicleSuggestions) {
+                  setShowVehicleSuggestions(false);
+                  setVehicleSearch("");
+                } else {
+                  setVehicleSearch("");
+                  setShowVehicleSuggestions(true);
+                }
+              }}
+              style={{
+                position: "absolute",
+                right: "8px",
+                top: "7px",
+                width: "32px",
+                height: "32px",
+                border: "none",
+                borderRadius: "6px",
+                background: "#374151",
+                color: "#f9fafb",
+                cursor: "pointer",
+                fontSize: "18px",
+                lineHeight: 1,
+                padding: 0,
+              }}
+            >
+              ▾
+            </button>
+
+            {showVehicleSuggestions && (
+              <div
+                style={{
+                  marginTop: "4px",
+                  width: "100%",
+                  boxSizing: "border-box",
+                  background: "#1f2937",
+                  border: "1px solid #374151",
+                  borderRadius: "8px",
+                  maxHeight: "220px",
+                  overflowY: "auto",
+                  boxShadow: "0 8px 20px rgba(0,0,0,0.35)",
+                  zIndex: 100,
+                }}
+              >
+                {filteredVehicleOptions.length > 0 ? (
+                  filteredVehicleOptions.map((item) => (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setVehicle(item.value);
+                        setVehicleSearch(item.value);
+                        setShowVehicleSuggestions(false);
+                      }}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        textAlign: "left",
+                        border: "none",
+                        borderBottom: "1px solid #374151",
+                        background: "transparent",
+                        color: "#f9fafb",
+                        padding: "10px 12px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {item.label}
+                    </button>
+                  ))
+                ) : (
+                  <div
+                    style={{
+                      padding: "10px 12px",
+                      color: "#9ca3af",
+                      fontSize: "13px",
+                    }}
+                  >
+                    No matching vehicle found. Use ＋ Or Add Custom Vehicle to create one.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {editingId === null && (
+            <button
+              type="button"
+              className="saveButton"
+              onClick={() => setShowVehicleForm((current) => !current)}
+              style={{
+                padding: "0 14px",
+                margin: 0,
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+                fontSize: "14px",
+                height: "46px",
+                position: "relative",
+                top: "6px",
+              }}
+            >
+              ＋ Or Add Custom Vehicle
+            </button>
+          )}
+        </div>
+
+        {showVehicleForm && editingId === null && (
+          <div
+            className="card"
+            style={{
+              marginTop: "12px",
+              marginBottom: "4px",
+            }}
+          >
+            <h4 style={{ marginTop: 0 }}>
+              Add Custom Vehicle
+            </h4>
+
+            <label>Brand</label>
+            <input
+              type="text"
+              placeholder="e.g. Tata"
+              value={vehicleBrand}
+              onChange={(e) => setVehicleBrand(e.target.value)}
+            />
+
+            <label>Model</label>
+            <input
+              type="text"
+              placeholder="e.g. Nexon EV"
+              value={vehicleModel}
+              onChange={(e) => setVehicleModel(e.target.value)}
+            />
+
+            <div
+              className="buttonGroup"
+              style={{ marginTop: "12px" }}
+            >
+              <button
+                type="button"
+                className="primaryButton"
+                onClick={() => void handleAddVehicle()}
+                disabled={savingVehicle}
+              >
+                {savingVehicle ? "Saving..." : "Save Vehicle"}
+              </button>
+
+              <button
+                type="button"
+                className="dangerButton"
+                onClick={() => {
+                  setShowVehicleForm(false);
+                  setVehicleBrand("");
+                  setVehicleModel("");
+                }}
+                disabled={savingVehicle}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
         {editingId !== null && (
           <p
@@ -946,86 +1366,149 @@ function Tracker({ onNavigate }: TrackerProps) {
           style={{
             display: "flex",
             gap: "8px",
-            alignItems: "center",
+            alignItems: "flex-start",
           }}
         >
-          <select
-            value={station}
-            onChange={(e) =>
-              setStation(
-                e.target.value
-              )
-            }
-            onBlur={
-              handleAutosaveBlur
-            }
+          <div
+            ref={stationDropdownRef}
             style={{
+              position: "relative",
               flex: 1,
               minWidth: 0,
             }}
           >
-            <option value="">
-              Select Charging Station
-            </option>
+            <input
+              type="text"
+              placeholder="Type charging station to search..."
+              value={
+                showStationSuggestions
+                  ? stationSearch
+                  : station
+              }
+              onFocus={() => {
+                setShowStationSuggestions(true);
+                if (!stationSearch) {
+                  setStationSearch("");
+                }
+              }}
+              onChange={(e) => {
+                setStationSearch(e.target.value);
+                setShowStationSuggestions(true);
+              }}
+              onBlur={handleAutosaveBlur}
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                paddingRight: "44px",
+              }}
+            />
 
+            <button
+              type="button"
+              aria-label="Open charging station list"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                if (showStationSuggestions) {
+                  setShowStationSuggestions(false);
+                  setStationSearch("");
+                } else {
+                  setStationSearch("");
+                  setShowStationSuggestions(true);
+                }
+              }}
+              style={{
+                position: "absolute",
+                right: "8px",
+                top: "7px",
+                width: "32px",
+                height: "32px",
+                border: "none",
+                borderRadius: "6px",
+                background: "#374151",
+                color: "#f9fafb",
+                cursor: "pointer",
+                fontSize: "18px",
+                lineHeight: 1,
+                padding: 0,
+              }}
+            >
+              ▾
+            </button>
 
-            <optgroup label="Standard Stations">
-              {chargingStations.map(
-                (item) => (
-                  <option
-                    key={item.name}
-                    value={item.name}
-                  >
-                    {item.name}
-                  </option>
-                )
-              )}
-            </optgroup>
-
-
-            {customStations.length >
-              0 && (
-              <optgroup label="My Stations">
-                {customStations.map(
-                  (item) => (
-                    <option
-                      key={`custom-${item.id}`}
-                      value={item.name}
+            {showStationSuggestions && (
+              <div
+                style={{
+                  marginTop: "4px",
+                  width: "100%",
+                  boxSizing: "border-box",
+                  background: "#1f2937",
+                  border: "1px solid #374151",
+                  borderRadius: "8px",
+                  maxHeight: "220px",
+                  overflowY: "auto",
+                  boxShadow: "0 8px 20px rgba(0,0,0,0.35)",
+                  zIndex: 100,
+                }}
+              >
+                {filteredStationOptions.length > 0 ? (
+                  filteredStationOptions.map((item) => (
+                    <button
+                      key={item.name}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setStation(item.name);
+                        setStationSearch(item.name);
+                        setShowStationSuggestions(false);
+                      }}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        textAlign: "left",
+                        border: "none",
+                        borderBottom: "1px solid #374151",
+                        background: "transparent",
+                        color: "#f9fafb",
+                        padding: "10px 12px",
+                        cursor: "pointer",
+                      }}
                     >
                       {item.name}
-                    </option>
-                  )
+                    </button>
+                  ))
+                ) : (
+                  <div
+                    style={{
+                      padding: "10px 12px",
+                      color: "#9ca3af",
+                      fontSize: "13px",
+                    }}
+                  >
+                    No matching charging station found. Use ＋ Or Add Custom Station to create one.
+                  </div>
                 )}
-              </optgroup>
+              </div>
             )}
-          </select>
-
+          </div>
 
           <button
             type="button"
             className="saveButton"
-            onClick={() =>
-              setShowAddStation(true)
-            }
+            onClick={() => setShowAddStation(true)}
             style={{
-              padding:
-                "0 14px",
+              padding: "0 14px",
               margin: 0,
-              whiteSpace:
-                "nowrap",
+              whiteSpace: "nowrap",
               flexShrink: 0,
-              fontSize:
-                "14px",
+              fontSize: "14px",
               height: "46px",
-              position:
-                "relative",
-              top: "-4px",
+              position: "relative",
+              top: "6px",
             }}
           >
-            + Add Station
+            ＋ Or Add Custom Station
           </button>
         </div>
-
 
         {showAddStation && (
           <div
@@ -1227,15 +1710,17 @@ function Tracker({ onNavigate }: TrackerProps) {
 
         {canUseFileUploads(subscriptionPlan) ? (
           <>
-            <ReceiptUploader
-              key={
-                invoiceResetKey
-              }
-              value={invoice}
-              onChange={(value) =>
-                setInvoice(value)
-              }
-            />
+            <div className="trackerFileUpload">
+              <ReceiptUploader
+                key={
+                  invoiceResetKey
+                }
+                value={invoice}
+                onChange={(value) =>
+                  setInvoice(value)
+                }
+              />
+            </div>
 
             <p
               style={{

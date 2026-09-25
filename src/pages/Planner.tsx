@@ -511,7 +511,20 @@ function Planner({
    */
 
   const allVehicles = useMemo<PlannerVehicle[]>(
-    () => [...vehicles, ...customVehicles],
+    () => {
+      const combined = [...vehicles, ...customVehicles];
+      const seen = new Set<string>();
+
+      return combined.filter((item) => {
+        const key =
+          `${item.brand} ${item.model}`.trim().toLowerCase();
+
+        if (seen.has(key)) return false;
+
+        seen.add(key);
+        return true;
+      });
+    },
     [customVehicles]
   );
 
@@ -536,6 +549,45 @@ function Planner({
 
   const [selectedBrand, setSelectedBrand] =
     useState("Tata");
+
+  const [vehicleSearch, setVehicleSearch] =
+    useState("");
+
+  const [showVehicleSuggestions, setShowVehicleSuggestions] =
+    useState(false);
+
+  const vehicleDropdownRef =
+    useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function handleVehicleOutsideClick(event: MouseEvent) {
+      const target = event.target as Node;
+
+      if (
+        showVehicleSuggestions &&
+        vehicleDropdownRef.current &&
+        !vehicleDropdownRef.current.contains(target)
+      ) {
+        setShowVehicleSuggestions(false);
+        setVehicleSearch("");
+      }
+    }
+
+    function handleVehicleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setShowVehicleSuggestions(false);
+        setVehicleSearch("");
+      }
+    }
+
+    document.addEventListener("mousedown", handleVehicleOutsideClick);
+    document.addEventListener("keydown", handleVehicleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleVehicleOutsideClick);
+      document.removeEventListener("keydown", handleVehicleEscape);
+    };
+  }, [showVehicleSuggestions]);
 
   const brandVehicles = useMemo(
     () =>
@@ -579,6 +631,18 @@ function Planner({
       ) ?? defaultVehicle,
     [allVehicles, vehicleId, defaultVehicle]
   );
+
+  const filteredVehicleOptions = useMemo(() => {
+    const query = vehicleSearch.trim().toLowerCase();
+
+    if (!query) return allVehicles;
+
+    return allVehicles.filter((item) =>
+      `${item.brand} ${item.model}`
+        .toLowerCase()
+        .includes(query)
+    );
+  }, [allVehicles, vehicleSearch]);
 
   /*
    * =========================================================
@@ -1250,6 +1314,10 @@ if (fastChargeTime > 0) {
 
     setSelectedBrand(brand);
     setVehicleId(customVehicle.id);
+    setVehicleSearch(
+      `${customVehicle.brand} ${customVehicle.model}`
+    );
+    setShowVehicleSuggestions(false);
 
     setNewVehicle(
       emptyVehicleForm
@@ -1288,11 +1356,14 @@ if (fastChargeTime > 0) {
       return;
     }
 
+    const normalizeName = (value: string) =>
+      value.trim().replace(/\s+/g, " ").toLowerCase();
+
     const duplicate =
       allChargers.some(
         (c) =>
-          c.name.toLowerCase() ===
-          name.toLowerCase()
+          normalizeName(c.name) ===
+          normalizeName(name)
       );
 
     if (duplicate) {
@@ -1447,52 +1518,135 @@ if (fastChargeTime > 0) {
         </h3>
 
         <label>
-          Brand
+          Vehicle
         </label>
 
-        <select
-          value={selectedBrand}
-          onChange={(e) =>
-            setSelectedBrand(
-              e.target.value
-            )
-          }
-          onBlur={handlePlannerAutosaveBlur}
+        <div
+          ref={vehicleDropdownRef}
+          style={{
+            position: "relative",
+            width: "100%",
+          }}
         >
-          {brands.map((brand) => (
-            <option
-              key={brand}
-              value={brand}
+          <input
+            type="text"
+            placeholder="Type vehicle name to search..."
+            value={
+              showVehicleSuggestions
+                ? vehicleSearch
+                : vehicle
+                  ? `${vehicle.brand} ${vehicle.model}`
+                  : ""
+            }
+            onFocus={() => {
+              setShowVehicleSuggestions(true);
+            }}
+            onChange={(e) => {
+              const value = e.target.value;
+              setVehicleSearch(value);
+              setShowVehicleSuggestions(true);
+            }}
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              paddingRight: "44px",
+            }}
+          />
+
+          <button
+            type="button"
+            aria-label="Show vehicle list"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              setShowVehicleSuggestions((open) => !open);
+
+              if (!showVehicleSuggestions) {
+                setVehicleSearch("");
+              }
+            }}
+            style={{
+              position: "absolute",
+              right: "6px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              width: "32px",
+              height: "32px",
+              border: "none",
+              borderRadius: "6px",
+              background: "#374151",
+              color: "#f9fafb",
+              cursor: "pointer",
+              fontSize: "18px",
+              lineHeight: 1,
+              padding: 0,
+            }}
+          >
+            ▾
+          </button>
+
+          {showVehicleSuggestions && (
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                zIndex: 100,
+                background: "#1f2937",
+                border: "1px solid #374151",
+                borderRadius: "8px",
+                maxHeight: "220px",
+                overflowY: "auto",
+                boxShadow: "0 8px 20px rgba(0,0,0,0.35)",
+              }}
             >
-              {brand}
-            </option>
-          ))}
-        </select>
-
-        <label>
-          Model
-        </label>
-
-        <select
-          value={vehicleId}
-          onChange={(e) =>
-            setVehicleId(
-              Number(e.target.value)
-            )
-          }
-          onBlur={handlePlannerAutosaveBlur}
-        >
-          {brandVehicles.map(
-            (v) => (
-              <option
-                key={v.id}
-                value={v.id}
-              >
-                {v.model}
-              </option>
-            )
+              {filteredVehicleOptions.length > 0 ? (
+                filteredVehicleOptions.map((item) => (
+                  <button
+                    key={`${item.brand}-${item.model}-${item.id}`}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setSelectedBrand(item.brand);
+                      setVehicleId(item.id);
+                      setVehicleSearch(
+                        `${item.brand} ${item.model}`
+                      );
+                      setShowVehicleSuggestions(false);
+                    }}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      textAlign: "left",
+                      border: "none",
+                      borderBottom: "1px solid #374151",
+                      background: "transparent",
+                      color: "#f9fafb",
+                      padding: "10px 12px",
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#374151";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "transparent";
+                    }}
+                  >
+                    {item.brand} {item.model}
+                  </button>
+                ))
+              ) : (
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    color: "#9ca3af",
+                    fontSize: "13px",
+                  }}
+                >
+                  No matching vehicle found. Use ＋ Or Add Custom Vehicle to create one.
+                </div>
+              )}
+            </div>
           )}
-        </select>
+        </div>
 
         <button
           type="button"
@@ -1508,7 +1662,7 @@ if (fastChargeTime > 0) {
             marginBottom: 16,
           }}
         >
-          ➕ Add Vehicle
+          ＋ Or Add Custom Vehicle
         </button>
 
       {showVehicleForm && (
@@ -1810,7 +1964,7 @@ if (fastChargeTime > 0) {
             marginBottom: 16,
           }}
         >
-          ➕ Add Charger
+          ＋ Or Add Custom Station
         </button>
 
       {showChargerForm && (
