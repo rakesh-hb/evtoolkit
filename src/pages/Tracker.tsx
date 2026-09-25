@@ -1059,7 +1059,7 @@ function Tracker({ onNavigate }: TrackerProps) {
             min-width: 0 !important;
             min-height: 44px !important;
             height: auto !important;
-            margin: 0 !important;
+            margin: 8px 0 12px !important;
             position: static !important;
             top: auto !important;
             transform: none !important;
