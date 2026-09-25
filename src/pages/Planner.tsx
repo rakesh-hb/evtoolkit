@@ -1531,43 +1531,48 @@ function Analytics({
   }: {
     expanded?: boolean;
   }) {
-
-    if (
-      chargingTypeData.length ===
-      0
-    ) {
-
+    if (chargingTypeData.length === 0) {
       return (
-
         <div
           style={{
-            minHeight:
-              expanded
-                ? "600px"
-                : "350px",
-            display:
-              "flex",
-            alignItems:
-              "center",
-            justifyContent:
-              "center",
-            color:
-              SECONDARY_TEXT,
-            fontSize:
-              "14px",
+            minHeight: expanded ? "600px" : "350px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: SECONDARY_TEXT,
+            fontSize: "14px",
           }}
         >
-          No charging type
-          data available.
+          No charging type data available.
         </div>
-
       );
-
     }
 
+    const isMobileViewport =
+      typeof window !== "undefined" &&
+      window.innerWidth <= 768;
+
+    const chartHeight = expanded
+      ? isMobileViewport ? 560 : 680
+      : isMobileViewport ? 330 : 390;
+
+    const chartCenterX = expanded
+      ? isMobileViewport ? "50%" : "42%"
+      : isMobileViewport ? "50%" : "40%";
+
+    const chartCenterY = expanded
+      ? isMobileViewport ? "44%" : "46%"
+      : isMobileViewport ? "43%" : "40%";
+
+    const innerRadius = expanded
+      ? isMobileViewport ? 92 : 175
+      : isMobileViewport ? 62 : 78;
+
+    const outerRadius = expanded
+      ? isMobileViewport ? 150 : 275
+      : isMobileViewport ? 100 : 125;
 
     return (
-
       <div
         className={
           expanded
@@ -1575,167 +1580,88 @@ function Analytics({
             : "analyticsChargingTypeChart"
         }
         style={{
-          position:
-            "relative",
-          width:
-            "100%",
-          height:
-            expanded
-              ? "min(70vh, 560px)"
-              : "350px",
+          position: "relative",
+          width: "100%",
+          height: `${chartHeight}px`,
+          boxSizing: "border-box",
+          overflow: "visible",
         }}
       >
-
-        <ResponsiveContainer
-          width="100%"
-          height="100%"
-        >
-
+        <ResponsiveContainer width="100%" height="100%">
           <PieChart>
-
             <Pie
-              data={
-                chargingTypeData
-              }
+              data={chargingTypeData}
               dataKey="value"
               nameKey="name"
               isAnimationActive={true}
               animationBegin={0}
               animationDuration={expanded ? 900 : 700}
               animationEasing="ease-out"
-              cx="50%"
-              cy={
-                expanded
-                  ? "40%"
-                  : "45%"
-              }
-              innerRadius={
-                expanded
-                  ? "20%"
-                  : 78
-              }
-              outerRadius={
-                expanded
-                  ? "34%"
-                  : 125
-              }
+              cx={chartCenterX}
+              cy={chartCenterY}
+              innerRadius={innerRadius}
+              outerRadius={outerRadius}
               paddingAngle={3}
               cornerRadius={6}
-              labelLine={{
-                stroke:
-                  SECONDARY_TEXT,
-              }}
+              labelLine={{ stroke: SECONDARY_TEXT }}
               label={{
-                fill:
-                  VALUE_ORANGE,
-                fontSize:
-                  expanded
-                    ? 16
-                    : 14,
+                fill: VALUE_ORANGE,
+                fontSize: expanded ? 16 : 13,
               }}
             >
-
-              {chargingTypeData.map(
-                (
-                  _,
-                  index
-                ) => (
-
-                  <Cell
-                    key={
-                      index
-                    }
-                    fill={
-                      COLORS[
-                        index %
-                          COLORS.length
-                      ]
-                    }
-                  />
-
-                )
-              )}
-
+              {chargingTypeData.map((_, index) => (
+                <Cell
+                  key={index}
+                  fill={COLORS[index % COLORS.length]}
+                />
+              ))}
             </Pie>
-
 
             <Tooltip
               contentStyle={{
-                background:
-                  "#1e293b",
-                border:
-                  "1px solid #475569",
-                borderRadius:
-                  "8px",
-                color:
-                  PRIMARY_TEXT,
+                background: "#1e293b",
+                border: "1px solid #475569",
+                borderRadius: "8px",
+                color: PRIMARY_TEXT,
               }}
-              labelStyle={{
-                color:
-                  PRIMARY_TEXT,
-              }}
-              itemStyle={{
-                color:
-                  VALUE_ORANGE,
-              }}
+              labelStyle={{ color: PRIMARY_TEXT }}
+              itemStyle={{ color: VALUE_ORANGE }}
             />
-
 
             <Legend
               verticalAlign="bottom"
               wrapperStyle={{
-                color:
-                  PRIMARY_TEXT,
+                color: PRIMARY_TEXT,
+                fontSize: expanded ? "14px" : "12px",
+                paddingTop: "4px",
               }}
             />
-
           </PieChart>
-
         </ResponsiveContainer>
 
-
-        {/* Charging type summary stays above the chart */}
         <div
           className="analyticsChargingTypeSummary"
           style={{
-            position:
-              "absolute",
-            top:
-              expanded
-                ? "18px"
-                : "0px",
-            left:
-              "50%",
-            transform:
-              "translateX(-50%)",
-            textAlign:
-              "center",
-            pointerEvents:
-              "none",
-            zIndex:
-              3,
-            whiteSpace:
-              "nowrap",
-            animation:
-              expanded
-                ? "chargingTypeSummaryIn 0.55s ease-out"
-                : "none",
+            position: "absolute",
+            left: chartCenterX,
+            top: chartCenterY,
+            transform: "translate(-50%, -50%)",
+            width: expanded
+              ? isMobileViewport ? "150px" : "220px"
+              : isMobileViewport ? "110px" : "150px",
+            textAlign: "center",
+            pointerEvents: "none",
+            zIndex: 3,
           }}
         >
           <div
             style={{
-              fontSize:
-                expanded
-                  ? "15px"
-                  : "12px",
-              fontWeight:
-                700,
-              color:
-                VALUE_ORANGE,
-              letterSpacing:
-                "0.4px",
-              lineHeight:
-                1.2,
+              fontSize: expanded ? "15px" : "11px",
+              fontWeight: 700,
+              color: VALUE_ORANGE,
+              letterSpacing: "0.4px",
+              lineHeight: 1.2,
+              whiteSpace: "normal",
             }}
           >
             TOTAL SESSIONS
@@ -1743,36 +1669,22 @@ function Analytics({
 
           <div
             style={{
-              marginTop:
-                "3px",
-              fontSize:
-                expanded
-                  ? "34px"
-                  : "22px",
-              fontWeight:
-                700,
-              color:
-                VALUE_ORANGE,
-              lineHeight:
-                1,
+              marginTop: "4px",
+              fontSize: expanded
+                ? isMobileViewport ? "38px" : "42px"
+                : isMobileViewport ? "22px" : "26px",
+              fontWeight: 700,
+              color: VALUE_ORANGE,
+              lineHeight: 1,
             }}
           >
             {totalSessions}
           </div>
         </div>
-
       </div>
-
     );
-
   }
 
-
-  /*
-   * ============================================================
-   * EXPANDED CHART OVERLAY
-   * ============================================================
-   */
 
   function ExpandedChartModal() {
 
@@ -2039,49 +1951,43 @@ function Analytics({
       <style>{`
         .analyticsChargingTypeChart {
           box-sizing: border-box;
+          width: 100%;
+          overflow: visible;
+        }
+
+        .analyticsChargingTypeChart .recharts-responsive-container {
+          overflow: visible;
         }
 
         .analyticsChargingTypeSummary {
           box-sizing: border-box;
         }
 
+        .analyticsExpandedChartModal .analyticsChargingTypeChartExpanded {
+          min-height: 0;
+        }
+
         @media (max-width: 768px) {
           .analyticsChargingTypeChart {
-            height: 300px !important;
-            overflow: visible;
+            height: 330px !important;
+            overflow: visible !important;
           }
 
-          .analyticsChargingTypeChart > .recharts-responsive-container {
-            height: 100% !important;
+          .analyticsChargingTypeChartExpanded {
+            height: 560px !important;
+            overflow: visible !important;
           }
 
-          .analyticsChargingTypeSummary {
-            top: 2px !important;
-            left: 50% !important;
-            transform: translateX(-50%) !important;
-            width: 100%;
-            white-space: nowrap;
+          .analyticsChargingTypeChart .recharts-wrapper,
+          .analyticsChargingTypeChart .recharts-surface {
+            overflow: visible !important;
           }
 
-          .analyticsChargingTypeChart:not(.analyticsChargingTypeChartExpanded) .analyticsChargingTypeSummary > div:first-child {
-            font-size: 12px !important;
-          }
-
-          .analyticsChargingTypeChart:not(.analyticsChargingTypeChartExpanded) .analyticsChargingTypeSummary > div:last-child {
-            font-size: 24px !important;
-            margin-top: 4px !important;
-          }
-
-          .analyticsChargingTypeChart:not(.analyticsChargingTypeChartExpanded) .recharts-legend-wrapper {
+          .analyticsChargingTypeChart .recharts-legend-wrapper {
+            width: 100% !important;
+            left: 0 !important;
             bottom: 0 !important;
-          }
-
-          .analyticsChargingTypeChart:not(.analyticsChargingTypeChartExpanded) .recharts-wrapper {
-            max-width: 100% !important;
-          }
-
-          .analyticsChargingTypeChart:not(.analyticsChargingTypeChartExpanded) .recharts-surface {
-            overflow: visible;
+            line-height: 1.25 !important;
           }
 
           .analyticsExpandedChartModal {
@@ -2091,22 +1997,11 @@ function Analytics({
             padding: 12px !important;
             border-radius: 16px !important;
             overflow-x: hidden !important;
+            overflow-y: auto !important;
           }
 
           .analyticsExpandedChartModal .analyticsChargingTypeChartExpanded {
-            height: 420px !important;
-          }
-
-          .analyticsChargingTypeChartExpanded .analyticsChargingTypeSummary {
-            top: 0 !important;
-          }
-
-          .analyticsChargingTypeChartExpanded .analyticsChargingTypeSummary > div:first-child {
-            font-size: 15px !important;
-          }
-
-          .analyticsChargingTypeChartExpanded .analyticsChargingTypeSummary > div:last-child {
-            font-size: 36px !important;
+            height: 560px !important;
           }
         }
       `}</style>
