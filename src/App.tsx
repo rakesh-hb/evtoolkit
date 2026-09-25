@@ -238,6 +238,22 @@ function App() {
 
   /*
    * ============================================================
+   * ABOUT EV TOOLKIT
+   * ============================================================
+   *
+   * About Us must also be publicly accessible so payment-gateway
+   * reviewers and visitors can view the business/product
+   * information without signing in.
+   */
+
+  const isAboutPage =
+    window.location.pathname ===
+      "/about" ||
+    window.location.pathname ===
+      "/about-us";
+
+  /*
+   * ============================================================
    * LOADING
    * ============================================================
    */
@@ -311,6 +327,20 @@ function App() {
   if (isCancellationPolicyPage) {
     return (
       <CancellationPolicy />
+    );
+  }
+
+  /*
+   * ============================================================
+   * ABOUT EV TOOLKIT
+   * ============================================================
+   *
+   * Public page — no authentication required.
+   */
+
+  if (isAboutPage) {
+    return (
+      <About />
     );
   }
 

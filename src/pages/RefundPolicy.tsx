@@ -1,6 +1,6 @@
 import React from "react";
 
-const CancellationPolicy: React.FC = () => {
+const RefundPolicy: React.FC = () => {
   return (
     <div
       style={{
@@ -24,7 +24,7 @@ const CancellationPolicy: React.FC = () => {
         }}
       >
         <h1 style={{ margin: "0 0 6px", fontSize: 26, fontWeight: 600, color: "#ffffff" }}>
-          Cancellation Policy
+          Return & Refund Policy
         </h1>
 
         <p style={{ margin: "0 0 28px", fontSize: 13, color: "#999999" }}>
@@ -37,63 +37,34 @@ const CancellationPolicy: React.FC = () => {
               1. Overview
             </h2>
             <p>
-              This Cancellation Policy applies to paid features and services
-              provided through EV Toolkit, operated by{" "}
+              This Return & Refund Policy applies to purchases made for paid
+              features and services provided through EV Toolkit, operated by{" "}
               <strong>Rocky Tales</strong>.
             </p>
             <p>
-              We aim to provide a clear and straightforward cancellation
-              process for customers who purchase paid features or services
-              through EV Toolkit.
+              We aim to provide a clear and straightforward refund process for
+              eligible purchases.
             </p>
           </section>
 
           <section>
             <h2 style={{ fontSize: 18, fontWeight: 600, color: "#ffffff", margin: "26px 0 8px" }}>
-              2. Cancellation Eligibility
+              2. Refund Eligibility
             </h2>
             <p>
-              Customers may request cancellation within{" "}
+              Customers may request a refund within{" "}
               <strong>10 days of the purchase date</strong>.
             </p>
             <p>
-              Cancellation requests should be submitted with sufficient
-              information to identify the relevant purchase and account.
+              Refund requests should be submitted with sufficient information
+              to identify the relevant purchase and account.
             </p>
           </section>
 
           <section>
             <h2 style={{ fontSize: 18, fontWeight: 600, color: "#ffffff", margin: "26px 0 8px" }}>
-              3. How to Request Cancellation
+              3. Refund Method
             </h2>
-            <p>
-              To request cancellation, please contact{" "}
-              <strong>Rocky Tales</strong> using the contact details below.
-            </p>
-            <p>
-              Please provide the account details and relevant purchase
-              information so that the request can be reviewed.
-            </p>
-            <p>
-              <strong>Email:</strong>{" "}
-              <a
-                href="mailto:iamrakeshhb@gmail.com?subject=EV%20Toolkit%20Cancellation%20Request"
-                style={{ color: "#f97316", textDecoration: "none" }}
-              >
-                iamrakeshhb@gmail.com
-              </a>
-            </p>
-          </section>
-
-          <section>
-            <h2 style={{ fontSize: 18, fontWeight: 600, color: "#ffffff", margin: "26px 0 8px" }}>
-              4. Cancellation and Refund
-            </h2>
-            <p>
-              Where a cancellation is eligible for a refund, the refund will
-              be handled in accordance with the{" "}
-              <strong>Return & Refund Policy</strong>.
-            </p>
             <p>
               Approved refunds will be issued to the{" "}
               <strong>original payment method</strong> used for the purchase.
@@ -102,12 +73,11 @@ const CancellationPolicy: React.FC = () => {
 
           <section>
             <h2 style={{ fontSize: 18, fontWeight: 600, color: "#ffffff", margin: "26px 0 8px" }}>
-              5. Refund Processing
+              4. Refund Processing
             </h2>
             <p>
-              Once an eligible cancellation and refund request has been
-              approved, the refund will be initiated to the original payment
-              method.
+              Once a refund request has been reviewed and approved, the refund
+              will be initiated to the original payment method.
             </p>
             <p>
               The time required for the refunded amount to appear in the
@@ -118,10 +88,31 @@ const CancellationPolicy: React.FC = () => {
 
           <section>
             <h2 style={{ fontSize: 18, fontWeight: 600, color: "#ffffff", margin: "26px 0 8px" }}>
+              5. How to Request a Refund
+            </h2>
+            <p>
+              To request a refund, please contact Rocky Tales using the contact
+              details below and provide the relevant account and purchase
+              information.
+            </p>
+            <p>
+              <strong>Email:</strong>{" "}
+              <a
+                href="mailto:iamrakeshhb@gmail.com?subject=EV%20Toolkit%20Refund%20Request"
+                style={{ color: "#f97316", textDecoration: "none" }}
+              >
+                iamrakeshhb@gmail.com
+              </a>
+            </p>
+
+          </section>
+
+          <section>
+            <h2 style={{ fontSize: 18, fontWeight: 600, color: "#ffffff", margin: "26px 0 8px" }}>
               6. Contact
             </h2>
             <p>
-              For questions regarding cancellation or this policy, please use:
+              For questions regarding refunds or this policy, please use:
             </p>
             <p>
               <strong>Email:</strong>{" "}
@@ -132,6 +123,7 @@ const CancellationPolicy: React.FC = () => {
                 iamrakeshhb@gmail.com
               </a>
             </p>
+
           </section>
 
           <section
@@ -156,6 +148,7 @@ const CancellationPolicy: React.FC = () => {
                 iamrakeshhb@gmail.com
               </a>
             </p>
+
           </section>
         </div>
       </div>
@@ -163,4 +156,4 @@ const CancellationPolicy: React.FC = () => {
   );
 };
 
-export default CancellationPolicy;
+export default RefundPolicy;

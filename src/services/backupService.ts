@@ -253,8 +253,8 @@ export async function restoreBackup(
       window.confirm(
         "Merge this backup with your existing data?\n\n" +
           "• Existing records will be kept.\n" +
-          "• New records will be imported.\n" +
-          "• Duplicate records will be skipped."
+          "• Records allowed by your current plan will be imported.\n" +
+          "• Duplicate or plan-limited records may be skipped."
       );
 
     if (!confirmed) {

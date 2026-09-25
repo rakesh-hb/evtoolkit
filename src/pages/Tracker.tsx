@@ -861,7 +861,7 @@ function Tracker({ onNavigate }: TrackerProps) {
           )
         ) {
           alert(
-            `The Free plan is limited to ${FREE_LIMITS.chargingSessions} charging sessions. Upgrade to Premium for ₹49 one-time to add more charging sessions.`
+            `The Free plan is limited to ${FREE_LIMITS.chargingSessions} charging sessions. Upgrade to Premium for ₹69 one-time to add more charging sessions.`
           );
 
           return;

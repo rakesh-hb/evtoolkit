@@ -175,7 +175,7 @@ export default function SideDrawer({
           background: active
             ? "rgba(59,130,246,0.16)"
             : "transparent",
-          color: active ? "#ffffff" : "#f1f5f9",
+          color: active ? "#ffffff" : "#e2e8f0",
           padding: "9px 11px",
           cursor: "pointer",
           fontSize: "14px",
@@ -211,7 +211,7 @@ export default function SideDrawer({
             background: active
               ? "rgba(59,130,246,0.24)"
               : "rgba(255,255,255,0.055)",
-            color: active ? "#93c5fd" : "#dbe4f0",
+            color: active ? "#93c5fd" : "#e2e8f0",
             fontSize: "16px",
             lineHeight: 1,
           }}
@@ -337,13 +337,13 @@ export default function SideDrawer({
             aria-label="Close menu"
             title="Close"
             style={{
-              width: "34px",
-              height: "34px",
+              width: "38px",
+              height: "38px",
               flexShrink: 0,
-              border: "1px solid rgba(255,255,255,0.10)",
+              border: "1px solid #dc2626",
               borderRadius: "9px",
-              background: "rgba(255,255,255,0.055)",
-              color: "#cbd5e1",
+              background: "#dc2626",
+              color: "#ffffff",
               cursor: "pointer",
               fontSize: "20px",
               lineHeight: 1,
@@ -381,8 +381,12 @@ export default function SideDrawer({
             >
               <div
                 style={{
-                  padding: "4px 8px 7px",
-                  color: "#aab7c8",
+                  padding: "8px 10px",
+                  marginBottom: "6px",
+                  background: "#334155",
+                  color: "#ffffff",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  borderRadius: "8px",
                   fontSize: "10px",
                   fontWeight: 800,
                   letterSpacing: "1.05px",
@@ -513,25 +517,24 @@ export default function SideDrawer({
               border:
                 "1px solid rgba(248,113,113,0.32)",
               borderRadius: "10px",
-              background:
-                "rgba(220,38,38,0.10)",
+              background: "#dc2626",
               padding: "9px 12px",
               cursor: "pointer",
               fontSize: "13px",
               textAlign: "left",
-              color: "#fecaca",
-              fontWeight: 650,
+              color: "#ffffff",
+              fontWeight: 700,
               transition: "all 0.18s ease",
             }}
             onMouseEnter={(event) => {
               event.currentTarget.style.background =
-                "rgba(220,38,38,0.18)";
+                "#b91c1c";
               event.currentTarget.style.borderColor =
                 "rgba(248,113,113,0.50)";
             }}
             onMouseLeave={(event) => {
               event.currentTarget.style.background =
-                "rgba(220,38,38,0.10)";
+                "#dc2626";
               event.currentTarget.style.borderColor =
                 "rgba(248,113,113,0.32)";
             }}
