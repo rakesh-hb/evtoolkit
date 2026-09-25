@@ -4021,8 +4021,8 @@ function Analytics({
                               VALUE_ORANGE,
                             fontWeight:
                               400,
-                    textAlign:
-                      "left",
+                            textAlign:
+                              "right",
                           }}
                         >
                           {index + 1}
@@ -4036,7 +4036,7 @@ function Analytics({
                             fontWeight:
                               400,
                     textAlign:
-                      "right",
+                      "left",
                           }}
                         >
                           {
@@ -4052,7 +4052,7 @@ function Analytics({
                             fontWeight:
                               400,
                     textAlign:
-                      "right",
+                      "left",
                           }}
                         >
                           {
@@ -4068,7 +4068,7 @@ function Analytics({
                             fontWeight:
                               400,
                     textAlign:
-                      "right",
+                      "left",
                           }}
                         >
                           {
@@ -4085,7 +4085,7 @@ function Analytics({
                             fontWeight:
                               400,
                     textAlign:
-                      "right",
+                      "left",
                           }}
                         >
                           {
