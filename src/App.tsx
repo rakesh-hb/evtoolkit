@@ -85,21 +85,6 @@ const UserProfile =
 
 /*
  * ============================================================
- * TEMPORARY SCREENING VISIBILITY
- * ============================================================
- *
- * These pages remain fully implemented in the project, but are
- * temporarily hidden and blocked from application navigation for
- * screening purposes. Remove an entry from this set when the page
- * should become available again.
- */
-const SCREENING_HIDDEN_PAGES = new Set([
-  "insurance",
-  "documents",
-]);
-
-/*
- * ============================================================
  * PAGE LOADING FALLBACK
  * ============================================================
  */
@@ -396,16 +381,6 @@ function App() {
   function navigateTo(
     selectedPage: string
   ) {
-    if (
-      SCREENING_HIDDEN_PAGES.has(
-        selectedPage
-      )
-    ) {
-      setPage("dashboard");
-      setDrawerOpen(false);
-      return;
-    }
-
     setPage(selectedPage);
     setDrawerOpen(false);
   }

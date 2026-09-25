@@ -367,18 +367,6 @@ const PrivacyPolicy: React.FC = () => {
               </a>
             </p>
 
-            <p>
-              <strong>Phone:</strong>{" "}
-              <a
-                href="tel:+919611761243"
-                style={{
-                  color: "#f97316",
-                  textDecoration: "none",
-                }}
-              >
-                +91 96117 61243
-              </a>
-            </p>
           </section>
 
           <section
@@ -409,18 +397,6 @@ const PrivacyPolicy: React.FC = () => {
               </a>
             </p>
 
-            <p style={{ margin: "4px 0" }}>
-              <strong>Phone:</strong>{" "}
-              <a
-                href="tel:+919611761243"
-                style={{
-                  color: "#f97316",
-                  textDecoration: "none",
-                }}
-              >
-                +91 96117 61243
-              </a>
-            </p>
           </section>
         </div>
       </div>

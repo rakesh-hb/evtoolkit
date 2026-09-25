@@ -13,11 +13,6 @@ interface SideDrawerProps {
   onNavigate: (page: string) => void;
 }
 
-const SCREENING_HIDDEN_MENU_ITEMS = new Set([
-  "insurance",
-  "documents",
-]);
-
 const menu = [
   {
     title: "Maintenance",
@@ -281,14 +276,7 @@ export default function SideDrawer({
                 {section.title}
               </div>
 
-              {section.items
-                .filter(
-                  (item) =>
-                    !SCREENING_HIDDEN_MENU_ITEMS.has(
-                      item.key
-                    )
-                )
-                .map(
+              {section.items.map(
                   (item) => (
                   <button
                     key={item.key}
@@ -461,24 +449,45 @@ export default function SideDrawer({
             handleLogout
           }
           style={{
-            width: "100%",
-            border: "none",
-            borderTop:
-              "1px solid #eee",
+            width: "calc(100% - 28px)",
+            margin:
+              "12px 14px 14px",
+            border:
+              "1px solid #b91c1c",
+            borderRadius:
+              "10px",
             background:
-              "white",
+              "#dc2626",
             padding:
-              "14px 18px",
+              "12px 16px",
             cursor:
               "pointer",
             fontSize: 15,
             textAlign:
               "left",
             color:
-              "#dc2626",
+              "#ffffff",
+            fontWeight:
+              600,
+            boxShadow:
+              "0 3px 8px rgba(220,38,38,0.25)",
+            transition:
+              "all 0.2s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background =
+              "#b91c1c";
+            e.currentTarget.style.boxShadow =
+              "0 4px 10px rgba(185,28,28,0.30)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background =
+              "#dc2626";
+            e.currentTarget.style.boxShadow =
+              "0 3px 8px rgba(220,38,38,0.25)";
           }}
         >
-          🚪 Logout
+          ⏻ Logout
         </button>
       </div>
     </>

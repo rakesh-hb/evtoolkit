@@ -232,15 +232,6 @@ const Terms: React.FC = () => {
                 iamrakeshhb@gmail.com
               </a>
             </p>
-            <p>
-              <strong>Phone:</strong>{" "}
-              <a
-                href="tel:+919611761243"
-                style={{ color: "#f97316", textDecoration: "none" }}
-              >
-                +91 96117 61243
-              </a>
-            </p>
           </section>
 
           <section
@@ -263,15 +254,6 @@ const Terms: React.FC = () => {
                 style={{ color: "#f97316", textDecoration: "none" }}
               >
                 iamrakeshhb@gmail.com
-              </a>
-            </p>
-            <p style={{ margin: "4px 0" }}>
-              <strong>Phone:</strong>{" "}
-              <a
-                href="tel:+919611761243"
-                style={{ color: "#f97316", textDecoration: "none" }}
-              >
-                +91 96117 61243
               </a>
             </p>
           </section>
