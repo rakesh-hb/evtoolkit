@@ -216,7 +216,11 @@ function addPageBackground(pdf: jsPDF) {
 function addPageHeader(
   pdf: jsPDF,
   title: string,
-  pageNumber: number
+  pageNumber: number,
+  userDetails?: {
+    name: string;
+    email: string;
+  }
 ) {
   pdf.setFillColor(COLORS.card);
   pdf.rect(0, 0, PAGE_WIDTH, 22, "F");
@@ -825,7 +829,22 @@ async function exportAnalyticsPDF(reportData: any) {
     );
   }
 
-  pdf.save("EVToolkit_Analytics_Report.pdf");
+  const generatedAt = new Date();
+
+  const pad = (value: number) =>
+    String(value).padStart(2, "0");
+
+  const fileTimestamp =
+    `${generatedAt.getFullYear()}-` +
+    `${pad(generatedAt.getMonth() + 1)}-` +
+    `${pad(generatedAt.getDate())}_` +
+    `${pad(generatedAt.getHours())}-` +
+    `${pad(generatedAt.getMinutes())}-` +
+    `${pad(generatedAt.getSeconds())}`;
+
+  pdf.save(
+    `EVToolkit_Analytics_Report_${fileTimestamp}.pdf`
+  );
 }
 
 async function getCurrentUserDetails() {
