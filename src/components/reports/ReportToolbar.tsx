@@ -217,19 +217,42 @@ function addPageHeader(
   pdf: jsPDF,
   title: string,
   pageNumber: number,
+  userDetails?: {
+    name?: string;
+    email?: string;
+  },
 ) {
   pdf.setFillColor(COLORS.card);
-  pdf.rect(0, 0, PAGE_WIDTH, 22, "F");
+  pdf.rect(0, 0, PAGE_WIDTH, 28, "F");
 
   pdf.setTextColor(COLORS.text);
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(15);
-  pdf.text("EV Toolkit", MARGIN, 14);
+  pdf.text("EV Toolkit", MARGIN, 15);
+
+  const userName = String(userDetails?.name || "User").trim();
+  const userEmail = String(userDetails?.email || "").trim();
+
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(8.5);
+  pdf.setTextColor(COLORS.text);
+  pdf.text(userName || "User", PAGE_WIDTH - MARGIN, 8, {
+    align: "right",
+  });
+
+  if (userEmail) {
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(COLORS.secondary);
+    pdf.text(userEmail, PAGE_WIDTH - MARGIN, 13, {
+      align: "right",
+    });
+  }
 
   pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(9);
+  pdf.setFontSize(8);
   pdf.setTextColor(COLORS.secondary);
-  pdf.text(title, PAGE_WIDTH - MARGIN, 14, {
+  pdf.text(title, PAGE_WIDTH - MARGIN, 21, {
     align: "right",
   });
 
@@ -556,13 +579,18 @@ async function exportAnalyticsPDF(reportData: any) {
     compress: true,
   });
 
+  const userDetails = reportData?.userDetails ?? {
+    name: "User",
+    email: "",
+  };
+
   // PAGE 1 — COVER + EXECUTIVE SUMMARY
   addCoverPage(pdf, reportData);
 
   // PAGE 2 — OVERVIEW + TWO MONTHLY GRAPHS
   pdf.addPage();
   addPageBackground(pdf);
-  addPageHeader(pdf, "Analytics Overview", 2);
+  addPageHeader(pdf, "Analytics Overview", 2, userDetails);
 
   let y = 34;
   y = addSectionTitle(pdf, "Analytics Overview", y);
@@ -606,7 +634,7 @@ async function exportAnalyticsPDF(reportData: any) {
   // PAGE 3 — WEEKLY ACTIVITY + CHARGING TYPE
   pdf.addPage();
   addPageBackground(pdf);
-  addPageHeader(pdf, "Charging Activity", 3);
+  addPageHeader(pdf, "Charging Activity", 3, userDetails);
 
   y = addSectionTitle(pdf, "Charging Activity", 34);
 
@@ -639,7 +667,7 @@ async function exportAnalyticsPDF(reportData: any) {
   // PAGE 4 — MONTHLY + YEARLY + WEEKLY SUMMARIES
   pdf.addPage();
   addPageBackground(pdf);
-  addPageHeader(pdf, "Summary Tables", 4);
+  addPageHeader(pdf, "Summary Tables", 4, userDetails);
 
   y = addSectionTitle(pdf, "Monthly Summary", 34);
 
@@ -722,7 +750,7 @@ async function exportAnalyticsPDF(reportData: any) {
   // PAGE 5 — VEHICLE + STATION STATISTICS
   pdf.addPage();
   addPageBackground(pdf);
-  addPageHeader(pdf, "Statistics", 5);
+  addPageHeader(pdf, "Statistics", 5, userDetails);
 
   y = addSectionTitle(pdf, "Vehicle Statistics", 34);
 
@@ -783,7 +811,8 @@ async function exportAnalyticsPDF(reportData: any) {
     addPageHeader(
       pdf,
       "Charging Session History",
-      pageNumber
+      pageNumber,
+      userDetails
     );
 
     y = addSectionTitle(
