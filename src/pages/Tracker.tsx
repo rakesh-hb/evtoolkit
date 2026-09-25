@@ -1025,6 +1025,48 @@ function Tracker({ onNavigate }: TrackerProps) {
   return (
     <>
       <style>{`
+
+        .evtoolkitCustomFieldRow {
+          width: 100%;
+          min-width: 0;
+        }
+
+        .evtoolkitCustomFieldControl {
+          min-width: 0;
+          flex: 1 1 auto;
+        }
+
+        .evtoolkitCustomFieldButton {
+          flex: 0 0 auto;
+          white-space: nowrap;
+        }
+
+        @media (max-width: 768px) {
+          .evtoolkitCustomFieldRow {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            width: 100% !important;
+          }
+
+          .evtoolkitCustomFieldControl {
+            width: 100% !important;
+            min-width: 0 !important;
+            flex: none !important;
+          }
+
+          .evtoolkitCustomFieldButton {
+            width: 100% !important;
+            min-width: 0 !important;
+            min-height: 44px !important;
+            height: auto !important;
+            margin: 0 !important;
+            position: static !important;
+            top: auto !important;
+            transform: none !important;
+            white-space: normal !important;
+            box-sizing: border-box !important;
+          }
+        }
         .trackerFileUpload input[type="file"]::file-selector-button {
           background: #16a34a;
           color: #ffffff;
@@ -1081,6 +1123,7 @@ function Tracker({ onNavigate }: TrackerProps) {
         </label>
 
         <div
+          className="evtoolkitCustomFieldRow"
           style={{
             display: "flex",
             gap: "8px",
@@ -1088,6 +1131,7 @@ function Tracker({ onNavigate }: TrackerProps) {
           }}
         >
           <div
+            className="evtoolkitCustomFieldControl"
             ref={vehicleDropdownRef}
             style={{
               position: "relative",
@@ -1219,7 +1263,7 @@ function Tracker({ onNavigate }: TrackerProps) {
           {editingId === null && (
             <button
               type="button"
-              className="saveButton"
+              className="saveButton evtoolkitCustomFieldButton"
               onClick={() => setShowVehicleForm((current) => !current)}
               style={{
                 padding: "0 14px",
@@ -1363,6 +1407,7 @@ function Tracker({ onNavigate }: TrackerProps) {
 
 
         <div
+          className="evtoolkitCustomFieldRow"
           style={{
             display: "flex",
             gap: "8px",
@@ -1370,6 +1415,7 @@ function Tracker({ onNavigate }: TrackerProps) {
           }}
         >
           <div
+            className="evtoolkitCustomFieldControl"
             ref={stationDropdownRef}
             style={{
               position: "relative",
@@ -1493,7 +1539,7 @@ function Tracker({ onNavigate }: TrackerProps) {
 
           <button
             type="button"
-            className="saveButton"
+            className="saveButton evtoolkitCustomFieldButton"
             onClick={() => setShowAddStation(true)}
             style={{
               padding: "0 14px",

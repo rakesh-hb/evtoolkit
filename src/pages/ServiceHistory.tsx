@@ -1160,6 +1160,7 @@ export default function ServiceHistory({
             </label>
 
             <div
+              className="evtoolkitCustomFieldRow"
               style={{
                 display: "flex",
                 gap: "8px",
@@ -1168,6 +1169,7 @@ export default function ServiceHistory({
             >
 
               <div
+                className="evtoolkitCustomFieldControl"
                 ref={vehicleDropdownRef}
                 style={{ position: "relative", flex: 1 }}
               >
@@ -1431,6 +1433,7 @@ export default function ServiceHistory({
             </label>
 
             <div
+              className="evtoolkitCustomFieldRow"
               style={{
                 display: "flex",
                 gap: "8px",
@@ -1439,6 +1442,7 @@ export default function ServiceHistory({
             >
 
               <select
+                className="evtoolkitCustomFieldControl"
                 value={selectedServiceCategory}
                 onChange={(e) => {
                   const category =
@@ -1460,6 +1464,7 @@ export default function ServiceHistory({
 
               {selectedServiceCategory !== "Other Service" && (
                 <div
+                  className="evtoolkitCustomFieldControl"
                   ref={serviceDropdownRef}
                   style={{ position: "relative", flex: 1 }}
                 >
@@ -1601,7 +1606,7 @@ export default function ServiceHistory({
 
               <button
                 type="button"
-                className="saveButton"
+                className="saveButton evtoolkitCustomFieldButton"
                 onClick={() => {
                   setShowCustomServiceForm((value) => !value);
                   setCustomServiceType("");
@@ -1618,7 +1623,7 @@ export default function ServiceHistory({
 
               <button
                 type="button"
-                className="saveButton"
+                className="saveButton evtoolkitCustomFieldButton"
                 style={{
                   height: "46px",
                   alignSelf: "flex-start",
@@ -1869,6 +1874,48 @@ export default function ServiceHistory({
         {canUseFileUploads(subscriptionPlan) ? (
           <>
             <style>{`
+
+        .evtoolkitCustomFieldRow {
+          width: 100%;
+          min-width: 0;
+        }
+
+        .evtoolkitCustomFieldControl {
+          min-width: 0;
+          flex: 1 1 auto;
+        }
+
+        .evtoolkitCustomFieldButton {
+          flex: 0 0 auto;
+          white-space: nowrap;
+        }
+
+        @media (max-width: 768px) {
+          .evtoolkitCustomFieldRow {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            width: 100% !important;
+          }
+
+          .evtoolkitCustomFieldControl {
+            width: 100% !important;
+            min-width: 0 !important;
+            flex: none !important;
+          }
+
+          .evtoolkitCustomFieldButton {
+            width: 100% !important;
+            min-width: 0 !important;
+            min-height: 44px !important;
+            height: auto !important;
+            margin: 0 !important;
+            position: static !important;
+            top: auto !important;
+            transform: none !important;
+            white-space: normal !important;
+            box-sizing: border-box !important;
+          }
+        }
               .serviceHistoryFileUpload input[type="file"]::file-selector-button {
                 background: #16a34a;
                 color: #ffffff;
