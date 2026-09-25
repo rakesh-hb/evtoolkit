@@ -13,70 +13,31 @@ interface SideDrawerProps {
   onNavigate: (page: string) => void;
 }
 
-const menu = [
+const sections = [
   {
     title: "Maintenance",
     items: [
-      {
-        key: "service",
-        icon: "🔧",
-        label: "Service History",
-      },
-      {
-        key: "tyres",
-        icon: "🛞",
-        label: "Tyre History",
-      },
-      {
-        key: "documents",
-        icon: "📁",
-        label: "Document Vault",
-      },
-      {
-        key: "insurance",
-        icon: "🛡️",
-        label: "Insurance",
-      },
+      { key: "service", icon: "🔧", label: "Service History" },
+      { key: "tyres", icon: "◉", label: "Tyre History" },
+      { key: "documents", icon: "▣", label: "Document Vault" },
+      { key: "insurance", icon: "♢", label: "Insurance" },
     ],
   },
   {
-    title: "System",
+    title: "Account",
     items: [
-      {
-        key: "profile",
-        icon: "👤",
-        label: "User Profile",
-      },
-      {
-        key: "settings",
-        icon: "⚙️",
-        label: "Settings",
-      },
-      {
-        key: "terms",
-        icon: "📄",
-        label: "Terms & Conditions",
-      },
-      {
-        key: "privacy",
-        icon: "🔒",
-        label: "Privacy Policy",
-      },
-      {
-        key: "refund",
-        icon: "💳",
-        label: "Return & Refund Policy",
-      },
-      {
-        key: "cancellation",
-        icon: "❌",
-        label: "Cancellation Policy",
-      },
-      {
-        key: "about",
-        icon: "ℹ️",
-        label: "About Us",
-      },
+      { key: "profile", icon: "●", label: "User Profile" },
+      { key: "settings", icon: "⚙", label: "Settings" },
+    ],
+  },
+  {
+    title: "Legal & Information",
+    items: [
+      { key: "terms", icon: "▤", label: "Terms & Conditions" },
+      { key: "privacy", icon: "🔒", label: "Privacy Policy" },
+      { key: "refund", icon: "↩", label: "Return & Refund Policy" },
+      { key: "cancellation", icon: "×", label: "Cancellation Policy" },
+      { key: "about", icon: "i", label: "About Us" },
     ],
   },
 ];
@@ -96,26 +57,18 @@ export default function SideDrawer({
     useState(true);
 
   const firstName =
-    session?.user?.user_metadata
-      ?.first_name || "";
-
-  const lastName =
-    session?.user?.user_metadata
-      ?.last_name || "";
+    session?.user?.user_metadata?.first_name || "";
 
   const email =
     session?.user?.email || "";
 
   const fullName =
-    `${firstName} ${lastName}`.trim() ||
-    session?.user?.user_metadata
-      ?.full_name ||
+    `${firstName} ${session?.user?.user_metadata?.last_name || ""}`.trim() ||
+    session?.user?.user_metadata?.full_name ||
     "EV Toolkit User";
 
   const avatarLetter =
-    firstName.charAt(0) ||
-    email.charAt(0) ||
-    "U";
+    firstName.charAt(0) || email.charAt(0) || "U";
 
   useEffect(() => {
     let mounted = true;
@@ -126,7 +79,6 @@ export default function SideDrawer({
           setSubscriptionPlan("free");
           setLoadingSubscriptionPlan(false);
         }
-
         return;
       }
 
@@ -139,10 +91,7 @@ export default function SideDrawer({
           setSubscriptionPlan(plan);
         }
       } catch (error) {
-        console.error(
-          "Failed to load subscription plan:",
-          error
-        );
+        console.error("Failed to load subscription plan:", error);
 
         if (mounted) {
           setSubscriptionPlan("free");
@@ -154,7 +103,7 @@ export default function SideDrawer({
       }
     }
 
-    loadSubscriptionPlan();
+    void loadSubscriptionPlan();
 
     return () => {
       mounted = false;
@@ -171,21 +120,21 @@ export default function SideDrawer({
   const planStyle =
     subscriptionPlan === "premium_plus"
       ? {
-          background: "#bfdbfe",
-          color: "#1d4ed8",
-          border: "1px solid #3b82f6",
+          background: "rgba(59,130,246,0.16)",
+          color: "#93c5fd",
+          border: "1px solid rgba(59,130,246,0.38)",
         }
       : subscriptionPlan === "premium"
         ? {
-            background: "#fee2e2",
-            color: "#b91c1c",
-            border: "1px solid #ef4444",
+            background: "rgba(239,68,68,0.14)",
+            color: "#fca5a5",
+            border: "1px solid rgba(239,68,68,0.35)",
           }
         : {
-            background: "#dcfce7",
-            color: "#15803d",
-            border: "1px solid #22c55e",
-          };
+            background: "rgba(34,197,94,0.13)",
+            color: "#86efac",
+            border: "1px solid rgba(34,197,94,0.30)",
+        };
 
   function navigate(page: string) {
     onNavigate(page);
@@ -197,16 +146,92 @@ export default function SideDrawer({
       await signOut();
       onClose();
     } catch (error) {
-      console.error(
-        "Logout error:",
-        error
-      );
-
-      alert(
-        "Failed to sign out."
-      );
+      console.error("Logout error:", error);
+      alert("Failed to sign out.");
     }
   }
+
+  const renderNavItem = (
+    item: {
+      key: string;
+      icon: string;
+      label: string;
+    },
+  ) => {
+    const active = currentPage === item.key;
+
+    return (
+      <button
+        key={item.key}
+        onClick={() => navigate(item.key)}
+        style={{
+          width: "100%",
+          minHeight: "46px",
+          display: "flex",
+          alignItems: "center",
+          gap: "11px",
+          border: "1px solid transparent",
+          borderRadius: "11px",
+          background: active
+            ? "rgba(59,130,246,0.16)"
+            : "transparent",
+          color: active ? "#ffffff" : "#f1f5f9",
+          padding: "9px 11px",
+          cursor: "pointer",
+          fontSize: "14px",
+          fontWeight: active ? 700 : 550,
+          textAlign: "left",
+          boxSizing: "border-box",
+          transition: "all 0.18s ease",
+        }}
+        onMouseEnter={(event) => {
+          if (!active) {
+            event.currentTarget.style.background =
+              "rgba(255,255,255,0.055)";
+            event.currentTarget.style.color = "#f8fafc";
+          }
+        }}
+        onMouseLeave={(event) => {
+          if (!active) {
+            event.currentTarget.style.background =
+              "transparent";
+            event.currentTarget.style.color = "#cbd5e1";
+          }
+        }}
+      >
+        <span
+          style={{
+            width: "30px",
+            height: "30px",
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: "9px",
+            background: active
+              ? "rgba(59,130,246,0.24)"
+              : "rgba(255,255,255,0.055)",
+            color: active ? "#93c5fd" : "#dbe4f0",
+            fontSize: "16px",
+            lineHeight: 1,
+          }}
+        >
+          {item.icon}
+        </span>
+
+        <span
+          style={{
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {item.label}
+        </span>
+      </button>
+    );
+  };
 
   return (
     <>
@@ -216,8 +241,8 @@ export default function SideDrawer({
           style={{
             position: "fixed",
             inset: 0,
-            background:
-              "rgba(0,0,0,.4)",
+            background: "rgba(2,6,23,0.62)",
+            backdropFilter: "blur(2px)",
             zIndex: 1000,
           }}
         />
@@ -227,268 +252,293 @@ export default function SideDrawer({
         style={{
           position: "fixed",
           top: 0,
-          left: open ? 0 : -280,
-          width: 260,
+          left: open ? 0 : -320,
+          width: "292px",
+          maxWidth: "88vw",
           height: "100vh",
-          background: "#ffffff",
-          color: "#222",
-          borderRight:
-            "1px solid #ddd",
-          transition: "0.25s",
+          background:
+            "linear-gradient(180deg, #0f172a 0%, #111827 52%, #0b1220 100%)",
+          color: "#f8fafc",
+          borderRight: "1px solid rgba(255,255,255,0.10)",
+          transition: "left 0.25s ease",
           zIndex: 1001,
-          boxShadow:
-            "2px 0 12px rgba(0,0,0,.2)",
+          boxShadow: "14px 0 45px rgba(0,0,0,0.35)",
           display: "flex",
           flexDirection: "column",
+          overflow: "hidden",
         }}
       >
+        {/* Header */}
         <div
           style={{
-            padding: 20,
-            fontSize: 22,
-            fontWeight: "bold",
-            borderBottom:
-              "1px solid #eee",
-          }}
-        >
-          ⚡ EV Toolkit
-        </div>
-
-        <div
-          style={{
-            flex: 1,
-            overflowY: "auto",
-          }}
-        >
-          {menu.map((section) => (
-            <div
-              key={section.title}
-            >
-              <div
-                style={{
-                  padding:
-                    "14px 18px 8px",
-                  color: "#777",
-                  fontSize: 13,
-                  fontWeight: "bold",
-                }}
-              >
-                {section.title}
-              </div>
-
-              {section.items.map(
-                  (item) => (
-                  <button
-                    key={item.key}
-                    onClick={() =>
-                      navigate(
-                        item.key
-                      )
-                    }
-                    style={{
-                      width: "100%",
-                      textAlign:
-                        "left",
-                      border: "none",
-                      background:
-                        currentPage ===
-                        item.key
-                          ? "#eef5ff"
-                          : "white",
-                      padding:
-                        "14px 18px",
-                      cursor:
-                        "pointer",
-                      fontSize: 16,
-                      color: "#222",
-                    }}
-                  >
-                    {item.icon}{" "}
-                    {item.label}
-                  </button>
-                )
-              )}
-            </div>
-          ))}
-        </div>
-
-        <button
-          onClick={() =>
-            navigate("profile")
-          }
-          style={{
-            width: "100%",
-            border: "none",
-            background:
-              currentPage ===
-              "profile"
-                ? "#eef5ff"
-                : "transparent",
-            cursor:
-              "pointer",
-            padding:
-              "16px 18px",
-            color: "inherit",
-            textAlign:
-              "left",
-            borderTop:
-              "1px solid #eee",
+            flexShrink: 0,
+            minHeight: "70px",
+            padding: "15px 14px 14px 18px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "12px",
+            borderBottom: "1px solid rgba(255,255,255,0.08)",
           }}
         >
           <div
             style={{
               display: "flex",
-              alignItems:
-                "center",
-              gap: 12,
+              alignItems: "center",
+              gap: "11px",
+              minWidth: 0,
             }}
           >
             <div
               style={{
-                width: 42,
-                height: 42,
-                borderRadius:
-                  "50%",
-                background:
-                  "#2563eb",
-                color: "#fff",
-                display:
-                  "flex",
-                alignItems:
-                  "center",
-                justifyContent:
-                  "center",
-                fontSize: 18,
-                fontWeight:
-                  "bold",
+                width: "38px",
+                height: "38px",
                 flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "11px",
+                background:
+                  "linear-gradient(145deg, #2563eb, #1d4ed8)",
+                boxShadow:
+                  "0 6px 18px rgba(37,99,235,0.30)",
+                fontSize: "20px",
               }}
             >
-              {avatarLetter.toUpperCase()}
+              ⚡
             </div>
 
-            <div
-              style={{
-                minWidth: 0,
-                flex: 1,
-              }}
-            >
+            <div style={{ minWidth: 0 }}>
               <div
                 style={{
-                  fontWeight:
-                    600,
-                  fontSize: 14,
-                  marginBottom:
-                    5,
-                  overflow:
-                    "hidden",
-                  textOverflow:
-                    "ellipsis",
-                  whiteSpace:
-                    "nowrap",
+                  fontSize: "16px",
+                  fontWeight: 800,
+                  letterSpacing: "-0.01em",
                 }}
               >
-                {fullName}
+                EV Toolkit
               </div>
-
               <div
                 style={{
-                  display:
-                    "inline-flex",
-                  alignItems:
-                    "center",
-                  gap: 5,
-                  padding:
-                    "3px 8px",
-                  borderRadius:
-                    999,
-                  fontSize: 11,
-                  fontWeight:
-                    600,
-                  lineHeight: 1.2,
-                  ...planStyle,
-                  marginBottom: 4,
+                  marginTop: "2px",
+                  color: "#aab7c8",
+                  fontSize: "11px",
+                  fontWeight: 500,
                 }}
               >
-                {loadingSubscriptionPlan
-                  ? "Loading..."
-                  : planLabel}
-
-                {!loadingSubscriptionPlan && (
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 500,
-                    }}
-                  >
-                    · Active
-                  </span>
-                )}
-              </div>
-
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "#777",
-                  overflow:
-                    "hidden",
-                  textOverflow:
-                    "ellipsis",
-                  whiteSpace:
-                    "nowrap",
-                }}
-              >
-                {email}
+                EV ownership companion
               </div>
             </div>
           </div>
-        </button>
 
-        <button
-          onClick={
-            handleLogout
-          }
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close menu"
+            title="Close"
+            style={{
+              width: "34px",
+              height: "34px",
+              flexShrink: 0,
+              border: "1px solid rgba(255,255,255,0.10)",
+              borderRadius: "9px",
+              background: "rgba(255,255,255,0.055)",
+              color: "#cbd5e1",
+              cursor: "pointer",
+              fontSize: "20px",
+              lineHeight: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Navigation */}
+        <div
           style={{
-            width: "calc(100% - 28px)",
-            margin:
-              "12px 14px 14px",
-            border:
-              "1px solid #b91c1c",
-            borderRadius:
-              "10px",
-            background:
-              "#dc2626",
-            padding:
-              "12px 16px",
-            cursor:
-              "pointer",
-            fontSize: 15,
-            textAlign:
-              "left",
-            color:
-              "#ffffff",
-            fontWeight:
-              600,
-            boxShadow:
-              "0 3px 8px rgba(220,38,38,0.25)",
-            transition:
-              "all 0.2s ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background =
-              "#b91c1c";
-            e.currentTarget.style.boxShadow =
-              "0 4px 10px rgba(185,28,28,0.30)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background =
-              "#dc2626";
-            e.currentTarget.style.boxShadow =
-              "0 3px 8px rgba(220,38,38,0.25)";
+            flex: "1 1 auto",
+            minHeight: 0,
+            overflowY: "scroll",
+            overflowX: "hidden",
+            padding: "12px 10px 18px",
+            scrollbarWidth: "thin",
+            scrollbarColor:
+              "#475569 rgba(255,255,255,0.04)",
           }}
         >
-          ⏻ Logout
-        </button>
+          {sections.map((section) => (
+            <div
+              key={section.title}
+              style={{
+                paddingTop: "14px",
+                paddingBottom: "13px",
+                borderBottom:
+                  "1px solid rgba(255,255,255,0.08)",
+              }}
+            >
+              <div
+                style={{
+                  padding: "4px 8px 7px",
+                  color: "#aab7c8",
+                  fontSize: "10px",
+                  fontWeight: 800,
+                  letterSpacing: "1.05px",
+                  textTransform: "uppercase",
+                }}
+              >
+                {section.title}
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "3px",
+                }}
+              >
+                {section.items.map(renderNavItem)}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Fixed user area */}
+        <div
+          style={{
+            flexShrink: 0,
+            padding: "10px 12px 12px",
+            borderTop:
+              "1px solid rgba(255,255,255,0.09)",
+            background:
+              "rgba(2,6,23,0.28)",
+          }}
+        >
+          <button
+            onClick={() => navigate("profile")}
+            style={{
+              width: "100%",
+              border:
+                currentPage === "profile"
+                  ? "1px solid rgba(59,130,246,0.38)"
+                  : "1px solid rgba(255,255,255,0.07)",
+              borderRadius: "12px",
+              background:
+                currentPage === "profile"
+                  ? "rgba(59,130,246,0.12)"
+                  : "rgba(255,255,255,0.035)",
+              cursor: "pointer",
+              padding: "10px",
+              color: "#f8fafc",
+              textAlign: "left",
+              boxSizing: "border-box",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+              }}
+            >
+              <div
+                style={{
+                  width: "38px",
+                  height: "38px",
+                  borderRadius: "50%",
+                  background:
+                    "linear-gradient(145deg, #334155, #1e293b)",
+                  border:
+                    "1px solid rgba(255,255,255,0.12)",
+                  color: "#e2e8f0",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "16px",
+                  fontWeight: 800,
+                  flexShrink: 0,
+                }}
+              >
+                {avatarLetter.toUpperCase()}
+              </div>
+
+              <div
+                style={{
+                  minWidth: 0,
+                  flex: 1,
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: 700,
+                    fontSize: "13px",
+                    marginBottom: "4px",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {fullName}
+                </div>
+
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "2px 7px",
+                    borderRadius: "999px",
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    lineHeight: 1.25,
+                    ...planStyle,
+                  }}
+                >
+                  {loadingSubscriptionPlan
+                    ? "Loading..."
+                    : planLabel}
+                </div>
+              </div>
+            </div>
+          </button>
+
+          <button
+            onClick={handleLogout}
+            style={{
+              width: "100%",
+              minHeight: "42px",
+              marginTop: "8px",
+              border:
+                "1px solid rgba(248,113,113,0.32)",
+              borderRadius: "10px",
+              background:
+                "rgba(220,38,38,0.10)",
+              padding: "9px 12px",
+              cursor: "pointer",
+              fontSize: "13px",
+              textAlign: "left",
+              color: "#fecaca",
+              fontWeight: 650,
+              transition: "all 0.18s ease",
+            }}
+            onMouseEnter={(event) => {
+              event.currentTarget.style.background =
+                "rgba(220,38,38,0.18)";
+              event.currentTarget.style.borderColor =
+                "rgba(248,113,113,0.50)";
+            }}
+            onMouseLeave={(event) => {
+              event.currentTarget.style.background =
+                "rgba(220,38,38,0.10)";
+              event.currentTarget.style.borderColor =
+                "rgba(248,113,113,0.32)";
+            }}
+          >
+            ⏻ Logout
+          </button>
+        </div>
       </div>
     </>
   );

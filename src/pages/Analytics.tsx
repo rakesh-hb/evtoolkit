@@ -1576,7 +1576,7 @@ function Analytics({
             "100%",
           height:
             expanded
-              ? "600px"
+              ? "min(70vh, 560px)"
               : "350px",
         }}
       >
@@ -1594,16 +1594,24 @@ function Analytics({
               }
               dataKey="value"
               nameKey="name"
+              isAnimationActive={true}
+              animationBegin={0}
+              animationDuration={expanded ? 900 : 700}
+              animationEasing="ease-out"
               cx="50%"
-              cy="45%"
+              cy={
+                expanded
+                  ? "40%"
+                  : "45%"
+              }
               innerRadius={
                 expanded
-                  ? 125
+                  ? "20%"
                   : 78
               }
               outerRadius={
                 expanded
-                  ? 200
+                  ? "34%"
                   : 125
               }
               paddingAngle={3}
@@ -1681,64 +1689,70 @@ function Analytics({
         </ResponsiveContainer>
 
 
-        {/* Center total */}
-
+        {/* Charging type summary stays above the chart */}
         <div
           style={{
             position:
               "absolute",
             top:
-              "45%",
+              expanded
+                ? "18px"
+                : "-38px",
             left:
               "50%",
             transform:
-              "translate(-50%, -50%)",
+              "translateX(-50%)",
             textAlign:
               "center",
             pointerEvents:
               "none",
+            zIndex:
+              3,
+            whiteSpace:
+              "nowrap",
+            animation:
+              expanded
+                ? "chargingTypeSummaryIn 0.55s ease-out"
+                : "none",
           }}
         >
-
           <div
             style={{
-              fontSize:
-                expanded
-                  ? "46px"
-                  : "32px",
-              fontWeight:
-                400,
-              color:
-                VALUE_ORANGE,
-              lineHeight:
-                1.1,
-            }}
-          >
-            {
-              totalSessions
-            }
-          </div>
-
-
-          <div
-            style={{
-              marginTop:
-                "6px",
               fontSize:
                 expanded
                   ? "15px"
                   : "12px",
               fontWeight:
-                400,
+                700,
               color:
                 VALUE_ORANGE,
               letterSpacing:
-                "0.5px",
+                "0.4px",
+              lineHeight:
+                1.2,
             }}
           >
             TOTAL SESSIONS
           </div>
 
+          <div
+            style={{
+              marginTop:
+                "3px",
+              fontSize:
+                expanded
+                  ? "34px"
+                  : "22px",
+              fontWeight:
+                700,
+              color:
+                VALUE_ORANGE,
+              lineHeight:
+                1,
+            }}
+          >
+            {totalSessions}
+          </div>
         </div>
 
       </div>
@@ -1878,11 +1892,15 @@ function Analytics({
         <div
           style={{
             width:
-              "min(1200px, 96vw)",
+              "calc(100vw - 24px)",
+            maxWidth:
+              "1200px",
             maxHeight:
-              "92vh",
+              "calc(100vh - 24px)",
             overflow:
               "auto",
+            boxSizing:
+              "border-box",
             background:
               "#1e293b",
             border:
@@ -1892,7 +1910,7 @@ function Analytics({
             boxShadow:
               "0 24px 80px rgba(0,0,0,0.45)",
             padding:
-              "24px",
+              "16px",
           }}
         >
 

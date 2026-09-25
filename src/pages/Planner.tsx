@@ -533,6 +533,14 @@ function Planner({
     [customChargers]
   );
 
+  const brands = useMemo(
+    () =>
+      [...new Set(allVehicles.map((v) => v.brand))].sort(
+        (a, b) => a.localeCompare(b)
+      ),
+    [allVehicles]
+  );
+
   /*
    * =========================================================
    * VEHICLE
@@ -2648,6 +2656,8 @@ if (fastChargeTime > 0) {
           Selected Vehicle Specifications
         </h3>
 
+        <div className="tableContainer">
+
         <table className="table">
 
           <tbody>
@@ -2772,6 +2782,8 @@ if (fastChargeTime > 0) {
           </tbody>
 
         </table>
+
+        </div>
 
       </div>
 
