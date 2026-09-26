@@ -210,8 +210,7 @@ export default function About({
 
           <strong>Registered Address</strong>
           <span>
-            103, North Winds 2, Jakkur main road, Near The Ledge,
-            Yelahanka Old Town, Bengaluru, Karnataka, 560064, India
+            Bengaluru, Karnataka, India
           </span>
         </div>
       </div>
@@ -306,7 +305,7 @@ export default function About({
           <span>Web Application / Capacitor Android support</span>
 
           <strong>Technology</strong>
-          <span>React 19 · TypeScript 6 · Vite 8 · Supabase</span>
+          <span>React · TypeScript · Vite · Supabase</span>
 
           <strong>Name</strong>
           <span>Rakesh H B</span>
@@ -363,18 +362,6 @@ export default function About({
                 </a>
               </div>
 
-              <div>
-                <strong>Phone:</strong>{" "}
-                <a
-                  href="tel:+919611761243"
-                  style={{
-                    color: "#f97316",
-                    textDecoration: "none",
-                  }}
-                >
-                  +91 96117 61243
-                </a>
-              </div>
             </div>
           </div>
         </div>
