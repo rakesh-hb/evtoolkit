@@ -188,6 +188,77 @@ function Analytics({
 
   /*
    * ============================================================
+   * APPROXIMATE PETROL / DIESEL COMPARISON
+   *
+   * These are benchmark assumptions, not vehicle-specific
+   * measurements. They are intentionally labeled approximate
+   * throughout the Analytics UI and report.
+   *
+   * EV:       6.0 km per kWh
+   * Petrol:  15.0 km per litre
+   * Diesel:  20.0 km per litre
+   * Petrol:  ₹110 per litre
+   * Diesel:  ₹100 per litre
+   *
+   * CO2 factors are based on published fuel emission factors:
+   * petrol ≈ 2.32 kg CO2/L
+   * diesel ≈ 2.70 kg CO2/L
+   *
+   * EV electricity-generation emissions are NOT subtracted here.
+   * This is an approximate tailpipe comparison against equivalent
+   * petrol/diesel travel for the estimated distance.
+   * ============================================================
+   */
+
+  const APPROX_EV_KM_PER_KWH = 6;
+  const APPROX_PETROL_KM_PER_LITRE = 15;
+  const APPROX_DIESEL_KM_PER_LITRE = 20;
+  const APPROX_PETROL_PRICE_PER_LITRE = 110;
+  const APPROX_DIESEL_PRICE_PER_LITRE = 100;
+  const APPROX_PETROL_CO2_KG_PER_LITRE = 2.32;
+  const APPROX_DIESEL_CO2_KG_PER_LITRE = 2.70;
+
+  const approximateDistanceKm =
+    totalEnergy * APPROX_EV_KM_PER_KWH;
+
+  const approximatePetrolLitres =
+    approximateDistanceKm /
+    APPROX_PETROL_KM_PER_LITRE;
+
+  const approximateDieselLitres =
+    approximateDistanceKm /
+    APPROX_DIESEL_KM_PER_LITRE;
+
+  const approximatePetrolCost =
+    approximatePetrolLitres *
+    APPROX_PETROL_PRICE_PER_LITRE;
+
+  const approximateDieselCost =
+    approximateDieselLitres *
+    APPROX_DIESEL_PRICE_PER_LITRE;
+
+  const approximatePetrolCostSavings =
+    approximatePetrolCost - totalCost;
+
+  const approximateDieselCostSavings =
+    approximateDieselCost - totalCost;
+
+  const approximatePetrolCo2AvoidedKg =
+    approximatePetrolLitres *
+    APPROX_PETROL_CO2_KG_PER_LITRE;
+
+  const approximateDieselCo2AvoidedKg =
+    approximateDieselLitres *
+    APPROX_DIESEL_CO2_KG_PER_LITRE;
+
+  const approximateCo2SavedKg =
+    (approximatePetrolCo2AvoidedKg +
+      approximateDieselCo2AvoidedKg) /
+    2;
+
+
+  /*
+   * ============================================================
    * STATISTICS
    * ============================================================
    */
@@ -796,6 +867,13 @@ function Analytics({
     averageEnergy,
 
     averageCost,
+
+    approximateDistanceKm,
+    approximatePetrolCostSavings,
+    approximateDieselCostSavings,
+    approximatePetrolCo2AvoidedKg,
+    approximateDieselCo2AvoidedKg,
+    approximateCo2SavedKg,
 
     vehicleStats,
 
@@ -2819,6 +2897,207 @@ function Analytics({
 
         </div>
 
+      </div>
+
+
+      {/* ==================================================
+          APPROXIMATE PETROL / DIESEL COMPARISON
+          ================================================== */}
+
+      <div
+        className="card"
+        style={{
+          marginTop: "18px",
+          border: "1px solid rgba(249,115,22,0.34)",
+          background:
+            "linear-gradient(145deg, rgba(120,53,15,0.18), rgba(15,23,42,0.96))",
+        }}
+      >
+        <h3>
+          🌱 Approximate EV Savings & CO₂ Avoided
+        </h3>
+
+        <p
+          style={{
+            marginTop: "-4px",
+            marginBottom: "16px",
+            fontSize: "12px",
+            lineHeight: 1.55,
+            color: SECONDARY_TEXT,
+          }}
+        >
+          Approximate comparison using benchmark vehicle efficiency,
+          fuel prices and tailpipe CO₂ factors. These figures are
+          estimates, not measured fuel consumption or actual fuel
+          purchases. EV electricity-generation emissions are not included.
+        </p>
+
+        <div
+          className="statsGrid"
+          style={{
+            gap: "14px",
+            marginTop: 0,
+          }}
+        >
+          <div
+            className="statCard"
+            style={{
+              minHeight: "132px",
+              background:
+                "linear-gradient(145deg, rgba(34,197,94,0.18), rgba(15,23,42,0.96))",
+              border:
+                "1px solid rgba(34,197,94,0.35)",
+            }}
+          >
+            <h3
+              style={{
+                color: PRIMARY_TEXT,
+                fontSize: "12px",
+              }}
+            >
+              Approx. CO₂ Avoided
+            </h3>
+
+            <h1
+              style={{
+                color: "#4ade80",
+                fontSize: "25px",
+                margin: "8px 0 0",
+              }}
+            >
+              {approximateCo2SavedKg.toFixed(1)} kg
+            </h1>
+
+            <p
+              style={{
+                margin: "8px 0 0",
+                color: MUTED_TEXT,
+                fontSize: "11px",
+              }}
+            >
+              Average of petrol and diesel tailpipe estimates
+            </p>
+          </div>
+
+          <div
+            className="statCard"
+            style={{
+              minHeight: "132px",
+              background:
+                "linear-gradient(145deg, rgba(59,130,246,0.18), rgba(15,23,42,0.96))",
+              border:
+                "1px solid rgba(59,130,246,0.35)",
+            }}
+          >
+            <h3
+              style={{
+                color: PRIMARY_TEXT,
+                fontSize: "12px",
+              }}
+            >
+              Approx. Savings vs Petrol
+            </h3>
+
+            <h1
+              style={{
+                color: "#38bdf8",
+                fontSize: "25px",
+                margin: "8px 0 0",
+              }}
+            >
+              ₹{approximatePetrolCostSavings.toLocaleString(
+                undefined,
+                {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                }
+              )}
+            </h1>
+
+            <p
+              style={{
+                margin: "8px 0 0",
+                color: MUTED_TEXT,
+                fontSize: "11px",
+              }}
+            >
+              Estimated fuel-cost difference
+            </p>
+          </div>
+
+          <div
+            className="statCard"
+            style={{
+              minHeight: "132px",
+              background:
+                "linear-gradient(145deg, rgba(168,85,247,0.18), rgba(15,23,42,0.96))",
+              border:
+                "1px solid rgba(168,85,247,0.35)",
+            }}
+          >
+            <h3
+              style={{
+                color: PRIMARY_TEXT,
+                fontSize: "12px",
+              }}
+            >
+              Approx. Savings vs Diesel
+            </h3>
+
+            <h1
+              style={{
+                color: "#d8b4fe",
+                fontSize: "25px",
+                margin: "8px 0 0",
+              }}
+            >
+              ₹{approximateDieselCostSavings.toLocaleString(
+                undefined,
+                {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                }
+              )}
+            </h1>
+
+            <p
+              style={{
+                margin: "8px 0 0",
+                color: MUTED_TEXT,
+                fontSize: "11px",
+              }}
+            >
+              Estimated fuel-cost difference
+            </p>
+          </div>
+        </div>
+
+        <div
+          style={{
+            marginTop: "14px",
+            padding: "10px 12px",
+            borderRadius: "10px",
+            background: "rgba(255,255,255,0.04)",
+            color: MUTED_TEXT,
+            fontSize: "11px",
+            lineHeight: 1.55,
+          }}
+        >
+          Estimated distance used:{" "}
+          <strong style={{ color: SECONDARY_TEXT }}>
+            {approximateDistanceKm.toFixed(0)} km
+          </strong>
+          {" · "}
+          Petrol CO₂ avoided:{" "}
+          <strong style={{ color: SECONDARY_TEXT }}>
+            {approximatePetrolCo2AvoidedKg.toFixed(1)} kg
+          </strong>
+          {" · "}
+          Diesel CO₂ avoided:{" "}
+          <strong style={{ color: SECONDARY_TEXT }}>
+            {approximateDieselCo2AvoidedKg.toFixed(1)} kg
+          </strong>
+        </div>
       </div>
 
 

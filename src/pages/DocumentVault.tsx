@@ -34,7 +34,6 @@ import {
 
 import {
   getCustomVehicles,
-  addCustomVehicle,
   type CustomVehicleRecord,
 } from "../services/customVehicleService";
 
@@ -48,6 +47,7 @@ import { vehicles } from "../data/vehicles";
 
 import ReceiptUploader from "../components/ReceiptUploader";
 import UserDetails from "../components/UserDetails";
+import { usePrimaryVehicle } from "../context/PrimaryVehicleContext";
 
 
 const emptyRecord: DocumentRecord = {
@@ -88,6 +88,11 @@ interface DocumentVaultProps {
 export default function DocumentVault({
   onNavigate,
 }: DocumentVaultProps) {
+  const {
+    primaryVehicle,
+    loading: primaryVehicleLoading,
+  } = usePrimaryVehicle();
+
   const [records, setRecords] =
     useState<DocumentRecord[]>([]);
 
@@ -146,22 +151,6 @@ export default function DocumentVault({
     customVehicles,
     setCustomVehicles,
   ] = useState<CustomVehicleRecord[]>([]);
-
-  const [
-    showVehicleForm,
-    setShowVehicleForm,
-  ] = useState(false);
-
-  const [vehicleBrand, setVehicleBrand] =
-    useState("");
-
-  const [vehicleModel, setVehicleModel] =
-    useState("");
-
-  const [
-    savingVehicle,
-    setSavingVehicle,
-  ] = useState(false);
 
   const [vehicleSearch, setVehicleSearch] = useState("");
   const [showVehicleSuggestions, setShowVehicleSuggestions] = useState(false);
@@ -488,111 +477,49 @@ export default function DocumentVault({
     );
   }, [allCategories, categorySearch]);
 
+  const primaryVehicleName = useMemo(() => {
+    if (!primaryVehicle) {
+      return "";
+    }
 
-  /* =========================================================
-     ADD CUSTOM VEHICLE
-     ========================================================= */
-
-  async function handleAddVehicle() {
-    const brand =
-      vehicleBrand.trim();
-
-    const model =
-      vehicleModel.trim();
-
-    if (!brand || !model) {
-      alert(
-        "Please enter the vehicle brand and model."
+    if (primaryVehicle.type === "built_in") {
+      const vehicle = vehicles.find(
+        (item) => Number(item.id) === Number(primaryVehicle.id)
       );
 
+      return vehicle
+        ? `${vehicle.brand} ${vehicle.model}`
+        : "";
+    }
+
+    const vehicle = customVehicles.find(
+      (item) => Number(item.id) === Number(primaryVehicle.id)
+    );
+
+    return vehicle
+      ? `${vehicle.brand} ${vehicle.model}`
+      : "";
+  }, [primaryVehicle, customVehicles]);
+
+  useEffect(() => {
+    if (
+      primaryVehicleLoading ||
+      editingId !== null
+    ) {
       return;
     }
 
-    const duplicate =
-      allVehicles.some(
-        (vehicle) =>
-          vehicle.value
-            .trim()
-            .toLowerCase() ===
-          `${brand} ${model}`
-            .trim()
-            .toLowerCase()
-      );
+    setForm((current) => ({
+      ...current,
+      vehicle: primaryVehicleName,
+    }));
+    setVehicleSearch(primaryVehicleName);
+  }, [
+    primaryVehicleLoading,
+    primaryVehicleName,
+    editingId,
+  ]);
 
-    if (duplicate) {
-      alert(
-        "This vehicle already exists."
-      );
-
-      return;
-    }
-
-    try {
-      setSavingVehicle(
-        true
-      );
-
-      const created =
-        await addCustomVehicle({
-          brand,
-          model,
-        });
-
-      setCustomVehicles(
-        (previous) => [
-          ...previous,
-          created,
-        ]
-      );
-
-      const vehicleName =
-        `${created.brand} ${created.model}`;
-
-      setForm(
-        (previous) => ({
-          ...previous,
-          vehicle:
-            vehicleName,
-        })
-      );
-
-      setVehicleSearch(vehicleName);
-      setShowVehicleSuggestions(false);
-
-      setVehicleBrand(
-        ""
-      );
-
-      setVehicleModel(
-        ""
-      );
-
-      setShowVehicleForm(
-        false
-      );
-
-      alert(
-        "Vehicle added successfully."
-      );
-
-    } catch (error) {
-      console.error(
-        "Failed to add vehicle:",
-        error
-      );
-
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Failed to add vehicle."
-      );
-
-    } finally {
-      setSavingVehicle(
-        false
-      );
-    }
-  }
 
 
   /* =========================================================
@@ -702,6 +629,10 @@ export default function DocumentVault({
         setForm((current) => ({
           ...current,
           ...draft.draft_data,
+          vehicle:
+            draft.draft_data.vehicle?.trim()
+              ? draft.draft_data.vehicle
+              : current.vehicle,
           file: "",
         }));
         setDraftStatus("saved");
@@ -928,10 +859,14 @@ export default function DocumentVault({
     });
 
     setEditingId(null);
-    setForm({ ...emptyRecord });
-    setShowVehicleForm(false);
-    setVehicleBrand("");
-    setVehicleModel("");
+
+    const resetVehicle = primaryVehicleName;
+
+    setForm({
+      ...emptyRecord,
+      vehicle: resetVehicle,
+    });
+    setVehicleSearch(resetVehicle);
     setShowCategoryForm(false);
     setCategoryName("");
     setDraftStatus("idle");
@@ -1050,9 +985,11 @@ export default function DocumentVault({
         null
       );
 
-      setForm(
-        emptyRecord
-      );
+      setForm({
+        ...emptyRecord,
+        vehicle: primaryVehicleName,
+      });
+      setVehicleSearch(primaryVehicleName);
 
       setDraftStatus("idle");
 
@@ -1323,123 +1260,14 @@ export default function DocumentVault({
                       ))
                     ) : (
                       <div style={{ padding: "10px 12px", color: "#9ca3af", fontSize: "13px" }}>
-                        No matching vehicle found. Use ＋ Or Add Custom Vehicle to create one.
+                        No matching vehicle found. Add a custom vehicle from Settings first.
                       </div>
                     )}
                   </div>
                 )}
               </div>
-
-              <button
-                type="button"
-                className="saveButton evtoolkitCustomFieldButton"
-                onClick={() => setShowVehicleForm((value) => !value)}
-                style={{
-                  whiteSpace: "nowrap",
-                  height: "44px",
-                  minHeight: "44px",
-                  boxSizing: "border-box",
-                  transform: "translateY(6px)",
-                }}
-              >
-                ＋ Or Add Custom Vehicle
-              </button>
             </div>
 
-            {showVehicleForm && (
-              <div
-                style={{
-                  marginTop: "10px",
-                  padding: "12px",
-                  border:
-                    "1px solid #e5e7eb",
-                  borderRadius: "8px",
-                }}
-              >
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      "1fr 1fr",
-                    gap: "8px",
-                  }}
-                >
-
-                  <input
-                    type="text"
-                    placeholder="Brand"
-                    value={
-                      vehicleBrand
-                    }
-                    onChange={(e) =>
-                      setVehicleBrand(
-                        e.target.value
-                      )
-                    }
-                  />
-
-                  <input
-                    type="text"
-                    placeholder="Model"
-                    value={
-                      vehicleModel
-                    }
-                    onChange={(e) =>
-                      setVehicleModel(
-                        e.target.value
-                      )
-                    }
-                  />
-
-                </div>
-
-
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "8px",
-                    marginTop: "10px",
-                  }}
-                >
-
-                  <button
-                    type="button"
-                    className="saveButton"
-                    disabled={
-                      savingVehicle
-                    }
-                    onClick={() =>
-                      void handleAddVehicle()
-                    }
-                  >
-                    {savingVehicle
-                      ? "Saving..."
-                      : "Save Vehicle"}
-                  </button>
-
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowVehicleForm(
-                        false
-                      );
-                      setVehicleBrand(
-                        ""
-                      );
-                      setVehicleModel(
-                        ""
-                      );
-                    }}
-                  >
-                    Cancel
-                  </button>
-
-                </div>
-
-              </div>
-            )}
 
           </div>
 

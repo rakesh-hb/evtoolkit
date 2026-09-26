@@ -34,7 +34,6 @@ import {
 
 import {
   getCustomVehicles,
-  addCustomVehicle,
   type CustomVehicleRecord,
 } from "../services/customVehicleService";
 
@@ -42,6 +41,7 @@ import { vehicles } from "../data/vehicles";
 
 import ReceiptUploader from "../components/ReceiptUploader";
 import UserDetails from "../components/UserDetails";
+import { usePrimaryVehicle } from "../context/PrimaryVehicleContext";
 
 
 const emptyRecord: ServiceRecord = {
@@ -69,6 +69,11 @@ interface ServiceHistoryProps {
 export default function ServiceHistory({
   onNavigate,
 }: ServiceHistoryProps) {
+  const {
+    primaryVehicle,
+    loading: primaryVehicleLoading,
+  } = usePrimaryVehicle();
+
   const [records, setRecords] =
     useState<ServiceRecord[]>([]);
 
@@ -97,22 +102,10 @@ export default function ServiceHistory({
   const [customVehicles, setCustomVehicles] =
     useState<CustomVehicleRecord[]>([]);
 
-  const [showVehicleForm, setShowVehicleForm] =
-    useState(false);
-
   const [vehicleSearch, setVehicleSearch] =
     useState("");
 
   const [showVehicleSuggestions, setShowVehicleSuggestions] =
-    useState(false);
-
-  const [vehicleBrand, setVehicleBrand] =
-    useState("");
-
-  const [vehicleModel, setVehicleModel] =
-    useState("");
-
-  const [savingVehicle, setSavingVehicle] =
     useState(false);
 
   const [customServiceType, setCustomServiceType] =
@@ -333,6 +326,7 @@ export default function ServiceHistory({
         setForm((current) => ({
           ...current,
           ...draft.draft_data,
+          vehicle: current.vehicle,
           attachment: "",
         }));
         setDraftStatus("saved");
@@ -437,6 +431,72 @@ export default function ServiceHistory({
     ]);
 
 
+  /*
+   * Resolve the shared Primary Vehicle into the display name used by
+   * Service History. Built-in and custom IDs are resolved separately
+   * because their numeric IDs can overlap.
+   */
+  const primaryVehicleName = useMemo(() => {
+    if (!primaryVehicle) {
+      return "";
+    }
+
+    if (primaryVehicle.type === "built_in") {
+      const builtInVehicle = vehicles.find(
+        (vehicle) => Number(vehicle.id) === Number(primaryVehicle.id)
+      );
+
+      return builtInVehicle
+        ? `${builtInVehicle.brand} ${builtInVehicle.model}`
+        : "";
+    }
+
+    const customVehicle = customVehicles.find(
+      (vehicle) => Number(vehicle.id) === Number(primaryVehicle.id)
+    );
+
+    return customVehicle
+      ? `${customVehicle.brand} ${customVehicle.model}`
+      : "";
+  }, [primaryVehicle, customVehicles]);
+
+  /*
+   * Primary Vehicle is the default for a new Service History record.
+   * A user can still temporarily choose another vehicle in this form;
+   * changing that temporary selection does not change Primary Vehicle.
+   * Existing records being edited always retain their recorded vehicle.
+   */
+  useEffect(() => {
+    if (primaryVehicleLoading || editingId !== null) {
+      return;
+    }
+
+    if (!primaryVehicle) {
+      setForm((current) => ({
+        ...current,
+        vehicle: "",
+      }));
+      setVehicleSearch("");
+      return;
+    }
+
+    if (!primaryVehicleName) {
+      return;
+    }
+
+    setForm((current) => ({
+      ...current,
+      vehicle: primaryVehicleName,
+    }));
+    setVehicleSearch(primaryVehicleName);
+    setShowVehicleSuggestions(false);
+  }, [
+    primaryVehicle,
+    primaryVehicleLoading,
+    primaryVehicleName,
+    editingId,
+  ]);
+
   const filteredVehicleOptions = useMemo(() => {
     const query = vehicleSearch.trim().toLowerCase();
 
@@ -533,65 +593,6 @@ export default function ServiceHistory({
       service.toLowerCase().includes(query)
     );
   }, [availableServices, serviceSearch]);
-
-  /* ============================================================
-     ADD CUSTOM VEHICLE
-     ============================================================ */
-
-  async function handleAddVehicle() {
-    const brand = vehicleBrand.trim();
-    const model = vehicleModel.trim();
-
-    if (!brand || !model) {
-      alert("Please enter the vehicle brand and model.");
-      return;
-    }
-
-    const vehicleName = `${brand} ${model}`;
-    const duplicate = allVehicles.some(
-      (vehicle) =>
-        vehicle.value.trim().toLowerCase() ===
-        vehicleName.trim().toLowerCase()
-    );
-
-    if (duplicate) {
-      alert("This vehicle already exists.");
-      return;
-    }
-
-    try {
-      setSavingVehicle(true);
-
-      const created = await addCustomVehicle({ brand, model });
-
-      setCustomVehicles((previous) => [...previous, created]);
-
-      const createdVehicle = `${created.brand} ${created.model}`;
-
-      setForm((previous) => ({
-        ...previous,
-        vehicle: createdVehicle,
-      }));
-      setVehicleSearch(createdVehicle);
-      setShowVehicleSuggestions(false);
-
-      setVehicleBrand("");
-      setVehicleModel("");
-      setShowVehicleForm(false);
-
-      alert("Vehicle added successfully.");
-    } catch (error) {
-      console.error("Failed to add vehicle:", error);
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Failed to add vehicle."
-      );
-    } finally {
-      setSavingVehicle(false);
-    }
-  }
-
 
   /* ============================================================
      SERVICES PERFORMED
@@ -718,10 +719,11 @@ export default function ServiceHistory({
     );
 
     setEditingId(null);
-    setForm({ ...emptyRecord });
-    setShowVehicleForm(false);
-    setVehicleBrand("");
-    setVehicleModel("");
+    setForm({
+      ...emptyRecord,
+      vehicle: primaryVehicleName,
+    });
+    setVehicleSearch(primaryVehicleName);
     setSelectedServiceToAdd("");
     setSelectedServiceCategory("");
     setOtherServiceDetail("");
@@ -729,7 +731,6 @@ export default function ServiceHistory({
     setServiceSearch("");
     setShowServiceSuggestions(false);
     setShowCustomServiceForm(false);
-    setVehicleSearch("");
     setShowVehicleSuggestions(false);
     setDraftStatus("idle");
 
@@ -922,10 +923,11 @@ export default function ServiceHistory({
         null
       );
 
-      setForm(
-        emptyRecord
-      );
-      setVehicleSearch("");
+      setForm({
+        ...emptyRecord,
+        vehicle: primaryVehicleName,
+      });
+      setVehicleSearch(primaryVehicleName);
       setShowVehicleSuggestions(false);
 
       setSelectedServiceCategory("");
@@ -935,7 +937,6 @@ export default function ServiceHistory({
       setServiceSearch("");
       setShowServiceSuggestions(false);
       setShowCustomServiceForm(false);
-      setVehicleSearch("");
       setDraftStatus("idle");
 
       window.setTimeout(() => {
@@ -1289,30 +1290,12 @@ export default function ServiceHistory({
                             fontSize: "13px",
                           }}
                         >
-                          No matching vehicle found. Use ＋ Or Add Custom Vehicle to create one.
+                          No matching vehicle found. Add a custom vehicle from Settings first.
                         </div>
                       )}
                     </div>
                   )}
               </div>
-
-              {editingId === null && (
-                <button
-                  type="button"
-                  className="saveButton"
-                  onClick={() => setShowVehicleForm((value) => !value)}
-                  style={{
-                    height: "46px",
-                    alignSelf: "flex-start",
-                    marginTop: "6px",
-                    boxSizing: "border-box",
-                  }}
-                >
-                  ＋ Or Add Custom Vehicle
-                </button>
-              )}
-
-            </div>
 
             {editingId !== null && form.vehicle && (
               <p style={{ fontSize: "12px", color: "#6b7280", marginTop: "6px" }}>
@@ -1320,75 +1303,7 @@ export default function ServiceHistory({
               </p>
             )}
 
-            {showVehicleForm && editingId === null && (
-              <div
-                style={{
-                  marginTop: "10px",
-                  padding: "12px",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "8px",
-                }}
-              >
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "8px",
-                  }}
-                >
-                  <input
-                    type="text"
-                    placeholder="Brand"
-                    value={vehicleBrand}
-                    onChange={(e) => setVehicleBrand(e.target.value)}
-                  />
-
-                  <input
-                    type="text"
-                    placeholder="Model"
-                    value={vehicleModel}
-                    onChange={(e) => setVehicleModel(e.target.value)}
-                  />
-                </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "8px",
-                    marginTop: "10px",
-                  }}
-                >
-                  <button
-                    type="button"
-                    className="saveButton"
-                    disabled={savingVehicle}
-                    onClick={() => void handleAddVehicle()}
-                  >
-                    {savingVehicle ? "Saving..." : "Save Vehicle"}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowVehicleForm(false);
-                      setVehicleBrand("");
-                      setVehicleModel("");
-                    }}
-                    style={{
-                      background: "#dc2626",
-                      color: "#ffffff",
-                      border: "none",
-                      borderRadius: "6px",
-                      padding: "10px 14px",
-                      cursor: "pointer",
-                      fontWeight: 600,
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
+          </div>
 
           </div>
 

@@ -186,6 +186,13 @@ async function captureElement(element: HTMLElement): Promise<string> {
       requestAnimationFrame(() => resolve());
     });
 
+    // Recharts animates the monthly trend paths when the page is rendered.
+    // Wait for that animation to finish before capturing the chart; otherwise
+    // html-to-image can capture only the first part of the line/area.
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, 1200);
+    });
+
     return await toPng(element, {
       cacheBust: true,
       pixelRatio: 2,
@@ -466,20 +473,6 @@ function addCoverPage(pdf: jsPDF, reportData: any) {
     ["Total Spend", formatCurrency(reportData?.totalCost)],
   ];
 
-  if (reportData?.petrolSaved !== undefined) {
-    rows.push([
-      "Petrol Saved",
-      `${formatNumber(reportData.petrolSaved, 2)} L`,
-    ]);
-  }
-
-  if (reportData?.carbonSaved !== undefined) {
-    rows.push([
-      "Carbon Saved",
-      `${formatNumber(reportData.carbonSaved, 2)} kg`,
-    ]);
-  }
-
   addTable(
     pdf,
     [["Field", "Value"]],
@@ -532,21 +525,7 @@ function addCoverPage(pdf: jsPDF, reportData: any) {
     ["Charging Type Split", chargerTypeSummary || "—"],
   ];
 
-  if (reportData?.petrolSaved !== undefined) {
-    executiveRows.push([
-      "Petrol Saved",
-      `${formatNumber(reportData.petrolSaved, 2)} L`,
-    ]);
-  }
-
-  if (reportData?.carbonSaved !== undefined) {
-    executiveRows.push([
-      "Carbon Saved",
-      `${formatNumber(reportData.carbonSaved, 2)} kg`,
-    ]);
-  }
-
-  addTable(
+  y = addTable(
     pdf,
     [["Metric", "Value"]],
     executiveRows,
@@ -559,6 +538,7 @@ function addCoverPage(pdf: jsPDF, reportData: any) {
       fontSize: 9,
     }
   );
+
 
   pdf.setTextColor(COLORS.muted);
   pdf.setFont("helvetica", "italic");
@@ -587,7 +567,7 @@ async function exportAnalyticsPDF(reportData: any) {
   // PAGE 1 — COVER + EXECUTIVE SUMMARY
   addCoverPage(pdf, reportData);
 
-  // PAGE 2 — OVERVIEW + TWO MONTHLY GRAPHS
+  // PAGE 2 — ANALYTICS OVERVIEW + APPROXIMATE SAVINGS
   pdf.addPage();
   addPageBackground(pdf);
   addPageHeader(pdf, "Analytics Overview", 2, userDetails);
@@ -596,30 +576,105 @@ async function exportAnalyticsPDF(reportData: any) {
   y = addSectionTitle(pdf, "Analytics Overview", y);
   y = addMetricCards(pdf, reportData, y + 2);
 
+  // Keep the approximate comparison directly below the overview totals.
+  // It gets its own space so it cannot spill onto a blank/white page.
+  if (
+    reportData?.approximateCo2SavedKg !== undefined ||
+    reportData?.approximatePetrolCostSavings !== undefined ||
+    reportData?.approximateDieselCostSavings !== undefined
+  ) {
+    y += 12;
+    y = addSectionTitle(
+      pdf,
+      "Approximate EV Savings & CO2 Avoided",
+      y
+    );
+
+    const approximateRows: string[][] = [];
+
+    if (reportData?.approximateCo2SavedKg !== undefined) {
+      approximateRows.push([
+        "Approx. CO2 Avoided",
+        `${formatNumber(reportData.approximateCo2SavedKg, 2)} kg`,
+      ]);
+    }
+
+    if (reportData?.approximatePetrolCostSavings !== undefined) {
+      approximateRows.push([
+        "Approx. Savings vs Petrol",
+        `Rs. ${formatNumber(reportData.approximatePetrolCostSavings, 2)}`,
+      ]);
+    }
+
+    if (reportData?.approximateDieselCostSavings !== undefined) {
+      approximateRows.push([
+        "Approx. Savings vs Diesel",
+        `Rs. ${formatNumber(reportData.approximateDieselCostSavings, 2)}`,
+      ]);
+    }
+
+    if (reportData?.approximateDistanceKm !== undefined) {
+      approximateRows.push([
+        "Estimated Distance",
+        `${formatNumber(reportData.approximateDistanceKm, 2)} km`,
+      ]);
+    }
+
+    y = addTable(
+      pdf,
+      [["Metric", "Value"]],
+      approximateRows,
+      y,
+      {
+        widths: [
+          CONTENT_WIDTH * 0.55,
+          CONTENT_WIDTH * 0.45,
+        ],
+        fontSize: 8.5,
+      }
+    );
+
+    const assumptionText =
+      "Approximate comparison only. Uses benchmark EV efficiency of 6.0 km/kWh, petrol 15.0 km/L, diesel 20.0 km/L, petrol Rs. 110/L, diesel Rs. 100/L, petrol 2.32 kg CO2/L and diesel 2.70 kg CO2/L. EV electricity-generation emissions are excluded; this is an estimated tailpipe comparison, not measured fuel consumption or actual fuel purchases.";
+
+    pdf.setTextColor(COLORS.secondary);
+    pdf.setFont("helvetica", "italic");
+    pdf.setFontSize(7.5);
+    const noteLines = pdf.splitTextToSize(
+      assumptionText,
+      CONTENT_WIDTH
+    );
+    pdf.text(noteLines, MARGIN, y + 6);
+  }
+
+  // PAGE 3 — MONTHLY TREND CHARTS
+  pdf.addPage();
+  addPageBackground(pdf);
+  addPageHeader(pdf, "Analytics Overview", 3, userDetails);
+
+  y = addSectionTitle(pdf, "Monthly Trends", 34);
+
   const spendChart = await captureBySelector("#monthlySpendChart");
   const energyChart = await captureBySelector("#monthlyEnergyChart");
 
-  // Keep the monthly trend charts one below the other. This gives each
-  // chart enough horizontal space for readable month labels and values,
-  // while both complete charts still fit on a single A4 page.
   const chartX = MARGIN;
   const chartWidth = CONTENT_WIDTH;
-  const chartHeight = 88;
-  const chartGap = 6;
+  const chartHeight = 105;
+  const chartGap = 10;
 
   if (spendChart) {
     await addChartImage(
       pdf,
       spendChart,
       chartX,
-      y + 8,
+      y,
       chartWidth,
       chartHeight
     );
   }
 
   if (energyChart) {
-    const energyY = y + 8 + chartHeight + chartGap;
+    const energyY = y + chartHeight + chartGap;
 
     await addChartImage(
       pdf,
@@ -631,10 +686,10 @@ async function exportAnalyticsPDF(reportData: any) {
     );
   }
 
-  // PAGE 3 — WEEKLY ACTIVITY + CHARGING TYPE
+  // PAGE 4 — WEEKLY ACTIVITY + CHARGING TYPE
   pdf.addPage();
   addPageBackground(pdf);
-  addPageHeader(pdf, "Charging Activity", 3, userDetails);
+  addPageHeader(pdf, "Charging Activity", 4, userDetails);
 
   y = addSectionTitle(pdf, "Charging Activity", 34);
 
@@ -667,7 +722,7 @@ async function exportAnalyticsPDF(reportData: any) {
   // PAGE 4 — MONTHLY + YEARLY + WEEKLY SUMMARIES
   pdf.addPage();
   addPageBackground(pdf);
-  addPageHeader(pdf, "Summary Tables", 4, userDetails);
+  addPageHeader(pdf, "Summary Tables", 5, userDetails);
 
   y = addSectionTitle(pdf, "Monthly Summary", 34);
 
@@ -750,7 +805,7 @@ async function exportAnalyticsPDF(reportData: any) {
   // PAGE 5 — VEHICLE + STATION STATISTICS
   pdf.addPage();
   addPageBackground(pdf);
-  addPageHeader(pdf, "Statistics", 5, userDetails);
+  addPageHeader(pdf, "Statistics", 6, userDetails);
 
   y = addSectionTitle(pdf, "Vehicle Statistics", 34);
 

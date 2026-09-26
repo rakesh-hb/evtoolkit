@@ -183,7 +183,7 @@ export default function About({
           <li>📊 EV ownership analytics</li>
           <li>⚡ EV planning and tracking</li>
           <li>💾 Backup and restore according to your subscription plan</li>
-          <li>💳 Premium subscriptions and Premium Plus features</li>
+          <li>💳 Premium and Premium Plus subscription features</li>
         </ul>
       </div>
 
@@ -303,7 +303,10 @@ export default function About({
           <span>1.0</span>
 
           <strong>Platform</strong>
-          <span>Web Application</span>
+          <span>Web Application / Capacitor Android support</span>
+
+          <strong>Technology</strong>
+          <span>React 19 · TypeScript 6 · Vite 8 · Supabase</span>
 
           <strong>Name</strong>
           <span>Rakesh H B</span>
@@ -1110,8 +1113,13 @@ export default function About({
                     Sign in and review your User Profile and Settings.
                   </li>
                   <li>
-                    Add or verify the vehicles available to the
-                    application.
+                    Open Settings and set your single Primary Vehicle. EV
+                    Toolkit currently keeps one saved Primary Vehicle per
+                    user. If you need to change it, clear the current
+                    Primary Vehicle first and then select the replacement.
+                    Other pages may temporarily use another vehicle for a
+                    specific operation, but that does not change the saved
+                    Primary Vehicle.
                   </li>
                   <li>
                     Record completed charging sessions in Tracker.
@@ -1167,69 +1175,759 @@ export default function About({
                     Deleting or changing a source charging record can
                     therefore change subsequent Analytics results.
                   </li>
+                  <li>
+                    The saved Primary Vehicle is a user preference used as
+                    the default vehicle context across vehicle-dependent
+                    pages. Changing or clearing it does not rewrite the
+                    historical vehicle value stored on existing records.
+                  </li>
                 </ul>
               </InfoSection>
 
-              <InfoSection title="21. Mobile & Responsive Use">
+              <InfoSection title="21. Calculation Reference — Charging & Analytics">
                 <p>
-                  EV Toolkit is designed to work across desktop and
-                  mobile browser layouts. Form controls are sized for
-                  smaller screens, including native date controls.
+                  Analytics calculations are derived from the charging-session
+                  records currently loaded by the application. The values
+                  below describe the calculation model used for the displayed
+                  totals and averages.
                 </p>
+                <ul>
+                  <li>
+                    <strong>Total Sessions:</strong> count of the loaded
+                    charging-session records.
+                  </li>
+                  <li>
+                    <strong>Total Energy:</strong> sum of the recorded
+                    session energy values, displayed as kWh.
+                  </li>
+                  <li>
+                    <strong>Total Cost / Spend:</strong> sum of the recorded
+                    charging-session cost values.
+                  </li>
+                  <li>
+                    <strong>Average Cost / Session:</strong> Total Cost ÷
+                    Total Sessions, when sessions are greater than zero.
+                  </li>
+                  <li>
+                    <strong>Average Energy / Session:</strong> Total Energy ÷
+                    Total Sessions, when sessions are greater than zero.
+                  </li>
+                  <li>
+                    <strong>Monthly Spend:</strong> session costs are grouped
+                    by the session date's month and summed.
+                  </li>
+                  <li>
+                    <strong>Monthly Energy:</strong> session energy values are
+                    grouped by month and summed.
+                  </li>
+                  <li>
+                    <strong>Weekly Activity:</strong> sessions are grouped by
+                    weekday to show charging activity across the week.
+                  </li>
+                  <li>
+                    <strong>Charging Type Distribution:</strong> sessions are
+                    grouped by their recorded charger/type.
+                  </li>
+                  <li>
+                    <strong>Vehicle Statistics:</strong> sessions, energy and
+                    cost are grouped by the vehicle recorded on each session.
+                  </li>
+                  <li>
+                    <strong>Station Statistics:</strong> sessions, energy and
+                    cost are grouped by charging station. A blank station is
+                    treated as <strong>Home</strong> for the relevant station
+                    statistics.
+                  </li>
+                  <li>
+                    <strong>Yearly Summary:</strong> sessions, energy and
+                    spend are grouped by calendar year.
+                  </li>
+                </ul>
                 <p>
-                  Tables may use horizontal scrolling when their
-                  structured columns require more width than a mobile
-                  screen can provide.
+                  Analytics is therefore a calculation layer over recorded
+                  charging data. If a source session is corrected, added or
+                  removed, the corresponding totals, charts, tables and
+                  summaries can change.
                 </p>
               </InfoSection>
 
-              <InfoSection title="22. Technology & Architecture">
+              <InfoSection title="22. Approximate Petrol / Diesel Comparison & CO₂">
                 <p>
-                  The application is a React and TypeScript web
-                  application built with a Vite-based frontend. It
-                  uses Supabase-backed services for authentication,
-                  database operations and application data workflows.
+                  EV Toolkit also provides an <strong>approximate</strong>
+                  comparison between the recorded EV charging activity and
+                  estimated equivalent petrol and diesel vehicle use. These
+                  values are estimates for comparison and are not measurements
+                  of fuel actually purchased or consumed.
                 </p>
                 <p>
-                  The codebase is organised into pages, reusable
-                  components, service modules, data definitions and
-                  backend-connected workflows. This allows common
-                  behaviours such as authentication, user details,
-                  draft saving, uploads and reporting to be reused
-                  across pages.
+                  The current benchmark assumptions are:
+                </p>
+                <ul>
+                  <li><strong>EV efficiency:</strong> 6.0 km/kWh</li>
+                  <li><strong>Petrol efficiency:</strong> 15.0 km/L</li>
+                  <li><strong>Diesel efficiency:</strong> 20.0 km/L</li>
+                  <li><strong>Petrol benchmark price:</strong> ₹110/L</li>
+                  <li><strong>Diesel benchmark price:</strong> ₹100/L</li>
+                  <li><strong>Petrol tailpipe CO₂ factor:</strong> 2.32 kg/L</li>
+                  <li><strong>Diesel tailpipe CO₂ factor:</strong> 2.70 kg/L</li>
+                </ul>
+                <p>
+                  The calculations are:
+                </p>
+                <ul>
+                  <li>
+                    <strong>Estimated distance:</strong> Total EV Energy ×
+                    6.0 km/kWh.
+                  </li>
+                  <li>
+                    <strong>Equivalent petrol litres:</strong> Estimated
+                    Distance ÷ 15.0 km/L.
+                  </li>
+                  <li>
+                    <strong>Equivalent diesel litres:</strong> Estimated
+                    Distance ÷ 20.0 km/L.
+                  </li>
+                  <li>
+                    <strong>Approx. petrol cost:</strong> Equivalent petrol
+                    litres × ₹110/L.
+                  </li>
+                  <li>
+                    <strong>Approx. diesel cost:</strong> Equivalent diesel
+                    litres × ₹100/L.
+                  </li>
+                  <li>
+                    <strong>Approx. savings vs petrol:</strong> Approx. petrol
+                    cost − recorded EV charging cost.
+                  </li>
+                  <li>
+                    <strong>Approx. savings vs diesel:</strong> Approx. diesel
+                    cost − recorded EV charging cost.
+                  </li>
+                  <li>
+                    <strong>Approx. petrol CO₂ avoided:</strong> Equivalent
+                    petrol litres × 2.32 kg/L.
+                  </li>
+                  <li>
+                    <strong>Approx. diesel CO₂ avoided:</strong> Equivalent
+                    diesel litres × 2.70 kg/L.
+                  </li>
+                  <li>
+                    <strong>Approx. CO₂ avoided:</strong> the average of the
+                    estimated petrol and diesel CO₂ avoided values.
+                  </li>
+                </ul>
+                <p>
+                  These comparison values use fixed benchmark assumptions so
+                  that the same charging data produces a consistent estimate.
+                  Actual fuel economy, fuel prices, driving conditions, vehicle
+                  size, charging losses and electricity-generation emissions
+                  can differ. The current comparison is therefore an
+                  approximate tailpipe-oriented comparison and does not claim
+                  to represent a full lifecycle emissions analysis.
+                </p>
+                <p>
+                  A negative estimated saving means the benchmark comparison
+                  cost is below the recorded EV charging cost for the same
+                  estimated distance; the application should be understood as
+                  reporting the mathematical result of the benchmark model,
+                  not as a guarantee of real-world savings.
                 </p>
               </InfoSection>
 
-              <InfoSection title="23. Security & Maintenance Notes">
+              <InfoSection title="23. Primary Vehicle & Vehicle Context">
                 <p>
-                  Keeping the application secure requires maintaining
-                  the frontend, backend policies, storage controls and
-                  third-party dependencies. A clean vulnerability scan
-                  at one point in time does not establish permanent
-                  vulnerability-free status.
+                  EV Toolkit uses a single saved <strong>Primary Vehicle</strong>
+                  as the user's main vehicle context. This is a preference,
+                  not a replacement for the vehicle value stored in historical
+                  records.
                 </p>
+                <ul>
+                  <li>
+                    Every user can have one saved Primary Vehicle.
+                  </li>
+                  <li>
+                    The Primary Vehicle is selected and cleared from Settings.
+                  </li>
+                  <li>
+                    A replacement Primary Vehicle requires the current Primary
+                    Vehicle to be cleared first.
+                  </li>
+                  <li>
+                    Vehicle-dependent pages use the Primary Vehicle as their
+                    default or reset context where supported.
+                  </li>
+                  <li>
+                    A page may still allow a temporary vehicle selection for a
+                    specific operation. That temporary selection does not
+                    change the saved Primary Vehicle.
+                  </li>
+                  <li>
+                    The Dashboard can display the Primary Vehicle and its
+                    vehicle-specific charging summary separately from
+                    family-wide charging totals.
+                  </li>
+                  <li>
+                    A Dashboard Vehicle Alias, when configured, changes only
+                    the name shown in the Dashboard Primary Vehicle section.
+                    It does not rename the actual vehicle record elsewhere in
+                    EV Toolkit.
+                  </li>
+                  <li>
+                    Dashboard aliases are stored separately from the vehicle
+                    reference and are case-insensitively unique after
+                    trimming.
+                  </li>
+                </ul>
+              </InfoSection>
+
+              <InfoSection title="24. End-to-End Application Data Flow">
                 <p>
-                  For production use, keep dependencies updated,
-                  review database access policies, protect backend
-                  credentials and secrets, restrict storage access,
-                  review authentication configuration and periodically
-                  perform dependency and vulnerability scans.
+                  The application follows an end-to-end flow from
+                  authentication and vehicle context through data entry,
+                  persistence, calculation, reporting and backup.
+                </p>
+                <ol>
+                  <li>
+                    <strong>Authentication:</strong> the user signs in through
+                    the application's authenticated account flow.
+                  </li>
+                  <li>
+                    <strong>User context:</strong> account information and
+                    subscription status determine the features available to
+                    the user.
+                  </li>
+                  <li>
+                    <strong>Vehicle context:</strong> the user selects a
+                    Primary Vehicle in Settings. Vehicle-dependent pages can
+                    use it as their default context.
+                  </li>
+                  <li>
+                    <strong>Data entry:</strong> charging, service, tyre,
+                    insurance, documents and planning information are entered
+                    through their respective pages.
+                  </li>
+                  <li>
+                    <strong>Draft protection:</strong> supported forms use
+                    autosaved drafts so unfinished entries can survive before
+                    final submission.
+                  </li>
+                  <li>
+                    <strong>Persistence:</strong> completed user-created
+                    records are stored through the application's backend
+                    services and database.
+                  </li>
+                  <li>
+                    <strong>Access control:</strong> authenticated access,
+                    database policies and ownership checks protect applicable
+                    user records.
+                  </li>
+                  <li>
+                    <strong>Analytics:</strong> charging-session data is
+                    aggregated into totals, averages, trends, distributions
+                    and grouped summaries.
+                  </li>
+                  <li>
+                    <strong>Approximate comparison:</strong> Analytics can
+                    derive estimated distance, petrol/diesel equivalent cost
+                    and approximate CO₂ avoided using the documented benchmark
+                    assumptions.
+                  </li>
+                  <li>
+                    <strong>Reporting:</strong> Analytics report data can be
+                    exported into a PDF snapshot containing the relevant
+                    report information and analytics data.
+                  </li>
+                  <li>
+                    <strong>Backup:</strong> supported plans can preserve
+                    application data through the available local and/or cloud
+                    backup mechanisms.
+                  </li>
+                </ol>
+              </InfoSection>
+
+              <InfoSection title="25. Data Ownership, Editing & Deletion">
+                <p>
+                  EV Toolkit separates the data shown to a user from the
+                  permissions used to modify or delete it. Where ownership
+                  checks apply, a user can update or delete records they own,
+                  while shared records may be visible without granting the
+                  same modification rights.
+                </p>
+                <ul>
+                  <li>
+                    Editing a record changes the stored source record and can
+                    change downstream calculations that depend on it.
+                  </li>
+                  <li>
+                    Deleting a source charging record can change Analytics
+                    totals and report results.
+                  </li>
+                  <li>
+                    Clearing the Primary Vehicle clears the saved vehicle
+                    preference; it does not delete historical charging,
+                    service, tyre, insurance or document records.
+                  </li>
+                  <li>
+                    Clearing a Dashboard Vehicle Alias removes only that
+                    Dashboard display alias; it does not delete the vehicle.
+                  </li>
+                </ul>
+              </InfoSection>
+
+              <InfoSection title="26. Charging Stations & Charging Types">
+                <p>
+                  Charging station and charger/type information is maintained
+                  separately from the core charging-session measurements so
+                  that charging activity can be analysed by location and
+                  charging method.
+                </p>
+                <ul>
+                  <li>
+                    A charging session can reference the charger/type used.
+                  </li>
+                  <li>
+                    A charging session can reference a charging station.
+                  </li>
+                  <li>
+                    Tracker supports charging-station management as part of
+                    the charging workflow.
+                  </li>
+                  <li>
+                    Analytics uses these values for charging-type and station
+                    statistics.
+                  </li>
+                  <li>
+                    Missing station information is treated as Home for the
+                    applicable station statistics.
+                  </li>
+                </ul>
+              </InfoSection>
+
+              <InfoSection title="27. Files, Attachments & Document Handling">
+                <p>
+                  EV Toolkit distinguishes structured application records from
+                  file attachments. Structured information is used directly
+                  by the relevant pages and calculations, while supported
+                  plans can store files such as policy documents, invoices and
+                  receipts.
+                </p>
+                <ul>
+                  <li>
+                    Insurance can reference policy documents.
+                  </li>
+                  <li>
+                    Service History can use invoice and receipt uploads where
+                    supported by the subscription.
+                  </li>
+                  <li>
+                    Tyre History can use invoice and receipt uploads where
+                    supported by the subscription.
+                  </li>
+                  <li>
+                    Document Vault is intended for supported vehicle-related
+                    documents and receipts.
+                  </li>
+                  <li>
+                    Large attachment content is not copied into supported
+                    form drafts; the file is handled by the attachment
+                    workflow.
+                  </li>
+                </ul>
+              </InfoSection>
+
+              <InfoSection title="28. Backup vs PDF Reporting">
+                <p>
+                  These are different functions and should not be confused.
+                </p>
+                <ul>
+                  <li>
+                    <strong>PDF report:</strong> a human-readable snapshot of
+                    Analytics information at the time it is generated.
+                  </li>
+                  <li>
+                    <strong>Structured backup:</strong> intended to preserve
+                    application data so it can be retained and restored
+                    through the supported backup workflow.
+                  </li>
+                  <li>
+                    A PDF does not become updated automatically when the
+                    underlying database records later change.
+                  </li>
+                  <li>
+                    Backups and reports may contain sensitive information and
+                    should be stored and shared securely.
+                  </li>
+                </ul>
+              </InfoSection>
+
+              <InfoSection title="29. Frontend, Backend & Project Technology">
+                <p>
+                  EV Toolkit is implemented as a modern TypeScript web
+                  application with a React frontend and Vite build system.
+                  The current project stack includes:
+                </p>
+                <ul>
+                  <li><strong>React:</strong> 19</li>
+                  <li><strong>TypeScript:</strong> 6</li>
+                  <li><strong>Vite:</strong> 8</li>
+                  <li><strong>Backend platform:</strong> Supabase</li>
+                  <li>
+                    <strong>Mobile packaging:</strong> Capacitor Android
+                    support is part of the project.
+                  </li>
+                </ul>
+                <p>
+                  The frontend is organised into application pages, reusable
+                  components, contexts, service modules, vehicle data,
+                  authentication, subscription handling, draft handling,
+                  reporting and backend-connected workflows.
                 </p>
               </InfoSection>
 
-              <InfoSection title="24. Support & Application Ownership">
+              <InfoSection title="30. Authentication & Subscription Architecture">
                 <p>
-                  Application: EV Toolkit
+                  Authentication identifies the current user and supplies the
+                  account context used by protected application workflows.
+                  Subscription state controls access to plan-specific
+                  features.
                 </p>
                 <p>
-                  Version: 1.0
+                  Premium payment uses the application's Razorpay integration.
+                  The frontend does not independently grant Premium access:
+                  the payment order is associated with the authenticated user
+                  and Premium activation occurs after backend verification.
                 </p>
                 <p>
-                  Name: Rakesh H B
+                  Payment credentials and verification secrets are kept on the
+                  backend rather than embedded as frontend secrets.
+                </p>
+              </InfoSection>
+
+              <InfoSection title="31. Supabase & Database Security Model">
+                <p>
+                  Supabase provides the backend authentication and database
+                  layer. Protected data is associated with authenticated
+                  users, and database-level Row Level Security (RLS) is used
+                  for applicable user-owned records.
+                </p>
+                <ul>
+                  <li>
+                    Authentication establishes the user's identity.
+                  </li>
+                  <li>
+                    RLS policies restrict database access according to the
+                    configured ownership rules.
+                  </li>
+                  <li>
+                    Application-level ownership checks provide an additional
+                    protection layer in protected update and delete workflows.
+                  </li>
+                  <li>
+                    Client-side UI visibility is not intended to be the only
+                    security boundary.
+                  </li>
+                  <li>
+                    Backend credentials and payment verification secrets are
+                    not intended to be exposed in the browser application.
+                  </li>
+                </ul>
+              </InfoSection>
+
+              <InfoSection title="32. Current Feature Set — End-to-End Summary">
+                <p>
+                  In practical terms, EV Toolkit covers the complete
+                  ownership workflow from maintaining the user's vehicle
+                  context through recording real charging activity,
+                  maintaining ownership records and producing analytics.
+                </p>
+                <ul>
+                  <li>Dashboard overview and Primary Vehicle summary.</li>
+                  <li>Single Primary Vehicle configuration in Settings.</li>
+                  <li>Charging Tracker and charging-station management.</li>
+                  <li>EV ownership and trip planning.</li>
+                  <li>Service and maintenance history.</li>
+                  <li>Tyre replacement and warranty history.</li>
+                  <li>Insurance policy and related information.</li>
+                  <li>Vehicle documents and Document Vault.</li>
+                  <li>Analytics charts, tables and summaries.</li>
+                  <li>Approximate petrol/diesel cost comparison.</li>
+                  <li>Approximate CO₂ avoided comparison.</li>
+                  <li>Analytics PDF reporting.</li>
+                  <li>Autosaved form drafts on supported pages.</li>
+                  <li>Manual local backup/restore for Premium.</li>
+                  <li>Cloud/automatic backup capabilities planned for Premium Plus.</li>
+                  <li>Family-oriented data access according to subscription.</li>
+                  <li>User Profile and account management.</li>
+                  <li>Responsive desktop/mobile web use.</li>
+                  <li>Support contact workflow with account/environment details.</li>
+                </ul>
+              </InfoSection>
+
+              <InfoSection title="33. What EV Toolkit Does Not Claim">
+                <p>
+                  The application is a management and analysis tool. Its
+                  calculations should be interpreted according to the source
+                  data and documented assumptions.
+                </p>
+                <ul>
+                  <li>
+                    Approximate petrol/diesel savings are not a guarantee of
+                    actual money saved.
+                  </li>
+                  <li>
+                    Approximate CO₂ avoided is not a complete lifecycle
+                    emissions assessment.
+                  </li>
+                  <li>
+                    Analytics cannot correct inaccurate source charging data;
+                    inaccurate input produces inaccurate derived results.
+                  </li>
+                  <li>
+                    A PDF report is not a live view of the database after it
+                    has been exported.
+                  </li>
+                  <li>
+                    Security controls reduce unauthorised access risk but do
+                    not constitute a guarantee that software can never contain
+                    a vulnerability.
+                  </li>
+                </ul>
+              </InfoSection>
+
+              <InfoSection title="34. Recommended End-to-End Usage">
+                <ol>
+                  <li>Sign in and confirm your account information.</li>
+                  <li>
+                    Open Settings and select your Primary Vehicle.
+                  </li>
+                  <li>
+                    Optionally configure a Dashboard Vehicle Alias if you want
+                    a custom display name on the Dashboard.
+                  </li>
+                  <li>
+                    Record actual charging sessions in Tracker, including
+                    accurate date, energy, cost, vehicle, charger/type and
+                    station information.
+                  </li>
+                  <li>
+                    Maintain service and tyre records whenever maintenance or
+                    replacement occurs.
+                  </li>
+                  <li>
+                    Keep insurance information and supported policy documents
+                    current.
+                  </li>
+                  <li>
+                    Store important vehicle documents in Document Vault when
+                    the feature is available on the subscription.
+                  </li>
+                  <li>
+                    Use Planner for future trips or ownership planning rather
+                    than treating planned activity as completed charging
+                    activity.
+                  </li>
+                  <li>
+                    Review Analytics to understand sessions, energy, costs,
+                    trends and charging patterns.
+                  </li>
+                  <li>
+                    Review the approximate petrol/diesel comparison as a
+                    benchmark rather than as a measured fuel-cost or emissions
+                    result.
+                  </li>
+                  <li>
+                    Export an Analytics PDF when a shareable report snapshot is
+                    required.
+                  </li>
+                  <li>
+                    Use the backup facilities available on the current
+                    subscription and keep exported backups in a secure
+                    location.
+                  </li>
+                </ol>
+              </InfoSection>
+
+              <InfoSection title="35. Project Status & Version">
+                <p>
+                  <strong>Application:</strong> EV Toolkit
                 </p>
                 <p>
-                  For application support, use the support contact
-                  provided on the main About page.
+                  <strong>Version:</strong> 1.0
+                </p>
+                <p>
+                  <strong>Platform:</strong> Web Application with Capacitor
+                  Android support in the project.
+                </p>
+                <p>
+                  The About page is intended to document the implemented
+                  application behaviour, feature boundaries, data flow and
+                  calculation assumptions so that users can understand what
+                  EV Toolkit is doing with their information.
+                </p>
+              </InfoSection>
+
+              <InfoSection title="36. Maintenance & Future Development">
+                <p>
+                  EV Toolkit is designed as an evolving application. Feature
+                  availability, subscription entitlements, backup capabilities,
+                  report layouts, calculation assumptions and supported
+                  integrations may change in future releases.
+                </p>
+                <p>
+                  When a calculation or feature changes, the relevant
+                  application workflow and documentation should be updated
+                  together so that the displayed result and its explanation
+                  remain consistent.
+                </p>
+              </InfoSection>
+
+              <InfoSection title="37. Support & Troubleshooting Workflow">
+                <ol>
+                  <li>
+                    Confirm the affected page and the action that produced
+                    the problem.
+                  </li>
+                  <li>
+                    Confirm the current account and subscription status.
+                  </li>
+                  <li>
+                    Confirm the Primary Vehicle and relevant source records.
+                  </li>
+                  <li>
+                    Recheck the input values used by the affected calculation.
+                  </li>
+                  <li>
+                    For Analytics issues, compare the source Tracker records
+                    with the displayed totals and summaries.
+                  </li>
+                  <li>
+                    Use Contact Support from the About page when assistance is
+                    required. The support workflow can include account,
+                    subscription, browser/device and application context to
+                    help diagnose the issue.
+                  </li>
+                </ol>
+              </InfoSection>
+
+              <InfoSection title="38. Important Privacy Reminder">
+                <p>
+                  EV Toolkit can contain detailed vehicle, charging,
+                  financial, maintenance, insurance, family and document
+                  information. Review recipients carefully before sharing
+                  screenshots, PDF reports, backups or exported files.
+                </p>
+              </InfoSection>
+
+              <InfoSection title="39. Documentation Principle">
+                <p>
+                  The purpose of this information page is transparency:
+                  users should be able to understand what each major part of
+                  EV Toolkit does, where the underlying data comes from, how
+                  the main analytics values are calculated, what is
+                  approximate, what is plan-dependent and how information
+                  moves through the application from entry to storage,
+                  analysis, reporting and backup.
+                </p>
+              </InfoSection>
+
+              <InfoSection title="40. Quick Reference">
+                <ul>
+                  <li>
+                    <strong>Source for charging analytics:</strong> Tracker
+                    charging-session records.
+                  </li>
+                  <li>
+                    <strong>Primary vehicle:</strong> one saved vehicle
+                    preference per user.
+                  </li>
+                  <li>
+                    <strong>Analytics:</strong> totals, averages, trends,
+                    distributions, grouped summaries and recent sessions.
+                  </li>
+                  <li>
+                    <strong>Approximate comparison:</strong> benchmark petrol
+                    and diesel cost and tailpipe CO₂ estimates.
+                  </li>
+                  <li>
+                    <strong>PDF:</strong> human-readable Analytics snapshot.
+                  </li>
+                  <li>
+                    <strong>Backup:</strong> plan-dependent data preservation
+                    mechanism.
+                  </li>
+                  <li>
+                    <strong>Persistent application data:</strong> backend
+                    services/database rather than browser localStorage as the
+                    primary record store.
+                  </li>
+                  <li>
+                    <strong>Security:</strong> authentication, RLS and
+                    applicable ownership checks.
+                  </li>
+                </ul>
+              </InfoSection>
+
+              <InfoSection title="41. Final End-to-End Picture">
+                <p>
+                  <strong>Sign in → select Primary Vehicle → enter and
+                  maintain ownership data → save records → protect unfinished
+                  forms with drafts where supported → analyse charging
+                  records → calculate approximate comparisons → generate PDF
+                  reports → back up supported data → securely retain or share
+                  the resulting information.</strong>
+                </p>
+                <p>
+                  Each stage has a different purpose. Tracker records actual
+                  charging activity; Analytics calculates summaries from those
+                  records; the approximate petrol/diesel section applies its
+                  documented benchmark model; PDF reporting captures the
+                  current Analytics state; and backup is intended to preserve
+                  application data rather than merely create a visual report.
+                </p>
+              </InfoSection>
+
+              <InfoSection title="42. Documentation Scope">
+                <p>
+                  This guide documents the application's current intended
+                  behaviour and the calculation assumptions implemented in
+                  EV Toolkit. It is not a substitute for the application's
+                  database schema, source code, legal terms, payment-provider
+                  terms, privacy policy or deployment configuration.
+                </p>
+              </InfoSection>
+
+              <InfoSection title="43. Change Awareness">
+                <p>
+                  If the application is upgraded, a feature is added or a
+                  calculation assumption changes, this page should be reviewed
+                  so that users are not relying on outdated instructions.
+                  In particular, analytics assumptions, subscription
+                  entitlements, backup functionality and document-upload
+                  capabilities should remain aligned with the deployed
+                  application.
+                </p>
+              </InfoSection>
+
+              <InfoSection title="44. Application Philosophy">
+                <p>
+                  EV Toolkit is intended to keep EV ownership information in
+                  one organised place while separating source records from
+                  derived analysis. The application does not treat an
+                  estimate as a measured fact: approximate comparisons are
+                  labelled as approximate, while recorded charging values are
+                  presented as the source data used by the analytics layer.
+                </p>
+              </InfoSection>
+
+              <InfoSection title="45. End of Complete Information">
+                <p>
+                  This completes the current EV Toolkit project information
+                  reference: what the application contains, how its major
+                  pages work together, how charging analytics are calculated,
+                  how the approximate petrol/diesel and CO₂ comparison is
+                  derived, how vehicle context works, how data is persisted
+                  and protected, how subscriptions affect features, and how
+                  reporting and backup fit into the overall workflow.
                 </p>
               </InfoSection>
 

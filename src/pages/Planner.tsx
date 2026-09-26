@@ -4,6 +4,7 @@ import { chargers } from "../data/chargers";
 import { STATES } from "../data/states";
 import { supabase } from "../lib/supabase";
 import UserDetails from "../components/UserDetails";
+import { usePrimaryVehicle } from "../context/PrimaryVehicleContext";
 import {
   getFormDraft,
   saveFormDraft,
@@ -118,17 +119,6 @@ interface CustomCharger {
   power: number;
 }
 
-const emptyVehicleForm = {
-  brand: "",
-  model: "",
-  battery: "",
-  range: "",
-  efficiency: "",
-  acPower: "",
-  dcPower: "",
-  fastCharge10to80: "",
-};
-
 const emptyChargerForm = {
   name: "",
   type: "AC" as "AC" | "DC",
@@ -142,6 +132,11 @@ interface PlannerProps {
 function Planner({
   onNavigate,
 }: PlannerProps) {
+  const {
+    primaryVehicle,
+    loading: primaryVehicleLoading,
+  } = usePrimaryVehicle();
+
   /*
    * =========================================================
    * FORM AUTOSAVE
@@ -236,6 +231,35 @@ function Planner({
         setTargetSOC(data.targetSOC);
       }
 
+      /*
+       * The unfinished Planner draft may contain a vehicle that was
+       * selected before the user changed Primary Vehicle in Settings.
+       * When a Primary Vehicle exists, it must remain authoritative.
+       */
+      if (primaryVehicle && !primaryVehicleLoading) {
+        const resolvedPrimaryVehicle =
+          primaryVehicle.type === "built_in"
+            ? vehicles.find(
+                (item) =>
+                  Number(item.id) ===
+                  Number(primaryVehicle.id)
+              )
+            : customVehicles.find(
+                (item) =>
+                  Number(item.id) ===
+                  Number(primaryVehicle.id)
+              );
+
+        if (resolvedPrimaryVehicle) {
+          setSelectedBrand(
+            resolvedPrimaryVehicle.brand
+          );
+          setVehicleId(
+            Number(resolvedPrimaryVehicle.id)
+          );
+        }
+      }
+
       setDraftStatus("saved");
       return true;
     } catch (error) {
@@ -298,8 +322,40 @@ function Planner({
 
     skipAutosaveRef.current = true;
 
-    setSelectedBrand("Tata");
-    setVehicleId(defaultVehicle?.id ?? 0);
+    if (primaryVehicle && !primaryVehicleLoading) {
+      const resolvedPrimaryVehicle =
+        primaryVehicle.type === "built_in"
+          ? vehicles.find(
+              (item) =>
+                Number(item.id) ===
+                Number(primaryVehicle.id)
+            )
+          : customVehicles.find(
+              (item) =>
+                Number(item.id) ===
+                Number(primaryVehicle.id)
+            );
+
+      if (resolvedPrimaryVehicle) {
+        setSelectedBrand(resolvedPrimaryVehicle.brand);
+        setVehicleId(Number(resolvedPrimaryVehicle.id));
+        setVehicleSearch(
+          `${resolvedPrimaryVehicle.brand} ${resolvedPrimaryVehicle.model}`
+        );
+        setShowVehicleSuggestions(false);
+      } else {
+        setSelectedBrand("");
+        setVehicleId(0);
+        setVehicleSearch("");
+        setShowVehicleSuggestions(false);
+      }
+    } else {
+      setSelectedBrand("");
+      setVehicleId(0);
+      setVehicleSearch("");
+      setShowVehicleSuggestions(false);
+    }
+
     setChargerId(defaultCharger?.id ?? "");
     setChargingLocation("Home");
     setState("Karnataka");
@@ -581,14 +637,6 @@ function Planner({
     };
   }, [showVehicleSuggestions]);
 
-  const brandVehicles = useMemo(
-    () =>
-      allVehicles.filter(
-        (v) => v.brand === selectedBrand
-      ),
-    [allVehicles, selectedBrand]
-  );
-
   const defaultVehicle =
     allVehicles.find(
       (v) =>
@@ -606,23 +654,61 @@ function Planner({
     );
 
   useEffect(() => {
-    if (
-      brandVehicles.length > 0 &&
-      !brandVehicles.some(
-        (v) => v.id === vehicleId
-      )
-    ) {
-      setVehicleId(brandVehicles[0].id);
+    if (primaryVehicleLoading || !primaryVehicle) {
+      return;
     }
-  }, [brandVehicles, vehicleId]);
 
-  const vehicle = useMemo(
-    () =>
+    const resolvedPrimaryVehicle =
+      primaryVehicle.type === "built_in"
+        ? vehicles.find(
+            (item) =>
+              Number(item.id) ===
+              Number(primaryVehicle.id)
+          )
+        : customVehicles.find(
+            (item) =>
+              Number(item.id) ===
+              Number(primaryVehicle.id)
+          );
+
+    if (!resolvedPrimaryVehicle) {
+      return;
+    }
+
+    setSelectedBrand(
+      resolvedPrimaryVehicle.brand
+    );
+    setVehicleId(
+      Number(resolvedPrimaryVehicle.id)
+    );
+    setVehicleSearch(
+      `${resolvedPrimaryVehicle.brand} ${resolvedPrimaryVehicle.model}`
+    );
+    setShowVehicleSuggestions(false);
+  }, [
+    primaryVehicle,
+    primaryVehicleLoading,
+    customVehicles,
+  ]);
+
+  const vehicle = useMemo(() => {
+    if (vehicleId <= 0) {
+      return undefined;
+    }
+
+    return (
       allVehicles.find(
-        (v) => v.id === vehicleId
-      ) ?? defaultVehicle,
-    [allVehicles, vehicleId, defaultVehicle]
-  );
+        (v) =>
+          v.id === vehicleId &&
+          v.brand === selectedBrand
+      ) ?? defaultVehicle
+    );
+  }, [
+    allVehicles,
+    vehicleId,
+    selectedBrand,
+    defaultVehicle,
+  ]);
 
   const filteredVehicleOptions = useMemo(() => {
     const query = vehicleSearch.trim().toLowerCase();
@@ -1092,234 +1178,6 @@ if (fastChargeTime > 0) {
 
   /*
    * =========================================================
-   * ADD VEHICLE
-   * =========================================================
-   */
-
-  const [showVehicleForm, setShowVehicleForm] =
-    useState(false);
-
-  const [newVehicle, setNewVehicle] =
-    useState(emptyVehicleForm);
-
-  async function addVehicle() {
-    const brand =
-      newVehicle.brand.trim();
-
-    const model =
-      newVehicle.model.trim();
-
-    if (!brand || !model) {
-      alert(
-        "Please enter the vehicle brand and model."
-      );
-      return;
-    }
-
-    const numberOrZero = (
-      value: string
-    ) => {
-      if (!value.trim()) {
-        return 0;
-      }
-
-      const n = Number(value);
-
-      return Number.isFinite(n) && n >= 0
-        ? n
-        : -1;
-    };
-
-    const battery =
-      numberOrZero(newVehicle.battery);
-
-    const range =
-      numberOrZero(newVehicle.range);
-
-    const efficiency =
-      numberOrZero(
-        newVehicle.efficiency
-      );
-
-    const acPower =
-      numberOrZero(
-        newVehicle.acPower
-      );
-
-    const dcPower =
-      numberOrZero(
-        newVehicle.dcPower
-      );
-
-    const fastCharge10to80 =
-      numberOrZero(
-        newVehicle.fastCharge10to80
-      );
-
-    if (
-      [
-        battery,
-        range,
-        efficiency,
-        acPower,
-        dcPower,
-        fastCharge10to80,
-      ].some((n) => n < 0)
-    ) {
-      alert(
-        "Please enter valid numbers."
-      );
-      return;
-    }
-
-    const duplicate =
-      allVehicles.some(
-        (v) =>
-          v.brand.toLowerCase() ===
-            brand.toLowerCase() &&
-          v.model.toLowerCase() ===
-            model.toLowerCase()
-      );
-
-    if (duplicate) {
-      alert(
-        "This vehicle already exists."
-      );
-      return;
-    }
-
-    const {
-      data: {
-        user,
-      },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      alert(
-        "Your session could not be verified. Please sign in again."
-      );
-      return;
-    }
-
-    const { data, error } =
-      await supabase
-        .from("custom_vehicles")
-        .insert({
-          user_id: user.id,
-          brand,
-          model,
-          battery,
-          range_km: range,
-          efficiency,
-          ac_power: acPower,
-          dc_power: dcPower,
-          fast_charge_10_to_80:
-            fastCharge10to80,
-        })
-        .select("*")
-        .single();
-
-    if (error || !data) {
-      console.error(
-        "Error adding custom vehicle:",
-        error
-      );
-
-      alert(
-        "Unable to save the vehicle. Please try again."
-      );
-      return;
-    }
-
-    const customVehicle: CustomVehicle =
-      {
-        id: Number(data.id),
-        brand: data.brand,
-        model: data.model,
-        year: new Date(
-          data.created_at ??
-            Date.now()
-        ).getFullYear(),
-        country: "Custom",
-
-        battery: Number(
-          data.battery ?? 0
-        ),
-        range: Number(
-          data.range_km ?? 0
-        ),
-        efficiency: Number(
-          data.efficiency ?? 0
-        ),
-
-        batteryChemistry: "Unknown",
-        architecture: 0,
-
-        acPower: Number(
-          data.ac_power ?? 0
-        ),
-        dcPower: Number(
-          data.dc_power ?? 0
-        ),
-
-        connectorAC: "Unknown",
-        connectorDC: "Unknown",
-
-        chargingPortLocation:
-          "Unknown",
-
-        fastCharge10to80: Number(
-          data.fast_charge_10_to_80 ??
-            0
-        ),
-
-        motorType: "Unknown",
-        drivetrain: "Unknown",
-
-        maxPower: 0,
-        maxTorque: 0,
-
-        acceleration0to100: 0,
-        topSpeed: 0,
-
-        bodyType: "Unknown",
-
-        seats: 0,
-        bootSpace: 0,
-        kerbWeight: 0,
-        wheelbase: 0,
-
-        adasLevel: "Unknown",
-
-        warrantyBattery:
-          "Unknown",
-
-        warrantyVehicle:
-          "Unknown",
-      };
-
-    setCustomVehicles((prev) => [
-      ...prev,
-      customVehicle,
-    ]);
-
-    setSelectedBrand(brand);
-    setVehicleId(customVehicle.id);
-    setVehicleSearch(
-      `${customVehicle.brand} ${customVehicle.model}`
-    );
-    setShowVehicleSuggestions(false);
-
-    setNewVehicle(
-      emptyVehicleForm
-    );
-
-    setShowVehicleForm(false);
-  }
-
-  /*
-   * =========================================================
    * ADD CHARGER
    * =========================================================
    */
@@ -1633,265 +1491,23 @@ if (fastChargeTime > 0) {
                     fontSize: "13px",
                   }}
                 >
-                  No matching vehicle found. Use ＋ Or Add Custom Vehicle to create one.
+                  No matching vehicle found. Add a custom vehicle from Settings if it is not listed.
                 </div>
               )}
             </div>
           )}
         </div>
 
-        <button
-          type="button"
-          className="saveButton"
-          onClick={() => {
-            setShowVehicleForm(
-              !showVehicleForm
-            );
-            setShowChargerForm(false);
-          }}
+        <p
           style={{
             marginTop: 8,
             marginBottom: 16,
+            color: "#94a3b8",
+            fontSize: 12,
           }}
         >
-          ＋ Or Add Custom Vehicle
-        </button>
-
-      {showVehicleForm && (
-        <div className="card">
-
-          <h3>
-            🚗 Add Vehicle
-          </h3>
-
-          <p
-            style={{
-              color: "#94a3b8",
-              fontSize: 13,
-            }}
-          >
-            Enter the information
-            you know. Optional
-            specifications can be
-            left blank.
-          </p>
-
-          <label>
-            Brand *
-          </label>
-
-          <input
-            value={newVehicle.brand}
-            onChange={(e) =>
-              setNewVehicle({
-                ...newVehicle,
-                brand:
-                  e.target.value,
-              })
-            }
-            placeholder="e.g. Tata"
-          />
-
-          <label>
-            Model *
-          </label>
-
-          <input
-            value={newVehicle.model}
-            onChange={(e) =>
-              setNewVehicle({
-                ...newVehicle,
-                model:
-                  e.target.value,
-              })
-            }
-            placeholder="e.g. Curvv EV 55"
-          />
-
-          <label>
-            Battery Capacity (kWh)
-          </label>
-
-          <input
-            type="number"
-            min="0"
-            step="0.1"
-            value={
-              newVehicle.battery
-            }
-            onChange={(e) =>
-              setNewVehicle({
-                ...newVehicle,
-                battery:
-                  e.target.value,
-              })
-            }
-            placeholder="Optional"
-          />
-
-          <div
-            style={{
-              marginTop: 16,
-              padding: 12,
-              borderRadius: 8,
-              background:
-                "rgba(255,255,255,.04)",
-            }}
-          >
-            <strong>
-              Optional specifications
-            </strong>
-
-            <p
-              style={{
-                color: "#94a3b8",
-                fontSize: 12,
-                marginBottom: 0,
-              }}
-            >
-              Leave these blank if
-              you don't know them.
-            </p>
-          </div>
-
-          <label>
-            Claimed Range (km)
-          </label>
-
-          <input
-            type="number"
-            min="0"
-            value={
-              newVehicle.range
-            }
-            onChange={(e) =>
-              setNewVehicle({
-                ...newVehicle,
-                range:
-                  e.target.value,
-              })
-            }
-            placeholder="Optional"
-          />
-
-          <label>
-            Efficiency (km/kWh)
-          </label>
-
-          <input
-            type="number"
-            min="0"
-            step="0.1"
-            value={
-              newVehicle.efficiency
-            }
-            onChange={(e) =>
-              setNewVehicle({
-                ...newVehicle,
-                efficiency:
-                  e.target.value,
-              })
-            }
-            placeholder="Optional"
-          />
-
-          <label>
-            AC Charging Limit (kW)
-          </label>
-
-          <input
-            type="number"
-            min="0"
-            step="0.1"
-            value={
-              newVehicle.acPower
-            }
-            onChange={(e) =>
-              setNewVehicle({
-                ...newVehicle,
-                acPower:
-                  e.target.value,
-              })
-            }
-            placeholder="Optional"
-          />
-
-          <label>
-            DC Charging Limit (kW)
-          </label>
-
-          <input
-            type="number"
-            min="0"
-            step="1"
-            value={
-              newVehicle.dcPower
-            }
-            onChange={(e) =>
-              setNewVehicle({
-                ...newVehicle,
-                dcPower:
-                  e.target.value,
-              })
-            }
-            placeholder="Optional"
-          />
-
-          <label>
-            DC 10–80% Charging Time
-            (minutes)
-          </label>
-
-          <input
-            type="number"
-            min="0"
-            value={
-              newVehicle
-                .fastCharge10to80
-            }
-            onChange={(e) =>
-              setNewVehicle({
-                ...newVehicle,
-                fastCharge10to80:
-                  e.target.value,
-              })
-            }
-            placeholder="Optional"
-          />
-
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              marginTop: 18,
-            }}
-          >
-            <button
-              type="button"
-              className="saveButton"
-              onClick={addVehicle}
-            >
-              Add Vehicle
-            </button>
-
-            <button
-              type="button"
-              className="deleteButton"
-              onClick={() => {
-                setShowVehicleForm(false);
-                setNewVehicle(
-                  emptyVehicleForm
-                );
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-
-        </div>
-      )}
-
-
+          Custom vehicles can be added or changed only from Settings.
+        </p>
 
         <label>
           Charging Location
@@ -1949,7 +1565,6 @@ if (fastChargeTime > 0) {
             setShowChargerForm(
               !showChargerForm
             );
-            setShowVehicleForm(false);
           }}
           style={{
             marginTop: 8,
@@ -2256,10 +1871,6 @@ if (fastChargeTime > 0) {
         )}
 
       </div>
-
-      {/* =====================================================
-          ADD VEHICLE CARD
-          ===================================================== */}
 
       {/* =====================================================
           ADD CHARGER CARD
@@ -2671,8 +2282,8 @@ if (fastChargeTime > 0) {
               </td>
 
               <td>
-                {vehicle?.battery > 0
-                  ? `${vehicle.battery} kWh`
+                {(vehicle?.battery ?? 0) > 0
+                  ? `${vehicle?.battery} kWh`
                   : "Not available"}
               </td>
             </tr>
@@ -2683,8 +2294,8 @@ if (fastChargeTime > 0) {
               </td>
 
               <td>
-                {vehicle?.efficiency > 0
-                  ? `${vehicle.efficiency} km/kWh`
+                {(vehicle?.efficiency ?? 0) > 0
+                  ? `${vehicle?.efficiency} km/kWh`
                   : "Not available"}
               </td>
             </tr>
@@ -2695,8 +2306,8 @@ if (fastChargeTime > 0) {
               </td>
 
               <td>
-                {vehicle?.range > 0
-                  ? `${vehicle.range} km`
+                {(vehicle?.range ?? 0) > 0
+                  ? `${vehicle?.range} km`
                   : "Not available"}
               </td>
             </tr>
@@ -2707,8 +2318,8 @@ if (fastChargeTime > 0) {
               </td>
 
               <td>
-                {vehicle?.acPower > 0
-                  ? `${vehicle.acPower} kW`
+                {(vehicle?.acPower ?? 0) > 0
+                  ? `${vehicle?.acPower} kW`
                   : "Not available"}
               </td>
             </tr>
@@ -2719,8 +2330,8 @@ if (fastChargeTime > 0) {
               </td>
 
               <td>
-                {vehicle?.dcPower > 0
-                  ? `${vehicle.dcPower} kW`
+                {(vehicle?.dcPower ?? 0) > 0
+                  ? `${vehicle?.dcPower} kW`
                   : "Not available"}
               </td>
             </tr>
@@ -2731,8 +2342,8 @@ if (fastChargeTime > 0) {
               </td>
 
               <td>
-              {(vehicle.fastCharge10to80 ?? 0) > 0
-  ? `${vehicle.fastCharge10to80} min`
+              {(vehicle?.fastCharge10to80 ?? 0) > 0
+  ? `${vehicle?.fastCharge10to80} min`
   : "Not available"}
               </td>
             </tr>

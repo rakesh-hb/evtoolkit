@@ -1,6 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import UserDetails from "../components/UserDetails";
+import { usePrimaryVehicle } from "../context/PrimaryVehicleContext";
+import { getCustomVehicles, type CustomVehicleRecord } from "../services/customVehicleService";
+import { vehicles } from "../data/vehicles";
 
 
 interface DashboardProps {
@@ -28,6 +31,32 @@ function Dashboard({
 
   const [loading, setLoading] =
     useState(true);
+
+  const {
+    primaryVehicle,
+    dashboardAlias,
+    loading: primaryVehicleLoading,
+  } = usePrimaryVehicle();
+
+  const [customVehicles, setCustomVehicles] =
+    useState<CustomVehicleRecord[]>([]);
+
+  useEffect(() => {
+    async function loadCustomVehicles() {
+      try {
+        const data = await getCustomVehicles();
+        setCustomVehicles(data);
+      } catch (error) {
+        console.error(
+          "Error loading custom vehicles for dashboard:",
+          error
+        );
+        setCustomVehicles([]);
+      }
+    }
+
+    void loadCustomVehicles();
+  }, []);
 
 
   useEffect(() => {
@@ -158,6 +187,54 @@ function Dashboard({
       ? sessions[0]
       : null;
 
+  const primaryVehicleName = useMemo(() => {
+    if (!primaryVehicle) {
+      return "";
+    }
+
+    if (primaryVehicle.type === "built_in") {
+      const vehicle = vehicles.find(
+        (item) => Number(item.id) === Number(primaryVehicle.id)
+      );
+
+      return vehicle
+        ? `${vehicle.brand} ${vehicle.model}`
+        : "";
+    }
+
+    const vehicle = customVehicles.find(
+      (item) => Number(item.id) === Number(primaryVehicle.id)
+    );
+
+    return vehicle
+      ? `${vehicle.brand} ${vehicle.model}`
+      : "";
+  }, [primaryVehicle, customVehicles]);
+
+  const primaryVehicleSessions = useMemo(() => {
+    if (!primaryVehicleName) {
+      return [];
+    }
+
+    return sessions.filter(
+      (session) =>
+        session.vehicle.trim().toLowerCase() ===
+        primaryVehicleName.trim().toLowerCase()
+    );
+  }, [sessions, primaryVehicleName]);
+
+  const primaryVehicleTotalEnergy =
+    primaryVehicleSessions.reduce(
+      (sum, item) => sum + item.energy,
+      0
+    );
+
+  const primaryVehicleTotalCost =
+    primaryVehicleSessions.reduce(
+      (sum, item) => sum + item.cost,
+      0
+    );
+
 
   return (
     <>
@@ -179,6 +256,200 @@ function Dashboard({
             onNavigate?.("profile");
           }}
         />
+      </div>
+
+
+      {/* ======================================================
+          PRIMARY VEHICLE
+          ====================================================== */}
+
+      <div
+        className="card"
+        style={{
+          marginBottom: "18px",
+          padding: "20px",
+          fontFamily: '"Avenir Next", "Montserrat", "Inter", "Segoe UI", Arial, sans-serif',
+          borderRadius: "18px",
+          border: "1px solid rgba(249,115,22,0.42)",
+          background:
+            "linear-gradient(135deg, rgba(30,41,59,0.98), rgba(15,23,42,0.98))",
+          boxShadow: "0 10px 30px rgba(15,23,42,0.28)",
+          overflow: "hidden",
+        }}
+      >
+        {primaryVehicleLoading ? (
+          <p style={{ margin: 0, color: "#94a3b8" }}>
+            Loading your Primary Vehicle...
+          </p>
+        ) : primaryVehicle && primaryVehicleName ? (
+          <>
+            <div
+              style={{
+                color: "#f97316",
+                fontSize: "12px",
+                fontWeight: 800,
+                letterSpacing: "0.09em",
+                textTransform: "uppercase",
+              }}
+            >
+              ⚡ Primary Vehicle
+            </div>
+
+            {dashboardAlias ? (
+              <>
+                <div
+                  style={{
+                    marginTop: "6px",
+                    color: "#ffffff",
+                    fontFamily: '"Avenir Next", "Montserrat", "Inter", "Segoe UI", Arial, sans-serif',
+                    fontSize: "clamp(24px, 5vw, 34px)",
+                    fontWeight: 700,
+                    letterSpacing: "-0.025em",
+                    lineHeight: 1.15,
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  {dashboardAlias}
+                </div>
+
+                <div
+                  style={{
+                    marginTop: "4px",
+                    color: "#cbd5e1",
+                    fontFamily: '"Avenir Next", "Montserrat", "Inter", "Segoe UI", Arial, sans-serif',
+                    fontSize: "clamp(14px, 3vw, 18px)",
+                    fontWeight: 500,
+                    lineHeight: 1.3,
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  ({primaryVehicleName})
+                </div>
+              </>
+            ) : (
+              <div
+                style={{
+                  marginTop: "6px",
+                  color: "#ffffff",
+                  fontFamily: '"Avenir Next", "Montserrat", "Inter", "Segoe UI", Arial, sans-serif',
+                  fontSize: "clamp(24px, 5vw, 34px)",
+                  fontWeight: 700,
+                  letterSpacing: "-0.025em",
+                  lineHeight: 1.15,
+                  overflowWrap: "anywhere",
+                }}
+              >
+                {primaryVehicleName}
+              </div>
+            )}
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit, minmax(110px, 1fr))",
+                gap: "10px",
+                marginTop: "16px",
+              }}
+            >
+              <div>
+                <div style={{ color: "#94a3b8", fontSize: "12px" }}>
+                  Sessions
+                </div>
+                <strong style={{ color: "#38bdf8", fontSize: "20px" }}>
+                  {primaryVehicleSessions.length}
+                </strong>
+              </div>
+
+              <div>
+                <div style={{ color: "#94a3b8", fontSize: "12px" }}>
+                  Energy
+                </div>
+                <strong style={{ color: "#4ade80", fontSize: "20px" }}>
+                  {primaryVehicleTotalEnergy.toFixed(1)} kWh
+                </strong>
+              </div>
+
+              <div>
+                <div style={{ color: "#94a3b8", fontSize: "12px" }}>
+                  Charging Cost
+                </div>
+                <strong style={{ color: "#fbbf24", fontSize: "20px" }}>
+                  ₹{primaryVehicleTotalCost.toLocaleString(
+                    undefined,
+                    {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    }
+                  )}
+                </strong>
+              </div>
+            </div>
+
+            <p
+              style={{
+                margin: "14px 0 0",
+                color: "#cbd5e1",
+                fontSize: "13px",
+              }}
+            >
+              Your Primary Vehicle is used as the default vehicle across
+              EV Toolkit.
+            </p>
+          </>
+        ) : (
+          <>
+            <div
+              style={{
+                color: "#f97316",
+                fontSize: "12px",
+                fontWeight: 800,
+                letterSpacing: "0.09em",
+                textTransform: "uppercase",
+              }}
+            >
+              ⚡ Primary Vehicle
+            </div>
+
+            <div
+              style={{
+                marginTop: "6px",
+                color: "#ffffff",
+                fontSize: "22px",
+                fontWeight: 800,
+              }}
+            >
+              No Primary Vehicle Selected
+            </div>
+
+            <p
+              style={{
+                margin: "8px 0 14px",
+                color: "#94a3b8",
+                fontSize: "13px",
+              }}
+            >
+              Select your vehicle in Settings to personalise your
+              Dashboard and use it as the default across the app.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => onNavigate?.("settings")}
+              style={{
+                border: "none",
+                borderRadius: "10px",
+                padding: "10px 14px",
+                background: "#f97316",
+                color: "#ffffff",
+                fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >
+              Go to Settings
+            </button>
+          </>
+        )}
       </div>
 
 

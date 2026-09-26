@@ -35,7 +35,6 @@ import {
 
 import {
   getCustomVehicles,
-  addCustomVehicle,
   type CustomVehicleRecord,
 } from "../services/customVehicleService";
 
@@ -43,6 +42,7 @@ import { vehicles } from "../data/vehicles";
 
 import ReceiptUploader from "../components/ReceiptUploader";
 import UserDetails from "../components/UserDetails";
+import { usePrimaryVehicle } from "../context/PrimaryVehicleContext";
 
 
 const emptyPolicy: InsuranceRecord = {
@@ -62,12 +62,6 @@ const emptyPolicy: InsuranceRecord = {
   notes: "",
   attachment: "",
   attachment_name: "",
-};
-
-
-const emptyVehicleForm = {
-  brand: "",
-  model: "",
 };
 
 
@@ -409,6 +403,11 @@ interface InsuranceProps {
 export default function Insurance({
   onNavigate,
 }: InsuranceProps) {
+  const {
+    primaryVehicle,
+    loading: primaryVehicleLoading,
+  } = usePrimaryVehicle();
+
   const [records, setRecords] =
     useState<InsuranceRecord[]>([]);
 
@@ -448,24 +447,6 @@ export default function Insurance({
     customVehicles,
     setCustomVehicles,
   ] = useState<CustomVehicleRecord[]>([]);
-
-  const [
-    showAddVehicle,
-    setShowAddVehicle,
-  ] = useState(false);
-
-  const [
-    newVehicle,
-    setNewVehicle,
-  ] = useState(
-    emptyVehicleForm
-  );
-
-  const [
-    addingVehicle,
-    setAddingVehicle,
-  ] = useState(false);
-
   const [
     vehicleSearch,
     setVehicleSearch,
@@ -506,6 +487,46 @@ export default function Insurance({
       document.removeEventListener("keydown", handleEscape);
     };
   }, [showVehicleSuggestions]);
+
+  const primaryVehicleName = useMemo(() => {
+    if (!primaryVehicle) {
+      return "";
+    }
+
+    if (primaryVehicle.type === "built_in") {
+      const vehicle = vehicles.find(
+        (item) => Number(item.id) === Number(primaryVehicle.id)
+      );
+
+      return vehicle
+        ? `${vehicle.brand} ${vehicle.model}`
+        : "";
+    }
+
+    const vehicle = customVehicles.find(
+      (item) => Number(item.id) === Number(primaryVehicle.id)
+    );
+
+    return vehicle
+      ? `${vehicle.brand} ${vehicle.model}`
+      : "";
+  }, [primaryVehicle, customVehicles]);
+
+  useEffect(() => {
+    if (primaryVehicleLoading || editingId !== null) {
+      return;
+    }
+
+    setForm((current) => ({
+      ...current,
+      vehicle: primaryVehicleName,
+    }));
+    setVehicleSearch(primaryVehicleName);
+  }, [
+    primaryVehicleLoading,
+    primaryVehicleName,
+    editingId,
+  ]);
 
   /*
    * =========================================================
@@ -641,6 +662,10 @@ export default function Insurance({
         setForm((current) => ({
           ...current,
           ...draft.draft_data,
+          vehicle:
+            draft.draft_data.vehicle?.trim()
+              ? draft.draft_data.vehicle
+              : current.vehicle,
         }));
         setDraftStatus("saved");
       } else {
@@ -822,111 +847,6 @@ export default function Insurance({
     vehicleSearch,
   ]);
 
-
-  /*
-   * =========================================================
-   * ADD CUSTOM VEHICLE
-   * =========================================================
-   */
-
-  async function handleAddVehicle() {
-    const brand =
-      newVehicle.brand.trim();
-
-    const model =
-      newVehicle.model.trim();
-
-    if (!brand || !model) {
-      alert(
-        "Please enter both vehicle brand and model."
-      );
-
-      return;
-    }
-
-    const duplicate =
-      vehicleOptions.some(
-        (vehicle) =>
-          vehicle.value
-            .trim()
-            .toLowerCase() ===
-          `${brand} ${model}`
-            .trim()
-            .toLowerCase()
-      );
-
-    if (duplicate) {
-      alert(
-        "This vehicle already exists."
-      );
-
-      return;
-    }
-
-    try {
-      setAddingVehicle(true);
-
-      const created =
-        await addCustomVehicle({
-          brand,
-          model,
-        });
-
-      setCustomVehicles(
-        (current) => [
-          ...current,
-          created,
-        ]
-      );
-
-      const vehicleName =
-        `${created.brand} ${created.model}`;
-
-      setForm(
-        (current) => ({
-          ...current,
-          vehicle:
-            vehicleName,
-        })
-      );
-
-      setVehicleSearch(
-        vehicleName
-      );
-
-      setShowVehicleSuggestions(
-        false
-      );
-
-      setNewVehicle(
-        emptyVehicleForm
-      );
-
-      setShowAddVehicle(
-        false
-      );
-
-      alert(
-        "Vehicle added successfully."
-      );
-
-    } catch (err: any) {
-      console.error(
-        "Failed to add custom vehicle:",
-        err
-      );
-
-      alert(
-        err?.message ||
-          "Failed to add vehicle."
-      );
-
-    } finally {
-      setAddingVehicle(
-        false
-      );
-    }
-  }
 
 
   /*
@@ -1210,11 +1130,14 @@ export default function Insurance({
     });
 
     setEditingId(null);
-    setForm({ ...emptyPolicy });
-    setSelectedAddon("");
-    setShowAddVehicle(false);
-    setNewVehicle({ ...emptyVehicleForm });
-    setVehicleSearch("");
+
+    const resetVehicle = primaryVehicleName;
+
+    setForm({
+      ...emptyPolicy,
+      vehicle: resetVehicle,
+    });
+    setSelectedAddon("");    setVehicleSearch(resetVehicle);
     setShowVehicleSuggestions(false);
     setDraftStatus("idle");
 
@@ -1387,15 +1310,14 @@ export default function Insurance({
         null
       );
 
-      setForm(
-        emptyPolicy
-      );
+      setForm({
+        ...emptyPolicy,
+        vehicle: primaryVehicleName,
+      });
 
       setSelectedAddon("");
-      setVehicleSearch("");
+      setVehicleSearch(primaryVehicleName);
       setShowVehicleSuggestions(false);
-      setShowAddVehicle(false);
-      setNewVehicle({ ...emptyVehicleForm });
 
       setDraftStatus("idle");
 
@@ -1636,32 +1558,12 @@ export default function Insurance({
                             fontSize: "13px",
                           }}
                         >
-                          No matching vehicle found. Use ＋ Or Add Custom Vehicle to create one.
+                          No matching vehicle found. Add a custom vehicle from Settings first.
                         </div>
                       )}
                     </div>
                   )}
               </div>
-
-              {editingId === null && (
-                <button
-                  type="button"
-                  className="saveButton evtoolkitCustomFieldButton"
-                  onClick={() =>
-                    setShowAddVehicle(
-                      (value) => !value
-                    )
-                  }
-                  style={{
-                    whiteSpace: "nowrap",
-                    height: "44px",
-                    position: "relative",
-                    top: "-4px",
-                  }}
-                >
-                  ＋ Or Add Custom Vehicle
-                </button>
-              )}
 
             </div>
 
@@ -1677,91 +1579,6 @@ export default function Insurance({
               </p>
             )}
 
-            {showAddVehicle &&
-              editingId === null && (
-                <div
-                  style={{
-                    marginTop: "10px",
-                    padding: "12px",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "8px",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: "8px",
-                    }}
-                  >
-                    <input
-                      type="text"
-                      placeholder="Brand"
-                      value={newVehicle.brand}
-                      onChange={(e) =>
-                        setNewVehicle({
-                          ...newVehicle,
-                          brand: e.target.value,
-                        })
-                      }
-                    />
-
-                    <input
-                      type="text"
-                      placeholder="Model"
-                      value={newVehicle.model}
-                      onChange={(e) =>
-                        setNewVehicle({
-                          ...newVehicle,
-                          model: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: "8px",
-                      marginTop: "10px",
-                    }}
-                  >
-                    <button
-                      type="button"
-                      className="saveButton"
-                      disabled={addingVehicle}
-                      onClick={() =>
-                        void handleAddVehicle()
-                      }
-                    >
-                      {addingVehicle
-                        ? "Saving..."
-                        : "Save Vehicle"}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowAddVehicle(false);
-                        setNewVehicle(
-                          emptyVehicleForm
-                        );
-                      }}
-                      style={{
-                        background: "#dc2626",
-                        color: "#ffffff",
-                        border: "none",
-                        borderRadius: "6px",
-                        padding: "10px 14px",
-                        cursor: "pointer",
-                        fontWeight: 600,
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
 
           </div>
 

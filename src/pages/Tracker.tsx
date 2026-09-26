@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { usePrimaryVehicle } from "../context/PrimaryVehicleContext";
+
 import {
   getChargingSessions,
   addChargingSession,
@@ -21,7 +23,6 @@ import {
 import { vehicles } from "../data/vehicles";
 import {
   getCustomVehicles,
-  addCustomVehicle,
   type CustomVehicleRecord,
 } from "../services/customVehicleService";
 import ReceiptUploader from "../components/ReceiptUploader";
@@ -128,15 +129,14 @@ interface TrackerProps {
 }
 
 function Tracker({ onNavigate }: TrackerProps) {
-  const defaultVehicle =
-    vehicles.find(
-      (v) => v.model === "Curvv EV 55"
-    ) ?? vehicles[0];
+  const {
+    primaryVehicle,
+    loading: primaryVehicleLoading,
+  } = usePrimaryVehicle();
 
-
-  const [vehicle, setVehicle] = useState(
-    `${defaultVehicle.brand} ${defaultVehicle.model}`
-  );
+  const [vehicle, setVehicle] = useState("");
+  const [trackerInitialized, setTrackerInitialized] =
+    useState(false);
 
   const [sessions, setSessions] =
     useState<ChargingSession[]>([]);
@@ -218,14 +218,6 @@ function Tracker({ onNavigate }: TrackerProps) {
   const vehicleDropdownRef =
     useRef<HTMLDivElement | null>(null);
 
-  const [showVehicleForm, setShowVehicleForm] =
-    useState(false);
-  const [vehicleBrand, setVehicleBrand] =
-    useState("");
-  const [vehicleModel, setVehicleModel] =
-    useState("");
-  const [savingVehicle, setSavingVehicle] =
-    useState(false);
 
   const [stationSearch, setStationSearch] =
     useState("");
@@ -336,10 +328,12 @@ function Tracker({ onNavigate }: TrackerProps) {
 
       skipAutosaveRef.current = true;
 
-      setVehicle(
-        data.vehicle ??
-          `${defaultVehicle.brand} ${defaultVehicle.model}`
-      );
+      // For a new charging session, the Primary Vehicle is authoritative.
+      // An old unfinished draft must not overwrite it. Existing session edits
+      // still restore the vehicle saved with that session.
+      if (editingId !== null) {
+        setVehicle(data.vehicle ?? "");
+      }
 
       setCharger(
         data.charger ?? "DC Fast"
@@ -403,6 +397,7 @@ function Tracker({ onNavigate }: TrackerProps) {
         );
 
         draftLoadedRef.current = true;
+        setTrackerInitialized(true);
       } catch (error) {
         console.error(
           "Failed to initialize Charge Tracker:",
@@ -616,66 +611,6 @@ function Tracker({ onNavigate }: TrackerProps) {
   }
 
 
-  async function handleAddVehicle() {
-    const brand = vehicleBrand.trim();
-    const model = vehicleModel.trim();
-
-    if (!brand || !model) {
-      alert("Please enter the vehicle brand and model.");
-      return;
-    }
-
-    const vehicleName = `${brand} ${model}`.trim();
-    const duplicate = allVehicles.some(
-      (item) =>
-        item.value.trim().toLowerCase() === vehicleName.toLowerCase()
-    );
-
-    if (duplicate) {
-      alert("This vehicle already exists.");
-      return;
-    }
-
-    try {
-      setSavingVehicle(true);
-
-      const created = await addCustomVehicle({
-        brand,
-        model,
-      });
-
-      setCustomVehicles((current) => [...current, created]);
-
-      const createdName = `${created.brand} ${created.model}`;
-
-      setVehicle(createdName);
-      setVehicleSearch(createdName);
-      setShowVehicleSuggestions(false);
-
-      setVehicleBrand("");
-      setVehicleModel("");
-      setShowVehicleForm(false);
-
-      alert("Vehicle added successfully.");
-    } catch (error: any) {
-      console.error(error);
-
-      if (
-        error?.code === "23505" ||
-        error?.message?.toLowerCase?.().includes("duplicate")
-      ) {
-        alert("This vehicle already exists.");
-      } else {
-        alert(
-          error?.message ||
-            "Failed to add vehicle."
-        );
-      }
-    } finally {
-      setSavingVehicle(false);
-    }
-  }
-
 
   async function handleAddStation() {
     const name = newStationName.trim();
@@ -778,6 +713,89 @@ function Tracker({ onNavigate }: TrackerProps) {
       item.label.toLowerCase().includes(query)
     );
   }, [allVehicles, vehicleSearch]);
+
+
+  /*
+   * Resolve the saved Primary Vehicle using its typed reference.
+   *
+   * IMPORTANT:
+   * - Do not use the first vehicle in the built-in list as a fallback.
+   * - Do not use subscription plan to determine the Primary Vehicle.
+   * - Built-in and custom vehicle IDs are resolved separately because their
+   *   numeric IDs can overlap.
+   */
+  const primaryVehicleName = useMemo(() => {
+    if (!primaryVehicle) {
+      return "";
+    }
+
+    if (primaryVehicle.type === "built_in") {
+      const builtInVehicle = vehicles.find(
+        (item) =>
+          Number(item.id) === Number(primaryVehicle.id)
+      );
+
+      return builtInVehicle
+        ? `${builtInVehicle.brand} ${builtInVehicle.model}`
+        : "";
+    }
+
+    const customVehicle = customVehicles.find(
+      (item) =>
+        Number(item.id) === Number(primaryVehicle.id)
+    );
+
+    return customVehicle
+      ? `${customVehicle.brand} ${customVehicle.model}`
+      : "";
+  }, [primaryVehicle, customVehicles]);
+
+  /*
+   * For a NEW charging session, the saved Primary Vehicle is authoritative.
+   *
+   * The unfinished `charging-session:new` draft may contain an older vehicle,
+   * but it must never replace the current Primary Vehicle.
+   *
+   * If there is no Primary Vehicle, leave the field blank. Never fall back
+   * to the first vehicle in the built-in vehicle list.
+   *
+   * Existing session edits are excluded because they intentionally use the
+   * vehicle stored on that charging session.
+   */
+  useEffect(() => {
+    if (
+      !trackerInitialized ||
+      primaryVehicleLoading ||
+      editingId !== null
+    ) {
+      return;
+    }
+
+    if (!primaryVehicle) {
+      setVehicle("");
+      setVehicleSearch("");
+      return;
+    }
+
+    if (!primaryVehicleName) {
+      console.warn(
+        "Primary Vehicle is saved, but Tracker could not resolve its vehicle details.",
+        primaryVehicle
+      );
+      setVehicle("");
+      setVehicleSearch("");
+      return;
+    }
+
+    setVehicle(primaryVehicleName);
+    setVehicleSearch(primaryVehicleName);
+  }, [
+    trackerInitialized,
+    primaryVehicleLoading,
+    primaryVehicle,
+    primaryVehicleName,
+    editingId,
+  ]);
 
   const allStationOptions = useMemo(() => {
     const seen = new Set<string>();
@@ -976,11 +994,10 @@ function Tracker({ onNavigate }: TrackerProps) {
 
     setEditingId(null);
 
-    const resetVehicle =
-      `${defaultVehicle.brand} ${defaultVehicle.model}`;
+    const resetVehicle = primaryVehicleName;
 
     setVehicle(resetVehicle);
-    setVehicleSearch("");
+    setVehicleSearch(resetVehicle);
     setShowVehicleSuggestions(false);
     setStationSearch("");
     setShowStationSuggestions(false);
@@ -1253,90 +1270,15 @@ function Tracker({ onNavigate }: TrackerProps) {
                       fontSize: "13px",
                     }}
                   >
-                    No matching vehicle found. Use ＋ Or Add Custom Vehicle to create one.
+                    No matching vehicle found. Add a custom vehicle from Settings.
                   </div>
                 )}
               </div>
             )}
           </div>
 
-          {editingId === null && (
-            <button
-              type="button"
-              className="saveButton evtoolkitCustomFieldButton"
-              onClick={() => setShowVehicleForm((current) => !current)}
-              style={{
-                padding: "0 14px",
-                margin: 0,
-                whiteSpace: "nowrap",
-                flexShrink: 0,
-                fontSize: "14px",
-                height: "46px",
-                position: "relative",
-                top: "6px",
-              }}
-            >
-              ＋ Or Add Custom Vehicle
-            </button>
-          )}
         </div>
 
-        {showVehicleForm && editingId === null && (
-          <div
-            className="card"
-            style={{
-              marginTop: "12px",
-              marginBottom: "4px",
-            }}
-          >
-            <h4 style={{ marginTop: 0 }}>
-              Add Custom Vehicle
-            </h4>
-
-            <label>Brand</label>
-            <input
-              type="text"
-              placeholder="e.g. Tata"
-              value={vehicleBrand}
-              onChange={(e) => setVehicleBrand(e.target.value)}
-            />
-
-            <label>Model</label>
-            <input
-              type="text"
-              placeholder="e.g. Nexon EV"
-              value={vehicleModel}
-              onChange={(e) => setVehicleModel(e.target.value)}
-            />
-
-            <div
-              className="buttonGroup"
-              style={{ marginTop: "12px" }}
-            >
-              <button
-                type="button"
-                className="primaryButton"
-                onClick={() => void handleAddVehicle()}
-                disabled={savingVehicle}
-              >
-                {savingVehicle ? "Saving..." : "Save Vehicle"}
-              </button>
-
-              <button
-                type="button"
-                className="dangerButton"
-                onClick={() => {
-                  setShowVehicleForm(false);
-                  setVehicleBrand("");
-                  setVehicleModel("");
-                }}
-                disabled={savingVehicle}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
 
         {editingId !== null && (
           <p

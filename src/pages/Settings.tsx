@@ -17,6 +17,16 @@ import {
   createBackup,
   restoreBackup,
 } from "../services/backupService";
+import {
+  addCustomVehicle,
+  getCustomVehicles,
+  type CustomVehicleRecord,
+} from "../services/customVehicleService";
+import {
+  type PrimaryVehicleReference,
+} from "../services/primaryVehicleService";
+import { usePrimaryVehicle } from "../context/PrimaryVehicleContext";
+import { vehicles } from "../data/vehicles";
 
 
 interface FamilyMember {
@@ -94,11 +104,26 @@ interface RazorpayWindow extends Window {
   ) => RazorpayCheckoutInstance;
 }
 
+interface SettingsVehicle {
+  type: "built_in" | "custom";
+  id: number;
+  brand: string;
+  model: string;
+}
+
 interface SettingsProps {
   onNavigate?: (page: string) => void;
 }
 
 function Settings({ onNavigate }: SettingsProps) {
+  const {
+    primaryVehicle: contextPrimaryVehicle,
+    setPrimaryVehicle: savePrimaryVehicle,
+    clearPrimaryVehicle: removePrimaryVehicle,
+    dashboardAlias,
+    setDashboardAlias,
+    clearDashboardAlias,
+  } = usePrimaryVehicle();
 
   const [, setBackupSchedule] =
     useState<BackupSchedule | null>(null);
@@ -177,9 +202,54 @@ function Settings({ onNavigate }: SettingsProps) {
   const fileInputRef =
     useRef<HTMLInputElement>(null);
 
+  const vehiclePickerRef =
+    useRef<HTMLDivElement>(null);
+
 
   const [lastBackupAt, setLastBackupAt] =
     useState<string | null>(null);
+
+  const [settingsVehicles, setSettingsVehicles] =
+    useState<SettingsVehicle[]>([]);
+
+  const [primaryVehicle, setPrimaryVehicleState] =
+    useState<PrimaryVehicleReference | null>(null);
+
+  const [loadingVehicles, setLoadingVehicles] =
+    useState(true);
+
+  const [savingPrimaryVehicle, setSavingPrimaryVehicle] =
+    useState(false);
+
+  const [dashboardAliasText, setDashboardAliasText] =
+    useState("");
+
+  const [savingDashboardAlias, setSavingDashboardAlias] =
+    useState(false);
+
+  const [dashboardAliasError, setDashboardAliasError] =
+    useState("");
+
+  const [vehicleSearchText, setVehicleSearchText] =
+    useState("");
+
+  const [showVehicleSuggestions, setShowVehicleSuggestions] =
+    useState(false);
+
+  const [selectedVehicleReference, setSelectedVehicleReference] =
+    useState<PrimaryVehicleReference | null>(null);
+
+  const [showCustomVehicleForm, setShowCustomVehicleForm] =
+    useState(false);
+
+  const [customVehicleBrand, setCustomVehicleBrand] =
+    useState("");
+
+  const [customVehicleModel, setCustomVehicleModel] =
+    useState("");
+
+  const [savingCustomVehicle, setSavingCustomVehicle] =
+    useState(false);
 
 
 
@@ -191,7 +261,435 @@ function Settings({ onNavigate }: SettingsProps) {
 
   useEffect(() => {
     void loadFamilyData();
+    void loadVehicleSettings();
   }, []);
+
+  useEffect(() => {
+    setPrimaryVehicleState(contextPrimaryVehicle);
+    setSelectedVehicleReference(contextPrimaryVehicle);
+
+    const displayName = contextPrimaryVehicle
+      ? getVehicleDisplayName(contextPrimaryVehicle)
+      : "";
+
+    setVehicleSearchText(displayName);
+    setDashboardAliasText(contextPrimaryVehicle ? dashboardAlias : "");
+    setDashboardAliasError("");
+  }, [contextPrimaryVehicle, dashboardAlias]);
+
+  useEffect(() => {
+    function handleVehiclePickerOutsideClick(event: MouseEvent) {
+      if (!showVehicleSuggestions) {
+        return;
+      }
+
+      const target = event.target as Node | null;
+
+      if (
+        vehiclePickerRef.current &&
+        target &&
+        !vehiclePickerRef.current.contains(target)
+      ) {
+        setShowVehicleSuggestions(false);
+      }
+    }
+
+    function handleVehiclePickerEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setShowVehicleSuggestions(false);
+      }
+    }
+
+    document.addEventListener(
+      "mousedown",
+      handleVehiclePickerOutsideClick
+    );
+    document.addEventListener(
+      "keydown",
+      handleVehiclePickerEscape
+    );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handleVehiclePickerOutsideClick
+      );
+      document.removeEventListener(
+        "keydown",
+        handleVehiclePickerEscape
+      );
+    };
+  }, [showVehicleSuggestions]);
+
+  async function loadVehicleSettings() {
+    setLoadingVehicles(true);
+
+    try {
+      const customVehicles = await getCustomVehicles();
+
+      const builtInVehicles: SettingsVehicle[] =
+        vehicles.map((vehicle) => ({
+          type: "built_in",
+          id: vehicle.id,
+          brand: vehicle.brand,
+          model: vehicle.model,
+        }));
+
+      const customVehicleOptions: SettingsVehicle[] =
+        customVehicles.map(
+          (vehicle: CustomVehicleRecord) => ({
+            type: "custom",
+            id: vehicle.id,
+            brand: vehicle.brand,
+            model: vehicle.model,
+          })
+        );
+
+      const allVehicleOptions = [
+        ...builtInVehicles,
+        ...customVehicleOptions,
+      ];
+
+      setSettingsVehicles(allVehicleOptions);
+
+      const savedPrimary = contextPrimaryVehicle;
+
+      setPrimaryVehicleState(savedPrimary);
+      setSelectedVehicleReference(savedPrimary);
+
+      const savedPrimaryVehicle = savedPrimary
+        ? allVehicleOptions.find(
+            (vehicle) =>
+              vehicle.type === savedPrimary.type &&
+              vehicle.id === savedPrimary.id
+          )
+        : null;
+
+      setVehicleSearchText(
+        savedPrimaryVehicle
+          ? `${savedPrimaryVehicle.brand} ${savedPrimaryVehicle.model}`
+          : ""
+      );
+    } catch (error) {
+      console.error(
+        "Vehicle settings load error:",
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Unable to load vehicle settings."
+      );
+    } finally {
+      setLoadingVehicles(false);
+    }
+  }
+
+  function getVehicleDisplayName(
+    reference: PrimaryVehicleReference | null
+  ) {
+    if (!reference) {
+      return "";
+    }
+
+    const vehicle = settingsVehicles.find(
+      (item) =>
+        item.type === reference.type &&
+        item.id === reference.id
+    );
+
+    if (!vehicle) {
+      return "";
+    }
+
+    return `${vehicle.brand} ${vehicle.model}`;
+  }
+
+  function normalizeVehicleSearchText(value: string) {
+    return value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim()
+      .replace(/\s+/g, " ");
+  }
+
+  const normalizedVehicleQuery = normalizeVehicleSearchText(vehicleSearchText);
+
+  const filteredVehicleSettings = normalizedVehicleQuery
+    ? settingsVehicles.filter((vehicle) => {
+        const searchableText = normalizeVehicleSearchText(
+          `${vehicle.brand} ${vehicle.model}`
+        );
+
+        return searchableText.includes(normalizedVehicleQuery);
+      })
+    : [];
+
+  const visibleVehicleSettings =
+    normalizedVehicleQuery || showVehicleSuggestions
+      ? filteredVehicleSettings.length > 0 || normalizedVehicleQuery
+        ? filteredVehicleSettings
+        : settingsVehicles
+      : [];
+
+  const hasExactVehicleMatch = settingsVehicles.some(
+    (vehicle) =>
+      normalizeVehicleSearchText(
+        `${vehicle.brand} ${vehicle.model}`
+      ) === normalizedVehicleQuery
+  );
+
+
+  async function handleDashboardAliasSave(forceClear = false) {
+    if (savingDashboardAlias) return;
+
+    setDashboardAliasError("");
+
+    if (!primaryVehicle) {
+      alert("Select a Primary Vehicle before setting a Dashboard alias.");
+      return;
+    }
+
+    const alias = forceClear ? "" : dashboardAliasText.trim();
+
+    if (alias.length > 100) {
+      setDashboardAliasError(
+        "Dashboard Vehicle Alias must be 100 characters or fewer."
+      );
+      alert("Dashboard Vehicle Alias must be 100 characters or fewer.");
+      return;
+    }
+
+    setSavingDashboardAlias(true);
+
+    try {
+      if (!alias) {
+        await clearDashboardAlias();
+        setDashboardAliasText("");
+        setDashboardAliasError("");
+        alert("Dashboard Vehicle Alias cleared.");
+        return;
+      }
+
+      await setDashboardAlias(alias);
+      setDashboardAliasText(alias);
+      setDashboardAliasError("");
+      alert("Dashboard Vehicle Alias saved.");
+    } catch (error) {
+      console.error("Dashboard alias save error:", error);
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to save the Dashboard Vehicle Alias.";
+
+      if (
+        message ===
+        "This Dashboard alias is already in use. Please choose another name."
+      ) {
+        setDashboardAliasError(message);
+        return;
+      }
+
+      alert(message);
+    } finally {
+      setSavingDashboardAlias(false);
+    }
+  }
+
+  async function handleSelectVehicle() {
+    if (!selectedVehicleReference) {
+      alert("Please select a vehicle first.");
+      return;
+    }
+
+    await handlePrimaryVehicleChange(
+      `${selectedVehicleReference.type}:${selectedVehicleReference.id}`
+    );
+  }
+
+  async function handleAddCustomVehicleFromSettings() {
+    if (primaryVehicle) {
+      alert(
+        "A primary vehicle is already selected. Set it to None before selecting another vehicle."
+      );
+      return;
+    }
+
+    const brand = customVehicleBrand.trim();
+    const model = customVehicleModel.trim();
+
+    if (!brand || !model) {
+      alert("Please enter the vehicle brand and model.");
+      return;
+    }
+
+    const duplicate = settingsVehicles.some(
+      (vehicle) =>
+        normalizeVehicleSearchText(
+          `${vehicle.brand} ${vehicle.model}`
+        ) ===
+        normalizeVehicleSearchText(`${brand} ${model}`)
+    );
+
+    if (duplicate) {
+      alert("This vehicle already exists. Select it from the vehicle list instead.");
+      return;
+    }
+
+    try {
+      setSavingCustomVehicle(true);
+
+      const created = await addCustomVehicle({
+        brand,
+        model,
+      });
+
+      const createdVehicle: SettingsVehicle = {
+        type: "custom",
+        id: created.id,
+        brand: created.brand,
+        model: created.model,
+      };
+
+      setSettingsVehicles((current) => [
+        ...current,
+        createdVehicle,
+      ]);
+
+      const reference: PrimaryVehicleReference = {
+        type: "custom",
+        id: created.id,
+      };
+
+      await savePrimaryVehicle(reference);
+
+      setPrimaryVehicleState(reference);
+      setSelectedVehicleReference(reference);
+      setVehicleSearchText(
+        `${created.brand} ${created.model}`
+      );
+      setShowVehicleSuggestions(false);
+      setShowCustomVehicleForm(false);
+      setCustomVehicleBrand("");
+      setCustomVehicleModel("");
+
+      alert(
+        `${created.brand} ${created.model} is now your primary vehicle.`
+      );
+    } catch (error: any) {
+      console.error(
+        "Custom vehicle save error:",
+        error
+      );
+
+      if (
+        error?.code === "23505" ||
+        error?.message?.toLowerCase?.().includes("duplicate")
+      ) {
+        alert("This vehicle already exists.");
+      } else {
+        alert(
+          error?.message ||
+            "Unable to add the custom vehicle."
+        );
+      }
+    } finally {
+      setSavingCustomVehicle(false);
+    }
+  }
+
+  async function handlePrimaryVehicleChange(
+    value: string
+  ) {
+    if (savingPrimaryVehicle) {
+      return;
+    }
+
+    setSavingPrimaryVehicle(true);
+
+    try {
+      if (value === "") {
+        await removePrimaryVehicle();
+        setPrimaryVehicleState(null);
+        setSelectedVehicleReference(null);
+        setVehicleSearchText("");
+        setDashboardAliasText("");
+        setShowVehicleSuggestions(false);
+        setShowCustomVehicleForm(false);
+        alert(
+          "Primary vehicle cleared. You can now select another vehicle."
+        );
+        return;
+      }
+
+      const [type, idText] = value.split(":");
+      const id = Number(idText);
+
+      if (
+        (type !== "built_in" &&
+          type !== "custom") ||
+        !Number.isInteger(id) ||
+        id <= 0
+      ) {
+        throw new Error(
+          "Invalid primary vehicle selection."
+        );
+      }
+
+      if (primaryVehicle) {
+        alert(
+          "A primary vehicle is already selected. Set it to None before selecting another vehicle."
+        );
+        return;
+      }
+
+      const selectedVehicle = settingsVehicles.find(
+        (vehicle) =>
+          vehicle.type === type &&
+          vehicle.id === id
+      );
+
+      if (!selectedVehicle) {
+        throw new Error(
+          "The selected vehicle could not be found."
+        );
+      }
+
+      const reference: PrimaryVehicleReference = {
+        type,
+        id,
+      };
+
+      await savePrimaryVehicle(reference);
+
+      setPrimaryVehicleState(reference);
+      setSelectedVehicleReference(reference);
+      setVehicleSearchText(
+        `${selectedVehicle.brand} ${selectedVehicle.model}`
+      );
+      setShowVehicleSuggestions(false);
+      setShowCustomVehicleForm(false);
+
+      alert(
+        `${selectedVehicle.brand} ${selectedVehicle.model} is now your primary vehicle.`
+      );
+    } catch (error) {
+      console.error(
+        "Primary vehicle save error:",
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Unable to update the primary vehicle."
+      );
+    } finally {
+      setSavingPrimaryVehicle(false);
+    }
+  }
 
 
   async function loadFamilyData() {
@@ -230,7 +728,14 @@ function Settings({ onNavigate }: SettingsProps) {
       );
 
       const plan = await getCurrentPlan();
-      setSubscriptionPlan(plan);
+      const normalizedPlan = String(plan).trim().toLowerCase();
+      setSubscriptionPlan(
+        normalizedPlan === "premium_plus"
+          ? "premium_plus"
+          : normalizedPlan === "premium"
+            ? "premium"
+            : "free"
+      );
 
       if (plan !== "free") {
         await loadLastBackup(user.id);
@@ -1525,6 +2030,692 @@ function Settings({ onNavigate }: SettingsProps) {
 
 
       {/* ======================================================
+          VEHICLE SETTINGS
+          ====================================================== */}
+
+      <div className="card">
+
+        <h3>
+          🚗 Vehicle Settings
+        </h3>
+
+        <p
+          style={{
+            marginTop: 8,
+            lineHeight: 1.5,
+          }}
+        >
+          Select one vehicle as your primary vehicle.
+          EV Toolkit will use this vehicle as the
+          default vehicle across the app.
+        </p>
+
+        {loadingVehicles ? (
+          <p style={{ marginTop: 16 }}>
+            Loading your vehicle...
+          </p>
+        ) : primaryVehicle ? (
+          <div
+            style={{
+              marginTop: 18,
+              width: "100%",
+              maxWidth: "560px",
+            }}
+          >
+            <div
+              style={{
+                padding: "18px 18px 16px",
+                border: "1px solid rgba(249, 115, 22, 0.55)",
+                borderRadius: "12px",
+                background:
+                  "linear-gradient(135deg, #1f2937 0%, #111827 100%)",
+                color: "#ffffff",
+                boxSizing: "border-box",
+                lineHeight: 1.5,
+                boxShadow: "0 8px 24px rgba(0,0,0,0.22)",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 800,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "#f97316",
+                }}
+              >
+                Primary Vehicle
+              </div>
+
+              <div
+                style={{
+                  marginTop: 5,
+                  fontSize: "clamp(22px, 4vw, 30px)",
+                  lineHeight: 1.2,
+                  fontWeight: 800,
+                  color: "#60a5fa",
+                  overflowWrap: "anywhere",
+                }}
+              >
+                {getVehicleDisplayName(primaryVehicle)}
+              </div>
+
+              <p
+                style={{
+                  marginTop: 10,
+                  marginBottom: 0,
+                  fontSize: 13,
+                  color: "#d1d5db",
+                }}
+              >
+                This is your only saved vehicle and is the default vehicle
+                across EV Toolkit. To switch vehicles, first set this
+                primary vehicle to <strong style={{ color: "#ffffff" }}>None</strong>.
+              </p>
+
+              <button
+                type="button"
+                className="deleteButton"
+                disabled={savingPrimaryVehicle}
+                onClick={() =>
+                  void handlePrimaryVehicleChange("")
+                }
+                style={{
+                  marginTop: 14,
+                  width: "100%",
+                  maxWidth: "320px",
+                  minHeight: "44px",
+                }}
+              >
+                {savingPrimaryVehicle
+                  ? "Saving..."
+                  : "🚫 Clear Primary Vehicle"}
+              </button>
+
+              <div
+                style={{
+                  marginTop: 18,
+                  paddingTop: 18,
+                  borderTop: "1px solid rgba(255,255,255,0.10)",
+                }}
+              >
+                <label
+                  htmlFor="dashboard-vehicle-alias"
+                  style={{
+                    display: "block",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: "#ffffff",
+                    marginBottom: 7,
+                  }}
+                >
+                  Dashboard Vehicle Alias
+                </label>
+
+                <input
+                  id="dashboard-vehicle-alias"
+                  type="text"
+                  value={dashboardAliasText}
+                  maxLength={100}
+                  onChange={(event) => {
+                    setDashboardAliasText(event.target.value);
+                    if (dashboardAliasError) {
+                      setDashboardAliasError("");
+                    }
+                  }}
+                  placeholder="e.g. Flash"
+                  disabled={savingDashboardAlias}
+                  style={{
+                    width: "100%",
+                    minHeight: "44px",
+                    padding: "10px 12px",
+                    borderRadius: "10px",
+                    border: "1px solid #4b5563",
+                    background: "#111827",
+                    color: "#ffffff",
+                    boxSizing: "border-box",
+                    outline: "none",
+                    fontSize: 14,
+                  }}
+                />
+
+                {dashboardAliasError && (
+                  <div
+                    role="alert"
+                    style={{
+                      marginTop: 8,
+                      padding: "9px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid rgba(239,68,68,0.55)",
+                      background: "rgba(239,68,68,0.12)",
+                      color: "#fca5a5",
+                      fontSize: 12,
+                      lineHeight: 1.45,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {dashboardAliasError}
+                  </div>
+                )}
+
+                <p
+                  style={{
+                    margin: "8px 0 0",
+                    fontSize: 12,
+                    lineHeight: 1.5,
+                    color: "#cbd5e1",
+                  }}
+                >
+                  This alias appears only in the Dashboard top section. It does not rename your vehicle anywhere else in EV Toolkit.
+                </p>
+
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 10,
+                    marginTop: 10,
+                  }}
+                >
+                  {dashboardAliasText.trim() !== dashboardAlias && (
+                    <button
+                      type="button"
+                      className="primaryButton"
+                      disabled={savingDashboardAlias}
+                      onClick={() => void handleDashboardAliasSave()}
+                      style={{ minHeight: "40px", margin: 0 }}
+                    >
+                      {savingDashboardAlias ? "Saving..." : "Save Alias"}
+                    </button>
+                  )}
+
+                  {dashboardAlias && (
+                    <button
+                      type="button"
+                      className="dangerButton"
+                      disabled={savingDashboardAlias}
+                      onClick={() => {
+                        setDashboardAliasText("");
+                        setDashboardAliasError("");
+                        void handleDashboardAliasSave(true);
+                      }}
+                      style={{
+                        minHeight: "40px",
+                        margin: 0,
+                        padding: "10px 16px",
+                        border: "none",
+                        borderRadius: "10px",
+                        background: "#ef4444",
+                        color: "#ffffff",
+                        fontWeight: 700,
+                        fontSize: "14px",
+                        lineHeight: 1.2,
+                        cursor: savingDashboardAlias ? "not-allowed" : "pointer",
+                        opacity: savingDashboardAlias ? 0.65 : 1,
+                        boxSizing: "border-box",
+                      }}
+                    >
+                      Clear Alias
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div
+              style={{
+                marginTop: 18,
+                width: "100%",
+                maxWidth: "560px",
+              }}
+            >
+              <label
+                htmlFor="primary-vehicle-search"
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  marginBottom: 8,
+                }}
+              >
+                Primary Vehicle
+              </label>
+
+              <div
+                ref={vehiclePickerRef}
+                style={{
+                  position: "relative",
+                  width: "100%",
+                }}
+              >
+                <input
+                  id="primary-vehicle-search"
+                  type="text"
+                  value={vehicleSearchText}
+                  disabled={savingPrimaryVehicle}
+                  placeholder="Type to search your vehicle..."
+                  autoComplete="off"
+                  onFocus={() => {
+                    if (!vehicleSearchText.trim()) {
+                      setShowVehicleSuggestions(false);
+                    }
+                  }}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setVehicleSearchText(value);
+                    setSelectedVehicleReference(null);
+                    setShowVehicleSuggestions(
+                      value.trim().length > 0
+                    );
+                  }}
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    minHeight: "46px",
+                    padding: "11px 46px 11px 12px",
+                    borderRadius: "8px",
+                    fontSize: "15px",
+                    background: "#1f2937",
+                    color: "#ffffff",
+                    border: "1px solid #4b5563",
+                    caretColor: "#ffffff",
+                  }}
+                />
+
+                <button
+                  type="button"
+                  aria-label="Show vehicle list"
+                  disabled={
+                    loadingVehicles ||
+                    savingPrimaryVehicle
+                  }
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                  }}
+                  onClick={() => {
+                    if (savingPrimaryVehicle) {
+                      return;
+                    }
+
+                    setVehicleSearchText("");
+                    setSelectedVehicleReference(null);
+                    setShowCustomVehicleForm(false);
+                    setShowVehicleSuggestions(true);
+                  }}
+                  style={{
+                    position: "absolute",
+                    top: "1px",
+                    right: "1px",
+                    width: "44px",
+                    height: "44px",
+                    border: "none",
+                    borderRadius: "0 8px 8px 0",
+                    background: "transparent",
+                    color: "#ffffff",
+                    cursor: "pointer",
+                    fontSize: "18px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: 0,
+                  }}
+                >
+                  ▾
+                </button>
+
+                {showVehicleSuggestions && (
+                  <div
+                    style={{
+                      position: "relative",
+                      width: "100%",
+                      marginTop: 8,
+                      zIndex: 30,
+                      background: "#111827",
+                      border: "1px solid #374151",
+                      borderRadius: "10px",
+                      boxShadow:
+                        "0 14px 30px rgba(0,0,0,0.45)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        maxHeight: "240px",
+                        overflowY: "auto",
+                        background: "#111827",
+                      }}
+                    >
+                      {visibleVehicleSettings.length > 0 ? (
+                        visibleVehicleSettings.map(
+                          (vehicle) => {
+                            const reference: PrimaryVehicleReference = {
+                              type: vehicle.type,
+                              id: vehicle.id,
+                            };
+
+                            const isSelected =
+                              selectedVehicleReference?.type ===
+                                reference.type &&
+                              selectedVehicleReference?.id ===
+                                reference.id;
+
+                            return (
+                              <button
+                                key={`${vehicle.type}:${vehicle.id}`}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedVehicleReference(
+                                    reference
+                                  );
+                                  setVehicleSearchText(
+                                    `${vehicle.brand} ${vehicle.model}`
+                                  );
+                                  setShowVehicleSuggestions(true);
+                                }}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  gap: 10,
+                                  width: "100%",
+                                  boxSizing: "border-box",
+                                  padding: "11px 12px",
+                                  border: "none",
+                                  borderBottom:
+                                    "1px solid #374151",
+                                  background: isSelected
+                                    ? "#374151"
+                                    : "#111827",
+                                  color: "#ffffff",
+                                  textAlign: "left",
+                                  cursor: "pointer",
+                                  fontSize: "14px",
+                                }}
+                              >
+                                <span>
+                                  {vehicle.brand} {vehicle.model}
+                                </span>
+
+                                {vehicle.type === "custom" && (
+                                  <span
+                                    style={{
+                                      flexShrink: 0,
+                                      fontSize: 12,
+                                      color: "#d1d5db",
+                                    }}
+                                  >
+                                    Custom
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          }
+                        )
+                      ) : (
+                        <div
+                          style={{
+                            padding: "12px",
+                            color: "#d1d5db",
+                            fontSize: "13px",
+                          }}
+                        >
+                          No matching vehicle found.
+                        </div>
+                      )}
+
+                      {normalizedVehicleQuery &&
+                        !hasExactVehicleMatch && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowCustomVehicleForm(true);
+                              setShowVehicleSuggestions(true);
+                              setCustomVehicleBrand(
+                                normalizedVehicleQuery
+                                  .split(" ")[0] ?? ""
+                              );
+                              setCustomVehicleModel(
+                                normalizedVehicleQuery
+                                  .split(" ")
+                                  .slice(1)
+                                  .join(" ")
+                              );
+                            }}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              width: "100%",
+                              minHeight: "48px",
+                              boxSizing: "border-box",
+                              padding: "12px",
+                              border: "none",
+                              borderTop: "1px solid #374151",
+                              background: "#172033",
+                              color: "#ffffff",
+                              textAlign: "left",
+                              cursor: "pointer",
+                              fontSize: "14px",
+                              fontWeight: 600,
+                              overflowWrap: "anywhere",
+                            }}
+                          >
+                            ＋ Add “{vehicleSearchText.trim()}” as a custom vehicle
+                          </button>
+                        )}
+
+                      {normalizedVehicleQuery &&
+                        hasExactVehicleMatch && (
+                          <div
+                            style={{
+                              padding: "11px 12px",
+                              borderTop: "1px solid #374151",
+                              color: "#9ca3af",
+                              background: "#111827",
+                              fontSize: "12px",
+                            }}
+                          >
+                            This vehicle already exists. Select it above.
+                          </div>
+                        )}
+                    </div>
+
+                    <div
+                      style={{
+                        padding: "10px",
+                        borderTop: "1px solid #374151",
+                        background: "#1f2937",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="primaryButton"
+                        disabled={
+                          savingPrimaryVehicle ||
+                          !selectedVehicleReference
+                        }
+                        onClick={() =>
+                          void handleSelectVehicle()
+                        }
+                        style={{
+                          width: "100%",
+                          minHeight: "46px",
+                          margin: 0,
+                        }}
+                      >
+                        {savingPrimaryVehicle
+                          ? "Saving..."
+                          : "Add your Primary Vehicle"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <p
+                style={{
+                  marginTop: 7,
+                  marginBottom: 0,
+                  fontSize: 12,
+                  color: "#d1d5db",
+                  lineHeight: 1.45,
+                }}
+              >
+                Start typing the brand or model to find a vehicle, or use
+                the arrow to browse all vehicles. You can have only one
+                primary vehicle at a time.
+              </p>
+            </div>
+          </>
+        )}
+
+            {showCustomVehicleForm && !primaryVehicle && (
+              <div
+                style={{
+                  marginTop: 14,
+                  width: "100%",
+                  maxWidth: "560px",
+                  padding: "16px",
+                  boxSizing: "border-box",
+                  border: "1px solid #374151",
+                  borderRadius: "10px",
+                  background: "#1f2937",
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: 700,
+                    color: "#ffffff",
+                  }}
+                >
+                  Add a custom vehicle
+                </div>
+
+                <p
+                  style={{
+                    marginTop: 5,
+                    marginBottom: 14,
+                    fontSize: 13,
+                    color: "#d1d5db",
+                    lineHeight: 1.45,
+                  }}
+                >
+                  Add a vehicle that is not available in the EV Toolkit list.
+                </p>
+
+                <label
+                  htmlFor="settings-custom-vehicle-brand"
+                  style={{
+                    display: "block",
+                    fontWeight: 600,
+                    marginBottom: 6,
+                  }}
+                >
+                  Brand
+                </label>
+                <input
+                  id="settings-custom-vehicle-brand"
+                  type="text"
+                  value={customVehicleBrand}
+                  onChange={(event) =>
+                    setCustomVehicleBrand(event.target.value)
+                  }
+                  placeholder="e.g. Tata"
+                  disabled={savingCustomVehicle}
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    minHeight: "44px",
+                    marginBottom: 12,
+                    background: "#111827",
+                    color: "#ffffff",
+                    border: "1px solid #4b5563",
+                  }}
+                />
+
+                <label
+                  htmlFor="settings-custom-vehicle-model"
+                  style={{
+                    display: "block",
+                    fontWeight: 600,
+                    marginBottom: 6,
+                  }}
+                >
+                  Model
+                </label>
+                <input
+                  id="settings-custom-vehicle-model"
+                  type="text"
+                  value={customVehicleModel}
+                  onChange={(event) =>
+                    setCustomVehicleModel(event.target.value)
+                  }
+                  placeholder="e.g. Nexon EV"
+                  disabled={savingCustomVehicle}
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    minHeight: "44px",
+                    background: "#111827",
+                    color: "#ffffff",
+                    border: "1px solid #4b5563",
+                  }}
+                />
+
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 10,
+                    marginTop: 14,
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="primaryButton"
+                    onClick={() =>
+                      void handleAddCustomVehicleFromSettings()
+                    }
+                    disabled={
+                      savingCustomVehicle ||
+                      Boolean(primaryVehicle)
+                    }
+                    style={{
+                      flex: "1 1 180px",
+                      minHeight: "44px",
+                      margin: 0,
+                    }}
+                  >
+                    {savingCustomVehicle
+                      ? "Saving..."
+                      : "Save custom vehicle"}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="dangerButton"
+                    disabled={savingCustomVehicle}
+                    onClick={() => {
+                      setShowCustomVehicleForm(false);
+                      setCustomVehicleBrand("");
+                      setCustomVehicleModel("");
+                    }}
+                    style={{
+                      flex: "1 1 120px",
+                      minHeight: "44px",
+                      margin: 0,
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+      </div>
+
+
+      {/* ======================================================
           FAMILY SHARING
           ====================================================== */}
 
@@ -1655,7 +2846,7 @@ function Settings({ onNavigate }: SettingsProps) {
                           justifyContent: "space-between",
                           gap: "12px",
                           padding: "12px",
-                          border: "1px solid #e5e7eb",
+                          border: "1px solid #374151",
                           borderRadius: "8px",
                           flexWrap: "wrap",
                         }}
@@ -1804,7 +2995,7 @@ function Settings({ onNavigate }: SettingsProps) {
                         right: 0,
                         zIndex: 20,
                         background: "#ffffff",
-                        border: "1px solid #e5e7eb",
+                        border: "1px solid #374151",
                         borderRadius: "8px",
                         marginTop: "4px",
                         maxHeight: "280px",
