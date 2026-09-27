@@ -2526,6 +2526,7 @@ export default function Insurance({
                 <th>Expiry</th>
                 <th>Status</th>
                 <th>Premium</th>
+                <th>Add-ons</th>
                 <th>Document</th>
                 <th>Actions</th>
               </tr>

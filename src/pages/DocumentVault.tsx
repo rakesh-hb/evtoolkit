@@ -152,6 +152,11 @@ export default function DocumentVault({
       : "document-vault:new";
 
 
+  // Keep the latest attachment values available when Save is clicked.
+  const attachmentRef = useRef(form.file);
+  const attachmentNameRef = useRef(form.attachment_name);
+
+
   const [search, setSearch] =
     useState("");
 
@@ -623,14 +628,21 @@ export default function DocumentVault({
         await getFormDraft<DocumentRecord>(draftKey);
 
       if (draft?.draft_data) {
+        const {
+          file: _draftFile,
+          attachment_name: _draftAttachmentName,
+          ...draftData
+        } = draft.draft_data;
+
         setForm((current) => ({
           ...current,
-          ...draft.draft_data,
+          ...draftData,
           vehicle:
             draft.draft_data.vehicle?.trim()
               ? draft.draft_data.vehicle
               : current.vehicle,
-          file: "",
+          file: current.file,
+          attachment_name: current.attachment_name,
         }));
         setDraftStatus("saved");
       } else {
@@ -770,6 +782,9 @@ export default function DocumentVault({
       record.id
     );
 
+    attachmentRef.current = record.file;
+    attachmentNameRef.current = record.attachment_name;
+
     setForm(
       record
     );
@@ -857,6 +872,9 @@ export default function DocumentVault({
 
     setEditingId(null);
 
+    attachmentRef.current = "";
+    attachmentNameRef.current = "";
+
     const resetVehicle = primaryVehicleName;
 
     setForm({
@@ -904,6 +922,12 @@ export default function DocumentVault({
       return;
     }
 
+    const formToSave: DocumentRecord = {
+      ...form,
+      file: attachmentRef.current,
+      attachment_name: attachmentNameRef.current,
+    };
+
     try {
       if (
         editingId !== null
@@ -920,7 +944,7 @@ export default function DocumentVault({
         }
 
         await updateDocument({
-          ...form,
+          ...formToSave,
           id: editingId,
         });
 
@@ -955,7 +979,7 @@ export default function DocumentVault({
           user_id,
           createdAt,
           ...newDocument
-        } = form;
+        } = formToSave;
 
         await addDocument(
           newDocument
@@ -981,6 +1005,9 @@ export default function DocumentVault({
       setEditingId(
         null
       );
+
+      attachmentRef.current = "";
+      attachmentNameRef.current = "";
 
       setForm({
         ...emptyRecord,
@@ -1596,18 +1623,20 @@ export default function DocumentVault({
                 value={form.file}
                 fileName={form.attachment_name}
                 onChange={(file) => {
-                  setForm({
-                    ...form,
+                  attachmentRef.current = file;
+                  setForm((previous) => ({
+                    ...previous,
                     file,
-                  });
-                  handleAutosaveBlur();
+                  }));
                 }}
-                onFileNameChange={(attachment_name) => {
-                  setForm({
-                    ...form,
+                onAttachmentChange={(file, attachment_name) => {
+                  attachmentRef.current = file;
+                  attachmentNameRef.current = attachment_name;
+                  setForm((previous) => ({
+                    ...previous,
+                    file,
                     attachment_name,
-                  });
-                  handleAutosaveBlur();
+                  }));
                 }}
               />
             </div>
