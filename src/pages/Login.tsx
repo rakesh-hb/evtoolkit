@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   signIn,
   signUp,
+  resendConfirmationEmail,
 } from "../services/authService";
 
 interface LoginProps {
@@ -40,6 +41,15 @@ export default function Login({
   const [loading, setLoading] =
     useState(false);
 
+  const [resendingConfirmation, setResendingConfirmation] =
+    useState(false);
+
+  const [showResendConfirmation, setShowResendConfirmation] =
+    useState(false);
+
+  const [confirmationMessage, setConfirmationMessage] =
+    useState("");
+
   function resetForm() {
     setFirstName("");
     setLastName("");
@@ -48,6 +58,8 @@ export default function Login({
     setPassword("");
     setConfirmPassword("");
     setSelectedPlan("free");
+    setShowResendConfirmation(false);
+    setConfirmationMessage("");
   }
 
   function switchMode(
@@ -65,6 +77,9 @@ export default function Login({
       return;
     }
 
+    setShowResendConfirmation(false);
+    setConfirmationMessage("");
+
     try {
       setLoading(true);
 
@@ -78,12 +93,62 @@ export default function Login({
         error
       );
 
-      alert(
-        error?.message ||
-          "Unable to sign in."
-      );
+      const errorCode =
+        String(error?.code || "").toLowerCase();
+
+      const errorMessage =
+        String(error?.message || "").toLowerCase();
+
+      const emailNotConfirmed =
+        errorCode === "email_not_confirmed" ||
+        errorMessage.includes("email not confirmed") ||
+        errorMessage.includes("email not verified");
+
+      if (emailNotConfirmed) {
+        setShowResendConfirmation(true);
+        setConfirmationMessage(
+          "Please confirm your email address before signing in."
+        );
+      } else {
+        alert(
+          error?.message ||
+            "Unable to sign in."
+        );
+      }
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleResendConfirmation() {
+    if (!email.trim()) {
+      alert("Please enter your email address.");
+      return;
+    }
+
+    try {
+      setResendingConfirmation(true);
+      setConfirmationMessage("");
+
+      await resendConfirmationEmail(
+        email.trim()
+      );
+
+      setConfirmationMessage(
+        "Confirmation email sent. Please check your inbox and spam folder."
+      );
+    } catch (error: any) {
+      console.error(
+        "Resend confirmation email error:",
+        error
+      );
+
+      alert(
+        error?.message ||
+          "Unable to resend the confirmation email."
+      );
+    } finally {
+      setResendingConfirmation(false);
     }
   }
 
@@ -546,9 +611,11 @@ export default function Login({
           placeholder="name@example.com"
           autoComplete="email"
           disabled={loading}
-          onChange={(e) =>
-            setEmail(e.target.value)
-          }
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setShowResendConfirmation(false);
+            setConfirmationMessage("");
+          }}
         />
 
         <label>Password *</label>
@@ -577,6 +644,57 @@ export default function Login({
             }
           }}
         />
+
+        {!registerMode &&
+          showResendConfirmation && (
+            <div
+              style={{
+                marginTop: 10,
+                marginBottom: 16,
+                padding: "12px 14px",
+                borderRadius: 8,
+                background: "#fff7ed",
+                border: "1px solid #fed7aa",
+              }}
+            >
+              <div
+                style={{
+                  color: "#9a3412",
+                  fontSize: 13,
+                  lineHeight: 1.5,
+                }}
+              >
+                {confirmationMessage}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleResendConfirmation}
+                disabled={
+                  loading ||
+                  resendingConfirmation
+                }
+                style={{
+                  marginTop: 10,
+                  border: "none",
+                  background: "transparent",
+                  color: "#2563eb",
+                  cursor:
+                    loading ||
+                    resendingConfirmation
+                      ? "not-allowed"
+                      : "pointer",
+                  padding: 0,
+                  fontSize: 14,
+                  fontWeight: 600,
+                }}
+              >
+                {resendingConfirmation
+                  ? "Sending..."
+                  : "Resend confirmation email"}
+              </button>
+            </div>
+          )}
 
         {registerMode && (
           <>

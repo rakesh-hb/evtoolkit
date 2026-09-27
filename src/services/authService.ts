@@ -73,7 +73,7 @@ export async function signUp(
 ) {
   const {
     data,
-    error,
+    error
   } =
     await supabase.auth.signUp({
       email,
@@ -98,13 +98,36 @@ export async function signUp(
 
 /*
  * =========================================================
+ * RESEND EMAIL CONFIRMATION
+ * =========================================================
+ */
+
+export async function resendConfirmationEmail(
+  email: string
+) {
+  const {
+    data,
+    error
+  } =
+    await supabase.auth.resend({
+      type: "signup",
+      email,
+    });
+
+  if (error) throw error;
+
+  return data;
+}
+
+/*
+ * =========================================================
  * SIGN OUT
  * =========================================================
  */
 
 export async function signOut() {
   const {
-    error,
+    error
   } =
     await supabase.auth.signOut();
 
@@ -123,7 +146,7 @@ export async function changePassword(
 ) {
   const {
     data,
-    error,
+    error
   } =
     await supabase.functions.invoke(
       "password-history",
@@ -169,7 +192,7 @@ export async function resetPassword(
 ) {
   const {
     data,
-    error,
+    error
   } =
     await supabase.functions.invoke(
       "password-history",
@@ -216,7 +239,7 @@ export async function updateProfile(
 ) {
   const {
     data,
-    error,
+    error
   } =
     await supabase.auth.updateUser({
       data: {
@@ -245,11 +268,11 @@ export async function sendPasswordResetEmail(
   email: string
 ) {
   const redirectTo =
-  "https://evtoolkit.rockytales.workers.dev/reset-password";
+    "https://evtoolkit.rockytales.workers.dev/reset-password";
 
   const {
     data,
-    error,
+    error
   } =
     await supabase.auth.resetPasswordForEmail(
       email,
