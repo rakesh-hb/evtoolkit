@@ -1500,7 +1500,7 @@ function Settings({ onNavigate }: SettingsProps) {
 
 
   const availableUsers =
-    normalizedSearch.length >= 2
+    normalizedSearch.length >= 1
       ? invitableUsers.filter(
           (user) =>
             !isAlreadyFamilyMember(
@@ -1735,6 +1735,68 @@ function Settings({ onNavigate }: SettingsProps) {
           : "Failed to accept family invitation."
       );
 
+    } finally {
+      setAcceptingInvitationId(
+        null
+      );
+    }
+  }
+
+
+  /*
+   * ============================================================
+   * REJECT INVITATION
+   * ============================================================
+   */
+
+  async function handleRejectInvitation(
+    invitationId: string
+  ) {
+    if (acceptingInvitationId) {
+      return;
+    }
+
+    setAcceptingInvitationId(
+      invitationId
+    );
+
+    try {
+      const {
+        data,
+        error,
+      } = await supabase.rpc(
+        "reject_family_invitation",
+        {
+          p_invitation_id:
+            invitationId,
+        }
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      console.log(
+        "Family invitation rejected:",
+        data
+      );
+
+      alert(
+        "Family invitation rejected."
+      );
+
+      await loadFamilyData();
+    } catch (error) {
+      console.error(
+        "Reject invitation error:",
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to reject family invitation."
+      );
     } finally {
       setAcceptingInvitationId(
         null
@@ -3013,8 +3075,8 @@ function Settings({ onNavigate }: SettingsProps) {
                         left: 0,
                         right: 0,
                         zIndex: 20,
-                        background: "#ffffff",
-                        border: "1px solid #374151",
+                        background: "#1f2937",
+                        border: "1px solid #4b5563",
                         borderRadius: "8px",
                         marginTop: "4px",
                         maxHeight: "280px",
@@ -3033,7 +3095,7 @@ function Settings({ onNavigate }: SettingsProps) {
                         >
                           Searching...
                         </div>
-                      ) : normalizedSearch.length < 2 ? (
+                      ) : normalizedSearch.length < 1 ? (
                         <div
                           style={{
                             padding: "12px 14px",
@@ -3073,7 +3135,9 @@ function Settings({ onNavigate }: SettingsProps) {
                                   width: "100%",
                                   textAlign: "left",
                                   border: "none",
-                                  background: "transparent",
+                                  borderBottom: "1px solid #374151",
+                                  background: "#1f2937",
+                                  color: "#f8fafc",
                                   padding: "12px 14px",
                                   cursor: "pointer",
                                 }}
@@ -3271,6 +3335,41 @@ function Settings({ onNavigate }: SettingsProps) {
                   }
                   style={{
                     marginTop: "12px",
+                    background:
+                      !selectedUser ||
+                      selectedUser.subscription_plan === "free" ||
+                      familyMemberLimitReached ||
+                      sendingInvitation
+                        ? "#6b7280"
+                        : undefined,
+                    color:
+                      !selectedUser ||
+                      selectedUser.subscription_plan === "free" ||
+                      familyMemberLimitReached ||
+                      sendingInvitation
+                        ? "#d1d5db"
+                        : undefined,
+                    borderColor:
+                      !selectedUser ||
+                      selectedUser.subscription_plan === "free" ||
+                      familyMemberLimitReached ||
+                      sendingInvitation
+                        ? "#6b7280"
+                        : undefined,
+                    cursor:
+                      !selectedUser ||
+                      selectedUser.subscription_plan === "free" ||
+                      familyMemberLimitReached ||
+                      sendingInvitation
+                        ? "not-allowed"
+                        : undefined,
+                    opacity:
+                      !selectedUser ||
+                      selectedUser.subscription_plan === "free" ||
+                      familyMemberLimitReached ||
+                      sendingInvitation
+                        ? 0.75
+                        : 1,
                   }}
                 >
                   {sendingInvitation
@@ -3367,23 +3466,58 @@ function Settings({ onNavigate }: SettingsProps) {
                             </div>
 
                             {invitationIsForCurrentUser ? (
-                              <button
-                                className="primaryButton"
-                                disabled={
-                                  acceptingInvitationId ===
-                                  invitation.id
-                                }
-                                onClick={() =>
-                                  void handleAcceptInvitation(
-                                    invitation.id
-                                  )
-                                }
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: "8px",
+                                  flexWrap: "wrap",
+                                }}
                               >
-                                {acceptingInvitationId ===
-                                invitation.id
-                                  ? "Accepting..."
-                                  : "Accept"}
-                              </button>
+                                <button
+                                  className="primaryButton"
+                                  disabled={
+                                    acceptingInvitationId ===
+                                    invitation.id
+                                  }
+                                  onClick={() =>
+                                    void handleAcceptInvitation(
+                                      invitation.id
+                                    )
+                                  }
+                                >
+                                  {acceptingInvitationId ===
+                                  invitation.id
+                                    ? "Processing..."
+                                    : "Accept"}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  style={{
+                                    background: "#dc2626",
+                                    color: "#ffffff",
+                                    border: "1px solid #dc2626",
+                                    borderRadius: "8px",
+                                    padding: "8px 14px",
+                                    fontWeight: 600,
+                                    cursor: "pointer",
+                                  }}
+                                  disabled={
+                                    acceptingInvitationId ===
+                                    invitation.id
+                                  }
+                                  onClick={() =>
+                                    void handleRejectInvitation(
+                                      invitation.id
+                                    )
+                                  }
+                                >
+                                  {acceptingInvitationId ===
+                                  invitation.id
+                                    ? "Processing..."
+                                    : "Reject"}
+                                </button>
+                              </div>
                             ) : (
                               <span
                                 style={{
@@ -3436,9 +3570,11 @@ function Settings({ onNavigate }: SettingsProps) {
                       marginTop: "16px",
                       padding: "14px",
                       border:
-                        "1px solid #e5e7eb",
+                        "1px solid #4b5563",
                       borderRadius:
                         "8px",
+                      background: "#1f2937",
+                      color: "#f8fafc",
                     }}
                   >
                     <p>
@@ -3452,26 +3588,63 @@ function Settings({ onNavigate }: SettingsProps) {
                       .
                     </p>
 
-                    <button
-                      className="primaryButton"
+                    <div
                       style={{
-                        marginTop: "10px",
+                        display: "flex",
+                        gap: "10px",
+                        flexWrap: "wrap",
+                        marginTop: "12px",
                       }}
-                      disabled={
-                        acceptingInvitationId ===
-                        invitation.id
-                      }
-                      onClick={() =>
-                        void handleAcceptInvitation(
-                          invitation.id
-                        )
-                      }
                     >
-                      {acceptingInvitationId ===
-                      invitation.id
-                        ? "Accepting..."
-                        : "Accept Invitation"}
-                    </button>
+                      <button
+                        className="primaryButton"
+                        style={{
+                          marginTop: 0,
+                        }}
+                        disabled={
+                          acceptingInvitationId ===
+                          invitation.id
+                        }
+                        onClick={() =>
+                          void handleAcceptInvitation(
+                            invitation.id
+                          )
+                        }
+                      >
+                        {acceptingInvitationId ===
+                        invitation.id
+                          ? "Processing..."
+                          : "Accept Invitation"}
+                      </button>
+
+                      <button
+                        type="button"
+                        style={{
+                          marginTop: 0,
+                          background: "#dc2626",
+                          color: "#ffffff",
+                          border: "1px solid #dc2626",
+                          borderRadius: "8px",
+                          padding: "10px 16px",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                        disabled={
+                          acceptingInvitationId ===
+                          invitation.id
+                        }
+                        onClick={() =>
+                          void handleRejectInvitation(
+                            invitation.id
+                          )
+                        }
+                      >
+                        {acceptingInvitationId ===
+                        invitation.id
+                          ? "Processing..."
+                          : "Reject Invitation"}
+                      </button>
+                    </div>
                   </div>
                 )
               )}
