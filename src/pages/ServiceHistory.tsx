@@ -18,6 +18,7 @@ import {
 
 import { getCurrentUserId } from "../services/authHelper";
 import { supabase } from "../lib/supabase";
+import { downloadAttachment } from "../services/attachmentService";
 
 import {
   getCurrentPlan,
@@ -188,10 +189,19 @@ export default function ServiceHistory({
   const draftReadyRef = useRef(false);
   const skipAutosaveRef = useRef(true);
 
+  // Keep the latest attachment value available when Save is clicked.
+  const attachmentRef = useRef(form.attachment);
+  const attachmentNameRef = useRef(form.attachment_name);
+
   const getDraftKey = () =>
     editingId !== null
       ? `service-history:${editingId}`
       : "service-history:new";
+
+  useEffect(() => {
+    attachmentRef.current = form.attachment || "";
+    attachmentNameRef.current = form.attachment_name || "";
+  }, [form.attachment, form.attachment_name]);
 
 
   /* ============================================================
@@ -305,11 +315,17 @@ export default function ServiceHistory({
       const draft = await getFormDraft<ServiceRecord>(draftKey);
 
       if (draft?.draft_data) {
+        // Drafts intentionally do not contain attachment data. Preserve the
+        // attachment already loaded from the saved record instead of allowing
+        // draft restoration to clear it.
+        const draftData = { ...draft.draft_data };
+        delete draftData.attachment;
+        delete draftData.attachment_name;
+
         setForm((current) => ({
           ...current,
-          ...draft.draft_data,
+          ...draftData,
           vehicle: current.vehicle,
-          attachment: "",
         }));
         setDraftStatus("saved");
       } else {
@@ -801,6 +817,14 @@ export default function ServiceHistory({
 
 
     try {
+      // Use the ref values so the exact attachment selected by the uploader
+      // is persisted even if the React state update has not committed yet.
+      const formToSave: ServiceRecord = {
+        ...form,
+        attachment: attachmentRef.current,
+        attachment_name: attachmentNameRef.current,
+      };
+
       if (
         editingId !== null
       ) {
@@ -817,7 +841,7 @@ export default function ServiceHistory({
 
 
         await updateServiceRecord({
-          ...form,
+          ...formToSave,
           id: editingId,
         });
 
@@ -872,7 +896,7 @@ export default function ServiceHistory({
           .join(", ");
 
         const recordWithServiceLabel = {
-          ...form,
+          ...formToSave,
           serviceType: `${serviceLabel} - ${serviceDetails}`,
         };
 
@@ -904,6 +928,9 @@ export default function ServiceHistory({
       setEditingId(
         null
       );
+
+      attachmentRef.current = "";
+      attachmentNameRef.current = "";
 
       setForm({
         ...emptyRecord,
@@ -987,14 +1014,21 @@ export default function ServiceHistory({
       );
 
     } catch (
-      error
+      error: any
     ) {
       console.error(
+        "Failed to delete service record:",
         error
       );
 
       alert(
-        "Failed to delete service record."
+        error?.message ||
+          error?.details ||
+          error?.hint ||
+          JSON.stringify(
+            error
+          ) ||
+          "Failed to delete service record."
       );
     }
   }
@@ -1025,6 +1059,9 @@ export default function ServiceHistory({
     setEditingId(
       record.id
     );
+
+    attachmentRef.current = record.attachment || "";
+    attachmentNameRef.current = record.attachment_name || "";
 
     setForm(
       record
@@ -1516,33 +1553,27 @@ export default function ServiceHistory({
                   boxSizing: "border-box",
                 }}
               >
-                ＋ Or Add Custom Service
+                ＋ Add Custom Service
               </button>
 
-              <button
-                type="button"
-                className="saveButton evtoolkitCustomFieldButton"
-                style={{
-                  height: "46px",
-                  alignSelf: "flex-start",
-                  marginTop: "6px",
-                  boxSizing: "border-box",
-                }}
-                disabled={
-                  (!selectedServiceCategory && !customServiceType.trim()) ||
-                  (selectedServiceCategory &&
-                    selectedServiceCategory !== "Other Service" &&
-                    !selectedServiceToAdd &&
-                    !customServiceType.trim()) ||
-                  ((selectedServiceCategory === "Other Service" ||
-                    selectedServiceToAdd === "Other") &&
-                    !otherServiceDetail.trim() &&
-                    !customServiceType.trim())
-                }
-                onClick={addServiceToForm}
-              >
-                ＋ Add
-              </button>
+              {!showCustomServiceForm &&
+                selectedServiceCategory &&
+                (selectedServiceToAdd ||
+                  otherServiceDetail.trim()) && (
+                  <button
+                    type="button"
+                    className="saveButton evtoolkitCustomFieldButton"
+                    style={{
+                      height: "46px",
+                      alignSelf: "flex-start",
+                      marginTop: "6px",
+                      boxSizing: "border-box",
+                    }}
+                    onClick={addServiceToForm}
+                  >
+                    ＋ Add
+                  </button>
+                )}
             </div>
 
             {showCustomServiceForm && (
@@ -1831,23 +1862,26 @@ export default function ServiceHistory({
             `}</style>
             <div className="serviceHistoryFileUpload">
               <ReceiptUploader
-              value={form.attachment}
-              fileName={form.attachment_name}
-              onChange={(attachment) => {
-                setForm({
-                  ...form,
-                  attachment,
-                });
-                handleAutosaveBlur();
-              }}
-              onFileNameChange={(attachment_name) => {
-                setForm({
-                  ...form,
-                  attachment_name,
-                });
-                handleAutosaveBlur();
-              }}
-            />
+                value={form.attachment}
+                fileName={form.attachment_name}
+                onChange={(attachment) => {
+                  attachmentRef.current = attachment;
+                  setForm((previous) => ({
+                    ...previous,
+                    attachment,
+                  }));
+                }}
+                onAttachmentChange={(attachment, attachment_name) => {
+                  attachmentRef.current = attachment;
+                  attachmentNameRef.current = attachment_name;
+
+                  setForm((previous) => ({
+                    ...previous,
+                    attachment,
+                    attachment_name,
+                  }));
+                }}
+              />
             </div>
 
             <p
@@ -2144,16 +2178,20 @@ export default function ServiceHistory({
 
                             <>
 
-                            <a
-                              href={
-                                record.attachment
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void downloadAttachment(
+                                  record.attachment,
+                                  record.attachment_name ||
+                                    `${record.vehicle}-${record.serviceType}-Receipt`
+                                )
                               }
-                              download={record.attachment_name || `${record.vehicle}-${record.serviceType}-Receipt`}
                               className="downloadButton"
                             >
                               ⬇
                               Download
-                            </a>
+                            </button>
 
                             {record.attachment_name && (
                               <div

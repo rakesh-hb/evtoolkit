@@ -18,6 +18,7 @@ import {
 
 import { getCurrentUserId } from "../services/authHelper";
 import { supabase } from "../lib/supabase";
+import { downloadAttachment } from "../services/attachmentService";
 
 import {
   getCurrentPlan,
@@ -1938,18 +1939,19 @@ export default function DocumentVault({
                             <>
 
 
-                            <a
-                              href={
-                                record.file
-                              }
-                              download={
-                                record.title
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void downloadAttachment(
+                                  record.file,
+                                  record.attachment_name || record.title
+                                )
                               }
                               className="downloadButton"
                             >
                               ⬇
                               Download
-                            </a>
+                            </button>
 
                             {record.attachment_name && (
                               <div

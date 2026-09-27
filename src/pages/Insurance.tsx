@@ -19,6 +19,7 @@ import {
 
 import { getCurrentUserId } from "../services/authHelper";
 import { supabase } from "../lib/supabase";
+import { downloadAttachment } from "../services/attachmentService";
 
 import {
   getCurrentPlan,
@@ -2648,15 +2649,19 @@ export default function Insurance({
 
                             <>
 
-                            <a
-                              href={
-                                record.attachment
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void downloadAttachment(
+                                  record.attachment,
+                                  record.attachment_name ||
+                                    `${record.company}-Insurance`
+                                )
                               }
-                              download={record.attachment_name || `${record.company}-Insurance`}
                               className="downloadButton"
                             >
                               ⬇ Download
-                            </a>
+                            </button>
 
                             {record.attachment_name && (
                               <div

@@ -8,6 +8,7 @@ interface Props {
   fileName?: string;
   onChange: (value: string) => void;
   onFileNameChange?: (fileName: string) => void;
+  onAttachmentChange?: (value: string, fileName: string) => void;
 }
 
 const STORAGE_BUCKET = "premium_plus_attachments";
@@ -25,6 +26,7 @@ export default function ReceiptUploader({
   fileName,
   onChange,
   onFileNameChange,
+  onAttachmentChange,
 }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -86,16 +88,17 @@ export default function ReceiptUploader({
           throw uploadError;
         }
 
-        onFileNameChange?.(file.name);
-        onChange(storagePath);
-
         /*
-         * Clear the native file input so the previous
-         * filename is not retained by the browser.
-         *
-         * The storage path and filename remain in the
-         * parent component state.
+         * Pass the storage path and filename together so the
+         * parent can update both attachment fields atomically.
          */
+        if (onAttachmentChange) {
+          onAttachmentChange(storagePath, file.name);
+        } else {
+          onChange(storagePath);
+          onFileNameChange?.(file.name);
+        }
+
         if (fileRef.current) {
           fileRef.current.value = "";
         }
@@ -105,23 +108,28 @@ export default function ReceiptUploader({
 
       /*
        * Existing behavior for Free and Premium users.
-       * Keep this unchanged so existing functionality and
-       * older Base64 attachments remain compatible.
        */
-      onFileNameChange?.(file.name);
-
       const reader = new FileReader();
 
       reader.onload = () => {
-        onChange(reader.result as string);
+        const dataUrl = reader.result as string;
 
-        /*
-         * Clear the native file input so the previous
-         * filename is not retained by the browser.
-         *
-         * The actual file data and filename remain in
-         * the parent component state.
-         */
+        if (onAttachmentChange) {
+          onAttachmentChange(dataUrl, file.name);
+        } else {
+          onChange(dataUrl);
+          onFileNameChange?.(file.name);
+        }
+
+        if (fileRef.current) {
+          fileRef.current.value = "";
+        }
+      };
+
+      reader.onerror = () => {
+        console.error("Failed to read the selected file.");
+        alert("Failed to read the selected file.");
+
         if (fileRef.current) {
           fileRef.current.value = "";
         }
