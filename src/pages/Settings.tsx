@@ -178,6 +178,9 @@ function Settings({ onNavigate }: SettingsProps) {
   const [invitableUsers, setInvitableUsers] =
     useState<InvitableUser[]>([]);
 
+  const [searchingInvitableUsers, setSearchingInvitableUsers] =
+    useState(false);
+
 
   const [searchText, setSearchText] =
     useState("");
@@ -795,27 +798,13 @@ function Settings({ onNavigate }: SettingsProps) {
 
 
       /*
-       * Registered users
-       * available for invitation.
+       * Registered users are searched on demand.
+       *
+       * Do not load the complete registered-user directory into
+       * the browser. Search results are fetched only after the
+       * family owner enters at least two characters.
        */
-
-      const {
-        data: usersData,
-        error: usersError,
-      } = await supabase.rpc(
-        "get_invitable_users"
-      );
-
-
-      if (usersError) {
-        throw usersError;
-      }
-
-
-      setInvitableUsers(
-        (usersData ??
-          []) as InvitableUser[]
-      );
+      setInvitableUsers([]);
 
     } catch (error) {
       console.error(
@@ -1360,6 +1349,81 @@ function Settings({ onNavigate }: SettingsProps) {
 
   /*
    * ============================================================
+   * SEARCH INVITABLE USERS
+   * ============================================================
+   *
+   * The registered-user directory is never loaded in full.
+   * Search is performed server-side by a protected RPC and only
+   * matching users are returned to the family owner.
+   */
+
+  useEffect(() => {
+    const query = searchText.trim();
+
+    if (
+      !isFamilyOwner ||
+      selectedUser ||
+      query.length < 2
+    ) {
+      setInvitableUsers([]);
+      setSearchingInvitableUsers(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const timer = window.setTimeout(async () => {
+      setSearchingInvitableUsers(true);
+
+      try {
+        const {
+          data,
+          error,
+        } = await supabase.rpc(
+          "search_invitable_users",
+          {
+            p_search_text: query,
+          }
+        );
+
+        if (error) {
+          throw error;
+        }
+
+        if (!cancelled) {
+          setInvitableUsers(
+            (data ?? []) as InvitableUser[]
+          );
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error(
+            "Invitable user search error:",
+            error
+          );
+
+          setInvitableUsers([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setSearchingInvitableUsers(false);
+        }
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [
+    searchText,
+    isFamilyOwner,
+    selectedUser,
+  ]);
+
+
+  /*
+   * ============================================================
    * HELPERS
    * ============================================================
    */
@@ -1435,75 +1499,17 @@ function Settings({ onNavigate }: SettingsProps) {
 
 
   const availableUsers =
-    invitableUsers.filter(
-      (user) => {
-
-        if (
-          isAlreadyFamilyMember(
-            user.email
-          )
-        ) {
-          return false;
-        }
-
-
-        if (
-          getPendingInvitation(
-            user.email
-          )
-        ) {
-          return false;
-        }
-
-
-        if (
-          !normalizedSearch
-        ) {
-          return true;
-        }
-
-
-        const firstName =
-          (
-            user.first_name ??
-            ""
-          ).toLowerCase();
-
-        const lastName =
-          (
-            user.last_name ??
-            ""
-          ).toLowerCase();
-
-        const email =
-          (
-            user.email ??
-            ""
-          ).toLowerCase();
-
-
-        const fullName =
-          `${firstName} ${lastName}`
-            .trim()
-            .toLowerCase();
-
-
-        return (
-          firstName.includes(
-            normalizedSearch
-          ) ||
-          lastName.includes(
-            normalizedSearch
-          ) ||
-          email.includes(
-            normalizedSearch
-          ) ||
-          fullName.includes(
-            normalizedSearch
-          )
-        );
-      }
-    );
+    normalizedSearch.length >= 2
+      ? invitableUsers.filter(
+          (user) =>
+            !isAlreadyFamilyMember(
+              user.email
+            ) &&
+            !getPendingInvitation(
+              user.email
+            )
+        )
+      : [];
 
 
   /*
@@ -3004,7 +3010,27 @@ function Settings({ onNavigate }: SettingsProps) {
                           "0 4px 12px rgba(0,0,0,0.08)",
                       }}
                     >
-                      {availableUsers.length >
+                      {searchingInvitableUsers ? (
+                        <div
+                          style={{
+                            padding: "12px 14px",
+                            fontSize: "13px",
+                            color: "#6b7280",
+                          }}
+                        >
+                          Searching...
+                        </div>
+                      ) : normalizedSearch.length < 2 ? (
+                        <div
+                          style={{
+                            padding: "12px 14px",
+                            fontSize: "13px",
+                            color: "#6b7280",
+                          }}
+                        >
+                          Enter at least 2 characters to search.
+                        </div>
+                      ) : availableUsers.length >
                       0 ? (
                         availableUsers.map(
                           (user) => {
