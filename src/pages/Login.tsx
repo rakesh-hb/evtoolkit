@@ -185,6 +185,34 @@ export default function Login({
       return;
     }
 
+    if (!/[a-z]/.test(password)) {
+      alert(
+        "Password must contain at least one lowercase letter."
+      );
+      return;
+    }
+
+    if (!/[A-Z]/.test(password)) {
+      alert(
+        "Password must contain at least one uppercase letter."
+      );
+      return;
+    }
+
+    if (!/[0-9]/.test(password)) {
+      alert(
+        "Password must contain at least one digit."
+      );
+      return;
+    }
+
+    if (!/[^A-Za-z0-9]/.test(password)) {
+      alert(
+        "Password must contain at least one symbol."
+      );
+      return;
+    }
+
     if (!confirmPassword) {
       alert(
         "Please confirm your password."
@@ -716,9 +744,9 @@ export default function Login({
                 marginTop: 6,
               }}
             >
-              Minimum 8 characters. Supabase
-              password-security settings may
-              require additional characters.
+              Minimum 8 characters, including at least
+              one lowercase letter, one uppercase letter,
+              one digit, and one symbol.
             </p>
 
             <label>
