@@ -56,6 +56,9 @@ export default function SideDrawer({
   const [loadingSubscriptionPlan, setLoadingSubscriptionPlan] =
     useState(true);
 
+  const [showLogoutConfirmation, setShowLogoutConfirmation] =
+    useState(false);
+
   const firstName =
     session?.user?.user_metadata?.first_name || "";
 
@@ -142,13 +145,22 @@ export default function SideDrawer({
   }
 
   async function handleLogout() {
+    setShowLogoutConfirmation(true);
+  }
+
+  async function confirmLogout() {
     try {
       await signOut();
+      setShowLogoutConfirmation(false);
       onClose();
     } catch (error) {
       console.error("Logout error:", error);
       alert("Failed to sign out.");
     }
+  }
+
+  function cancelLogout() {
+    setShowLogoutConfirmation(false);
   }
 
   const renderNavItem = (
@@ -235,6 +247,125 @@ export default function SideDrawer({
 
   return (
     <>
+      {showLogoutConfirmation && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="logout-confirmation-title"
+          onClick={cancelLogout}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(2,6,23,0.68)",
+            backdropFilter: "blur(3px)",
+            zIndex: 2000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+            boxSizing: "border-box",
+          }}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: "380px",
+              borderRadius: "16px",
+              background: "#ffffff",
+              color: "#0f172a",
+              boxShadow: "0 24px 70px rgba(0,0,0,0.40)",
+              border: "1px solid rgba(15,23,42,0.10)",
+              padding: "22px",
+              boxSizing: "border-box",
+            }}
+          >
+            <div
+              style={{
+                width: "46px",
+                height: "46px",
+                borderRadius: "12px",
+                background: "#fee2e2",
+                color: "#dc2626",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "22px",
+                marginBottom: "14px",
+              }}
+            >
+              ⏻
+            </div>
+
+            <div
+              id="logout-confirmation-title"
+              style={{
+                fontSize: "18px",
+                fontWeight: 800,
+                marginBottom: "7px",
+              }}
+            >
+              Are you sure you want to logout?
+            </div>
+
+            <div
+              style={{
+                fontSize: "13px",
+                lineHeight: 1.55,
+                color: "#64748b",
+                marginBottom: "20px",
+              }}
+            >
+              You will be signed out of EV Toolkit on this device.
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                type="button"
+                onClick={cancelLogout}
+                style={{
+                  minHeight: "42px",
+                  padding: "9px 16px",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "10px",
+                  background: "#ffffff",
+                  color: "#334155",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void confirmLogout()}
+                style={{
+                  minHeight: "42px",
+                  padding: "9px 16px",
+                  border: "1px solid #dc2626",
+                  borderRadius: "10px",
+                  background: "#dc2626",
+                  color: "#ffffff",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                }}
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {open && (
         <div
           onClick={onClose}
