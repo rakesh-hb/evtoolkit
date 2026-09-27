@@ -994,8 +994,8 @@ function Tracker({ onNavigate }: TrackerProps) {
     const confirmed =
       window.confirm(
         isOwnRecord
-          ? "Are you sure you want to delete this charging session?\\n\\nThis action cannot be undone."
-          : `⚠️ Delete Family Member's Charging Session?\\n\\nYou are about to permanently delete this charging session belonging to ${familyMemberName}.\\n\\nThis session will also be removed from ${familyMemberName}'s EV Toolkit account.\\n\\nThis action cannot be undone.`
+          ? "Are you sure you want to delete this charging session?\n\nThis action cannot be undone."
+          : `⚠️ Delete Family Member's Charging Session?\n\nYou are about to permanently delete this charging session belonging to ${familyMemberName}.\n\nThis session will also be removed from ${familyMemberName}'s EV Toolkit account.\n\nThis action cannot be undone.`
       );
 
     if (!confirmed) {
