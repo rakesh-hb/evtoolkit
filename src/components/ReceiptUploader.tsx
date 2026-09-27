@@ -1,10 +1,23 @@
 import { useRef } from "react";
 
+import { supabase } from "../lib/supabase";
+import { getCurrentPlan } from "../services/subscriptionService";
+
 interface Props {
   value?: string;
   fileName?: string;
   onChange: (value: string) => void;
   onFileNameChange?: (fileName: string) => void;
+}
+
+const STORAGE_BUCKET = "premium_plus_attachments";
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+function sanitizeFileName(fileName: string) {
+  return fileName
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, "_")
+    .replace(/_+/g, "_");
 }
 
 export default function ReceiptUploader({
@@ -15,33 +28,122 @@ export default function ReceiptUploader({
 }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = (
+  const handleFile = async (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = e.target.files?.[0];
 
     if (!file) return;
 
-    onFileNameChange?.(file.name);
-
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      onChange(reader.result as string);
-
-      /*
-       * Clear the native file input so the previous
-       * filename is not retained by the browser.
-       *
-       * The actual file data and filename remain in
-       * the parent component state.
-       */
+    if (file.size > MAX_FILE_SIZE) {
+      alert("The selected file is larger than 5 MB.");
       if (fileRef.current) {
         fileRef.current.value = "";
       }
-    };
+      return;
+    }
 
-    reader.readAsDataURL(file);
+    try {
+      const plan = await getCurrentPlan();
+
+      /*
+       * Premium Plus attachments are stored in private
+       * Supabase Storage. Free and Premium keep the existing
+       * Base64/Data URL behavior for backward compatibility.
+       */
+      if (plan === "premium_plus") {
+        const {
+          data: {
+            user,
+          },
+          error: userError,
+        } = await supabase.auth.getUser();
+
+        if (userError || !user) {
+          throw new Error(
+            "Unable to identify the current user."
+          );
+        }
+
+        const safeFileName =
+          sanitizeFileName(file.name) ||
+          "attachment";
+
+        const storagePath =
+          `${user.id}/${crypto.randomUUID()}-${safeFileName}`;
+
+        const {
+          error: uploadError,
+        } = await supabase.storage
+          .from(STORAGE_BUCKET)
+          .upload(storagePath, file, {
+            contentType:
+              file.type || "application/octet-stream",
+            upsert: false,
+          });
+
+        if (uploadError) {
+          throw uploadError;
+        }
+
+        onFileNameChange?.(file.name);
+        onChange(storagePath);
+
+        /*
+         * Clear the native file input so the previous
+         * filename is not retained by the browser.
+         *
+         * The storage path and filename remain in the
+         * parent component state.
+         */
+        if (fileRef.current) {
+          fileRef.current.value = "";
+        }
+
+        return;
+      }
+
+      /*
+       * Existing behavior for Free and Premium users.
+       * Keep this unchanged so existing functionality and
+       * older Base64 attachments remain compatible.
+       */
+      onFileNameChange?.(file.name);
+
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        onChange(reader.result as string);
+
+        /*
+         * Clear the native file input so the previous
+         * filename is not retained by the browser.
+         *
+         * The actual file data and filename remain in
+         * the parent component state.
+         */
+        if (fileRef.current) {
+          fileRef.current.value = "";
+        }
+      };
+
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error(
+        "Failed to upload attachment:",
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to upload attachment."
+      );
+
+      if (fileRef.current) {
+        fileRef.current.value = "";
+      }
+    }
   };
 
   return (
