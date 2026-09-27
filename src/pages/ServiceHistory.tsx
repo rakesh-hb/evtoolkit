@@ -318,9 +318,11 @@ export default function ServiceHistory({
         // Drafts intentionally do not contain attachment data. Preserve the
         // attachment already loaded from the saved record instead of allowing
         // draft restoration to clear it.
-        const draftData = { ...draft.draft_data };
-        delete draftData.attachment;
-        delete draftData.attachment_name;
+        const {
+    attachment: _draftAttachment,
+    attachment_name: _draftAttachmentName,
+    ...draftData
+  } = draft.draft_data;
 
         setForm((current) => ({
           ...current,
@@ -1014,21 +1016,14 @@ export default function ServiceHistory({
       );
 
     } catch (
-      error: any
+      error
     ) {
       console.error(
-        "Failed to delete service record:",
         error
       );
 
       alert(
-        error?.message ||
-          error?.details ||
-          error?.hint ||
-          JSON.stringify(
-            error
-          ) ||
-          "Failed to delete service record."
+        "Failed to delete service record."
       );
     }
   }
