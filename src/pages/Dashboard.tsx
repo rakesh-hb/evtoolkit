@@ -1,191 +1,477 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
+import type {
+  DocumentRecord,
+} from "../types/document";
+
+import {
+  getDocuments,
+  addDocument,
+  updateDocument,
+  deleteDocument,
+} from "../services/documentVaultService";
+
+import { getCurrentUserId } from "../services/authHelper";
 import { supabase } from "../lib/supabase";
-import UserDetails from "../components/UserDetails";
-import { usePrimaryVehicle } from "../context/PrimaryVehicleContext";
-import { getCustomVehicles, type CustomVehicleRecord } from "../services/customVehicleService";
+
+import {
+  getCurrentPlan,
+  canAddDocument,
+  canUseFileUploads,
+  FREE_LIMITS,
+  type SubscriptionPlan,
+} from "../services/subscriptionService";
+
+import {
+  getFormDraft,
+  saveFormDraft,
+  deleteFormDraft,
+} from "../services/formDraftService";
+
+import {
+  getCustomVehicles,
+  type CustomVehicleRecord,
+} from "../services/customVehicleService";
+
+import {
+  getDocumentCategories,
+  addDocumentCategory,
+  type DocumentCategory,
+} from "../services/documentCategoryService";
+
 import { vehicles } from "../data/vehicles";
 
+import ReceiptUploader from "../components/ReceiptUploader";
+import UserDetails from "../components/UserDetails";
+import { usePrimaryVehicle } from "../context/PrimaryVehicleContext";
 
-interface DashboardProps {
+
+const emptyRecord: DocumentRecord = {
+  id: 0,
+  user_id: "",
+
+  title: "",
+  category: "",
+  vehicle: "",
+  documentDate: "",
+  file: "",
+  attachment_name: "",
+  notes: "",
+  createdAt: "",
+};
+
+
+const builtInCategories = [
+  "Registration Certificate (RC)",
+  "Insurance",
+  "Driving Licence",
+  "Purchase Invoice",
+  "Warranty",
+  "Service Record",
+  "Tyre Invoice",
+  "Charging",
+  "FASTag",
+  "Loan",
+  "Pollution Certificate",
+  "Other",
+];
+
+
+interface DocumentVaultProps {
   onNavigate?: (page: string) => void;
 }
 
-
-interface Session {
-  id: number;
-  vehicle: string;
-  charger: string;
-  energy: number;
-  cost: number;
-  station: string;
-  date: string;
-  user_id: string;
-}
-
-
-function Dashboard({
+export default function DocumentVault({
   onNavigate,
-}: DashboardProps) {
-  const [sessions, setSessions] =
-    useState<Session[]>([]);
-
-  const [loading, setLoading] =
-    useState(true);
-
+}: DocumentVaultProps) {
   const {
     primaryVehicle,
-    dashboardAlias,
     loading: primaryVehicleLoading,
   } = usePrimaryVehicle();
 
-  const [customVehicles, setCustomVehicles] =
-    useState<CustomVehicleRecord[]>([]);
+  const [records, setRecords] =
+    useState<DocumentRecord[]>([]);
+
+  const [
+    currentUserId,
+    setCurrentUserId,
+  ] = useState<string | null>(null);
+
+  const [subscriptionPlan, setSubscriptionPlan] =
+    useState<SubscriptionPlan>("free");
+
+  const [familyMemberDirectory, setFamilyMemberDirectory] =
+    useState<
+      {
+        user_id: string;
+        display_name: string | null;
+        email: string;
+        role: string;
+      }[]
+    >([]);
+
+  const [subscriptionPlanLoading, setSubscriptionPlanLoading] =
+    useState(true);
+
+  const [form, setForm] =
+    useState<DocumentRecord>(
+      emptyRecord
+    );
+
+  const [
+    editingId,
+    setEditingId,
+  ] = useState<number | null>(null);
+
+
+  /* =========================================================
+     AUTOSAVE
+     ========================================================= */
+
+  const [draftStatus, setDraftStatus] =
+    useState<"idle" | "loading" | "saving" | "saved" | "error">("idle");
+
+  const autosaveTimerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const skipAutosaveRef =
+    useRef(true);
+
+  const draftLoadedRef =
+    useRef(false);
+
+  const getDraftKey = () =>
+    editingId !== null
+      ? `document-vault:${editingId}`
+      : "document-vault:new";
+
+
+  const [search, setSearch] =
+    useState("");
+
+  /* =========================================================
+     CUSTOM VEHICLES
+     ========================================================= */
+
+  const [
+    customVehicles,
+    setCustomVehicles,
+  ] = useState<CustomVehicleRecord[]>([]);
+
+  const [vehicleSearch, setVehicleSearch] = useState("");
+  const [showVehicleSuggestions, setShowVehicleSuggestions] = useState(false);
+  const vehicleDropdownRef = useRef<HTMLDivElement | null>(null);
+
+
+  /* =========================================================
+     CUSTOM CATEGORIES
+     ========================================================= */
+
+  const [
+    customCategories,
+    setCustomCategories,
+  ] = useState<DocumentCategory[]>([]);
+
+  const [
+    showCategoryForm,
+    setShowCategoryForm,
+  ] = useState(false);
+
+  const [
+    categoryName,
+    setCategoryName,
+  ] = useState("");
+
+  const [
+    savingCategory,
+    setSavingCategory,
+  ] = useState(false);
+
+  const [categorySearch, setCategorySearch] = useState("");
+  const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
+  const categoryDropdownRef = useRef<HTMLDivElement | null>(null);
+
 
   useEffect(() => {
-    async function loadCustomVehicles() {
-      try {
-        const data = await getCustomVehicles();
-        setCustomVehicles(data);
-      } catch (error) {
-        console.error(
-          "Error loading custom vehicles for dashboard:",
-          error
-        );
-        setCustomVehicles([]);
+    function handleOutsideClick(event: MouseEvent) {
+      const target = event.target as Node;
+
+      if (
+        vehicleDropdownRef.current &&
+        !vehicleDropdownRef.current.contains(target)
+      ) {
+        setShowVehicleSuggestions(false);
+        setVehicleSearch("");
+      }
+
+      if (
+        categoryDropdownRef.current &&
+        !categoryDropdownRef.current.contains(target)
+      ) {
+        setShowCategorySuggestions(false);
+        setCategorySearch("");
       }
     }
 
-    void loadCustomVehicles();
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setShowVehicleSuggestions(false);
+        setShowCategorySuggestions(false);
+        setVehicleSearch("");
+        setCategorySearch("");
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleEscape);
+    };
   }, []);
 
+
+  /* =========================================================
+     DATE
+     ========================================================= */
+
+  function getTodayLocalDate() {
+    const today =
+      new Date();
+
+    const year =
+      today.getFullYear();
+
+    const month =
+      String(
+        today.getMonth() + 1
+      ).padStart(2, "0");
+
+    const day =
+      String(
+        today.getDate()
+      ).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+
+  const today =
+    getTodayLocalDate();
+
+
+  /* =========================================================
+     LOAD CURRENT USER + DOCUMENTS + VEHICLES + CATEGORIES
+     ========================================================= */
 
   useEffect(() => {
-    void loadSessions();
+    async function initialize() {
+      try {
+        const [
+          userId,
+          plan,
+          documentsData,
+          customVehiclesData,
+          customCategoriesData,
+          familyDirectoryData,
+        ] = await Promise.all([
+          getCurrentUserId(),
+          getCurrentPlan(),
+          getDocuments(),
+          getCustomVehicles(),
+          getDocumentCategories(),
+          supabase.rpc("get_my_family_member_directory"),
+        ]);
+
+        setCurrentUserId(userId);
+        setSubscriptionPlan(plan);
+        setSubscriptionPlanLoading(false);
+
+        setRecords(documentsData);
+        setCustomVehicles(customVehiclesData);
+        setCustomCategories(customCategoriesData);
+
+        if (familyDirectoryData.error) {
+          throw familyDirectoryData.error;
+        }
+
+        setFamilyMemberDirectory(
+          (familyDirectoryData.data ?? []) as {
+            user_id: string;
+            display_name: string | null;
+            email: string;
+            role: string;
+          }[]
+        );
+
+        await restoreDraft("document-vault:new");
+      } catch (err) {
+        console.error(
+          "Failed to initialize document vault:",
+          err
+        );
+
+        setSubscriptionPlanLoading(false);
+
+        alert(
+          "Failed to initialize Document Vault."
+        );
+      }
+    }
+
+
+    void initialize();
   }, []);
 
 
-  async function loadSessions() {
-    setLoading(true);
+  function getFamilyMemberName(userId: string) {
+    const member = familyMemberDirectory.find(
+      (item) => item.user_id === userId
+    );
 
+    if (!member) return "";
+
+    return (
+      member.display_name?.trim() ||
+      member.email?.trim() ||
+      "Family member"
+    );
+  }
+
+  async function loadDocuments() {
     try {
-      /*
-       * =========================================================
-       * FAMILY DATA
-       * =========================================================
-       *
-       * Do NOT filter by user_id here.
-       *
-       * The Supabase RLS policy on charging_sessions controls
-       * which records the logged-in user is allowed to see.
-       *
-       * Therefore:
-       *
-       *   Rakesh  -> Rakesh + family members
-       *   Sushma  -> Sushma + family members
-       *
-       * Records belonging to users outside the family remain
-       * inaccessible because of RLS.
-       */
+      const data =
+        await getDocuments();
 
-      const {
-        data,
-        error,
-      } = await supabase
-        .from("charging_sessions")
-        .select("*")
-        .order("date", {
-          ascending: false,
-        });
-
-      if (error) {
-        console.error(
-          "Error loading family charging sessions:",
-          error
-        );
-
-        setSessions([]);
-
-        return;
-      }
-
-
-      setSessions(
-        (data ?? []).map((row) => ({
-          id: row.id,
-
-          vehicle:
-            row.vehicle ?? "",
-
-          charger:
-            row.charger ?? "",
-
-          energy:
-            Number(row.energy ?? 0),
-
-          cost:
-            Number(row.cost ?? 0),
-
-          station:
-            row.station ?? "",
-
-          date:
-            row.date ?? "",
-
-          user_id:
-            row.user_id,
-        }))
+      setRecords(
+        data
       );
 
-    } catch (error) {
+    } catch (err) {
       console.error(
-        "Error loading dashboard:",
-        error
+        err
       );
 
-      setSessions([]);
-
-    } finally {
-      setLoading(false);
+      alert(
+        "Failed to load documents."
+      );
     }
   }
 
 
-  /*
-   * ============================================================
-   * FAMILY-WIDE CALCULATIONS
-   * ============================================================
-   */
+  const allVehicles = useMemo(() => {
+    const builtInVehicles =
+      vehicles.map(
+        (vehicle) => ({
+          value:
+            `${vehicle.brand} ${vehicle.model}`,
+          label:
+            `${vehicle.brand} ${vehicle.model}`,
+        })
+      );
 
-  const totalSessions =
-    sessions.length;
+    const custom =
+      customVehicles.map(
+        (vehicle) => ({
+          value:
+            `${vehicle.brand} ${vehicle.model}`,
+          label:
+            `${vehicle.brand} ${vehicle.model}`,
+        })
+      );
 
+    const combined = [
+      ...builtInVehicles,
+      ...custom,
+    ];
 
-  const totalEnergy =
-    sessions.reduce(
-      (sum, item) =>
-        sum + item.energy,
-      0
+    const seen =
+      new Set<string>();
+
+    return combined.filter(
+      (vehicle) => {
+        const key =
+          vehicle.value
+            .trim()
+            .toLowerCase();
+
+        if (seen.has(key)) {
+          return false;
+        }
+
+        seen.add(key);
+
+        return true;
+      }
     );
+  }, [
+    customVehicles,
+  ]);
 
 
-  const totalCost =
-    sessions.reduce(
-      (sum, item) =>
-        sum + item.cost,
-      0
+  /* =========================================================
+     CATEGORY LIST
+     ========================================================= */
+
+  const allCategories =
+    useMemo(() => {
+      const combined = [
+        ...builtInCategories,
+        ...customCategories.map(
+          (category) =>
+            category.name
+        ),
+      ];
+
+      const seen =
+        new Set<string>();
+
+      return combined.filter(
+        (category) => {
+          const key =
+            category
+              .trim()
+              .toLowerCase();
+
+          if (seen.has(key)) {
+            return false;
+          }
+
+          seen.add(key);
+
+          return true;
+        }
+      );
+    }, [
+      customCategories,
+    ]);
+
+
+  const filteredVehicleOptions = useMemo(() => {
+    const query = vehicleSearch.trim().toLowerCase();
+
+    if (!query) return allVehicles;
+
+    return allVehicles.filter((vehicle) =>
+      vehicle.label.toLowerCase().includes(query)
     );
+  }, [allVehicles, vehicleSearch]);
 
+  const filteredCategoryOptions = useMemo(() => {
+    const query = categorySearch.trim().toLowerCase();
 
-  const averageCost =
-    totalSessions > 0
-      ? totalCost / totalSessions
-      : 0;
+    if (!query) return allCategories;
 
-
-  const lastSession =
-    totalSessions > 0
-      ? sessions[0]
-      : null;
+    return allCategories.filter((category) =>
+      category.toLowerCase().includes(query)
+    );
+  }, [allCategories, categorySearch]);
 
   const primaryVehicleName = useMemo(() => {
     if (!primaryVehicle) {
@@ -211,37 +497,596 @@ function Dashboard({
       : "";
   }, [primaryVehicle, customVehicles]);
 
-  const primaryVehicleSessions = useMemo(() => {
-    if (!primaryVehicleName) {
-      return [];
+  useEffect(() => {
+    if (
+      primaryVehicleLoading ||
+      editingId !== null
+    ) {
+      return;
     }
 
-    return sessions.filter(
-      (session) =>
-        session.vehicle.trim().toLowerCase() ===
-        primaryVehicleName.trim().toLowerCase()
-    );
-  }, [sessions, primaryVehicleName]);
+    setForm((current) => ({
+      ...current,
+      vehicle: primaryVehicleName,
+    }));
+    setVehicleSearch(primaryVehicleName);
+  }, [
+    primaryVehicleLoading,
+    primaryVehicleName,
+    editingId,
+  ]);
 
-  const primaryVehicleTotalEnergy =
-    primaryVehicleSessions.reduce(
-      (sum, item) => sum + item.energy,
-      0
+
+
+  /* =========================================================
+     ADD CUSTOM CATEGORY
+     ========================================================= */
+
+  async function handleAddCategory() {
+    const name =
+      categoryName.trim();
+
+    if (!name) {
+      alert(
+        "Please enter a category name."
+      );
+
+      return;
+    }
+
+    const duplicate =
+      allCategories.some(
+        (category) =>
+          category
+            .trim()
+            .toLowerCase() ===
+          name.toLowerCase()
+      );
+
+    if (duplicate) {
+      alert(
+        "This category already exists."
+      );
+
+      return;
+    }
+
+    try {
+      setSavingCategory(
+        true
+      );
+
+      const created =
+        await addDocumentCategory(
+          name
+        );
+
+      setCustomCategories(
+        (previous) => [
+          ...previous,
+          created,
+        ]
+      );
+
+      setForm(
+        (previous) => ({
+          ...previous,
+          category:
+            created.name,
+        })
+      );
+
+      setCategorySearch(created.name);
+      setShowCategorySuggestions(false);
+
+      setCategoryName(
+        ""
+      );
+
+      setShowCategoryForm(
+        false
+      );
+
+      alert(
+        "Category created successfully."
+      );
+
+    } catch (error) {
+      console.error(
+        "Failed to create category:",
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to create category."
+      );
+
+    } finally {
+      setSavingCategory(
+        false
+      );
+    }
+  }
+
+
+
+  async function restoreDraft(draftKey: string) {
+    try {
+      setDraftStatus("loading");
+      skipAutosaveRef.current = true;
+      draftLoadedRef.current = false;
+
+      const draft =
+        await getFormDraft<DocumentRecord>(draftKey);
+
+      if (draft?.draft_data) {
+        setForm((current) => ({
+          ...current,
+          ...draft.draft_data,
+          vehicle:
+            draft.draft_data.vehicle?.trim()
+              ? draft.draft_data.vehicle
+              : current.vehicle,
+          file: "",
+        }));
+        setDraftStatus("saved");
+      } else {
+        setDraftStatus("idle");
+      }
+    } catch (err) {
+      console.error("Failed to restore document draft:", err);
+      setDraftStatus("error");
+    } finally {
+      draftLoadedRef.current = true;
+      window.setTimeout(() => {
+        skipAutosaveRef.current = false;
+      }, 0);
+    }
+  }
+
+  useEffect(() => {
+    if (!draftLoadedRef.current || skipAutosaveRef.current) return;
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    setDraftStatus("saving");
+
+    autosaveTimerRef.current = setTimeout(() => {
+      void saveFormDraft(
+        getDraftKey(),
+        {
+          ...form,
+          file: "",
+        }
+      )
+        .then(() => setDraftStatus("saved"))
+        .catch((err) => {
+          console.error("Failed to autosave document draft:", err);
+          setDraftStatus("error");
+        });
+    }, 1000);
+
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+      }
+    };
+  }, [form, editingId]);
+
+  useEffect(() => {
+    if (editingId !== null) {
+      void restoreDraft(`document-vault:${editingId}`);
+    }
+  }, [editingId]);
+
+  function handleAutosaveBlur() {
+    if (!draftLoadedRef.current || skipAutosaveRef.current) return;
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    setDraftStatus("saving");
+
+    void saveFormDraft(
+      getDraftKey(),
+      {
+        ...form,
+        file: "",
+      }
+    )
+      .then(() => setDraftStatus("saved"))
+      .catch((err) => {
+        console.error("Failed to autosave document draft:", err);
+        setDraftStatus("error");
+      });
+  }
+
+
+  /* =========================================================
+     SEARCH
+     ========================================================= */
+
+  const filtered =
+    useMemo(() => {
+      const text =
+        search.toLowerCase();
+
+      return records.filter(
+        (r) =>
+          r.title
+            .toLowerCase()
+            .includes(text) ||
+
+          r.category
+            .toLowerCase()
+            .includes(text) ||
+
+          r.vehicle
+            .toLowerCase()
+            .includes(text) ||
+
+          (r.notes ?? "")
+            .toLowerCase()
+            .includes(text)
+      );
+    }, [
+      records,
+      search,
+    ]);
+
+
+  const totalDocuments =
+    filtered.length;
+
+
+  /* =========================================================
+     EDIT
+     ========================================================= */
+
+  function handleEdit(
+    record: DocumentRecord
+  ) {
+    if (
+      record.user_id !==
+      currentUserId
+    ) {
+      alert(
+        "You can only edit your own documents."
+      );
+
+      return;
+    }
+
+    skipAutosaveRef.current = true;
+    draftLoadedRef.current = false;
+
+    setEditingId(
+      record.id
     );
 
-  const primaryVehicleTotalCost =
-    primaryVehicleSessions.reduce(
-      (sum, item) => sum + item.cost,
-      0
+    setForm(
+      record
     );
 
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
+
+  /* =========================================================
+     DELETE
+     ========================================================= */
+
+  async function handleDelete(
+    record: DocumentRecord
+  ) {
+    if (
+      record.user_id !==
+      currentUserId
+    ) {
+      alert(
+        "You can only delete your own documents."
+      );
+
+      return;
+    }
+
+    if (
+      !window.confirm(
+        "Delete this document?"
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await deleteDocument(
+        record.id
+      );
+
+      await loadDocuments();
+
+      alert(
+        "Document deleted successfully."
+      );
+
+    } catch (err) {
+      console.error(
+        err
+      );
+
+      alert(
+        "Failed to delete document."
+      );
+    }
+  }
+
+
+  /* =========================================================
+     RESET
+     ========================================================= */
+
+  function handleReset() {
+    if (!window.confirm("Are you sure you want to reset the values you have entered? This will clear the current form.")) {
+      return;
+    }
+
+    const draftKey =
+      editingId !== null
+        ? `document-vault:${editingId}`
+        : "document-vault:new";
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    skipAutosaveRef.current = true;
+    draftLoadedRef.current = false;
+
+    void deleteFormDraft(draftKey).catch((err) => {
+      console.error("Failed to delete document draft:", err);
+    });
+
+    setEditingId(null);
+
+    const resetVehicle = primaryVehicleName;
+
+    setForm({
+      ...emptyRecord,
+      vehicle: resetVehicle,
+    });
+    setVehicleSearch(resetVehicle);
+    setShowCategoryForm(false);
+    setCategoryName("");
+    setDraftStatus("idle");
+
+    window.setTimeout(() => {
+      draftLoadedRef.current = true;
+      skipAutosaveRef.current = false;
+    }, 0);
+  }
+
+
+  /* =========================================================
+     SAVE / UPDATE
+     ========================================================= */
+
+  async function handleSave() {
+    if (
+      !form.vehicle ||
+      !form.category ||
+      !form.title ||
+      !form.documentDate
+    ) {
+      alert(
+        "Please complete all required fields."
+      );
+
+      return;
+    }
+
+    if (
+      form.documentDate >
+      today
+    ) {
+      alert(
+        "Document date cannot be in the future."
+      );
+
+      return;
+    }
+
+    try {
+      if (
+        editingId !== null
+      ) {
+        if (
+          form.user_id !==
+          currentUserId
+        ) {
+          alert(
+            "You can only update your own documents."
+          );
+
+          return;
+        }
+
+        await updateDocument({
+          ...form,
+          id: editingId,
+        });
+
+        alert(
+          "Document updated successfully."
+        );
+
+      } else {
+        const ownDocumentCount =
+          currentUserId === null
+            ? records.length
+            : records.filter(
+                (record) =>
+                  record.user_id === currentUserId
+              ).length;
+
+        if (
+          !canAddDocument(
+            ownDocumentCount,
+            subscriptionPlan
+          )
+        ) {
+          alert(
+            `The Free plan is limited to ${FREE_LIMITS.documents} documents. Upgrade to Premium for ₹69 one-time to add more documents.`
+          );
+
+          return;
+        }
+
+        const {
+          id,
+          user_id,
+          createdAt,
+          ...newDocument
+        } = form;
+
+        await addDocument(
+          newDocument
+        );
+
+        alert(
+          "Document added successfully."
+        );
+      }
+
+      const savedDraftKey =
+        editingId !== null
+          ? `document-vault:${editingId}`
+          : "document-vault:new";
+
+      await deleteFormDraft(savedDraftKey);
+
+      skipAutosaveRef.current = true;
+      draftLoadedRef.current = false;
+
+      await loadDocuments();
+
+      setEditingId(
+        null
+      );
+
+      setForm({
+        ...emptyRecord,
+        vehicle: primaryVehicleName,
+      });
+      setVehicleSearch(primaryVehicleName);
+
+      setDraftStatus("idle");
+
+      window.setTimeout(() => {
+        draftLoadedRef.current = true;
+        skipAutosaveRef.current = false;
+      }, 0);
+
+    } catch (error) {
+      console.error(
+        error
+      );
+
+      alert(
+        editingId !== null
+          ? "Failed to update document."
+          : "Failed to add document."
+      );
+    }
+  }
+
+
+  /* =========================================================
+     RENDER
+     ========================================================= */
 
   return (
     <>
-      {/* ======================================================
-          HEADER / USER DETAILS
-          ====================================================== */}
+      <style>{`
 
+        .evtoolkitCustomFieldRow {
+          width: 100%;
+          min-width: 0;
+        }
+
+        .evtoolkitCustomFieldControl {
+          min-width: 0;
+          flex: 1 1 auto;
+        }
+
+        .evtoolkitCustomFieldButton {
+          flex: 0 0 auto;
+          white-space: nowrap;
+        }
+
+        @media (max-width: 768px) {
+          .evtoolkitCustomFieldRow {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            width: 100% !important;
+          }
+
+          .evtoolkitCustomFieldControl {
+            width: 100% !important;
+            min-width: 0 !important;
+            flex: none !important;
+          }
+
+          .evtoolkitCustomFieldButton {
+            width: 100% !important;
+            min-width: 0 !important;
+            min-height: 44px !important;
+            height: auto !important;
+            margin: 0 !important;
+            position: static !important;
+            top: auto !important;
+            transform: none !important;
+            white-space: normal !important;
+            box-sizing: border-box !important;
+          }
+        }
+        .documentVaultFileUpload input[type="file"]::file-selector-button {
+          background: #16a34a;
+          color: #ffffff;
+          border: none;
+          border-radius: 6px;
+          padding: 8px 14px;
+          margin-right: 10px;
+          cursor: pointer;
+          font-weight: 600;
+        }
+
+        .documentVaultFileUpload input[type="file"]::file-selector-button:hover {
+          background: #15803d;
+        }
+      `}</style>
+      {subscriptionPlanLoading ? (
+        <div
+          style={{
+            minHeight: "220px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#6b7280",
+            fontSize: "14px",
+          }}
+        >
+          Loading Document Vault...
+        </div>
+      ) : (
+      <>
       <div
         style={{
           position: "relative",
@@ -258,893 +1103,975 @@ function Dashboard({
         />
       </div>
 
-
-      {/* ======================================================
-          PRIMARY VEHICLE
-          ====================================================== */}
-
-      <div
-        className="card"
-        style={{
-          marginBottom: "18px",
-          padding: "20px",
-          fontFamily: '"Avenir Next", "Montserrat", "Inter", "Segoe UI", Arial, sans-serif',
-          borderRadius: "18px",
-          border: "1px solid rgba(249,115,22,0.42)",
-          background:
-            "linear-gradient(135deg, rgba(30,41,59,0.98), rgba(15,23,42,0.98))",
-          boxShadow: "0 10px 30px rgba(15,23,42,0.28)",
-          overflow: "hidden",
-        }}
-      >
-        {primaryVehicleLoading ? (
-          <p style={{ margin: 0, color: "#94a3b8" }}>
-            Loading your Primary Vehicle...
-          </p>
-        ) : primaryVehicle && primaryVehicleName ? (
-          <>
-            <div
-              style={{
-                color: "#f97316",
-                fontSize: "12px",
-                fontWeight: 800,
-                letterSpacing: "0.09em",
-                textTransform: "uppercase",
-              }}
-            >
-              ⚡ Primary Vehicle
-            </div>
-
-            {dashboardAlias ? (
-              <>
-                <div
-                  style={{
-                    marginTop: "6px",
-                    color: "#ffffff",
-                    fontFamily: '"Avenir Next", "Montserrat", "Inter", "Segoe UI", Arial, sans-serif',
-                    fontSize: "clamp(24px, 5vw, 34px)",
-                    fontWeight: 700,
-                    letterSpacing: "-0.025em",
-                    lineHeight: 1.15,
-                    overflowWrap: "anywhere",
-                  }}
-                >
-                  {dashboardAlias}
-                </div>
-
-                <div
-                  style={{
-                    marginTop: "4px",
-                    color: "#cbd5e1",
-                    fontFamily: '"Avenir Next", "Montserrat", "Inter", "Segoe UI", Arial, sans-serif',
-                    fontSize: "clamp(14px, 3vw, 18px)",
-                    fontWeight: 500,
-                    lineHeight: 1.3,
-                    overflowWrap: "anywhere",
-                  }}
-                >
-                  ({primaryVehicleName})
-                </div>
-              </>
-            ) : (
-              <div
-                style={{
-                  marginTop: "6px",
-                  color: "#ffffff",
-                  fontFamily: '"Avenir Next", "Montserrat", "Inter", "Segoe UI", Arial, sans-serif',
-                  fontSize: "clamp(24px, 5vw, 34px)",
-                  fontWeight: 700,
-                  letterSpacing: "-0.025em",
-                  lineHeight: 1.15,
-                  overflowWrap: "anywhere",
-                }}
-              >
-                {primaryVehicleName}
-              </div>
-            )}
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns:
-                  "repeat(auto-fit, minmax(110px, 1fr))",
-                gap: "10px",
-                marginTop: "16px",
-              }}
-            >
-              <div>
-                <div style={{ color: "#94a3b8", fontSize: "12px" }}>
-                  Sessions
-                </div>
-                <strong style={{ color: "#38bdf8", fontSize: "20px" }}>
-                  {primaryVehicleSessions.length}
-                </strong>
-              </div>
-
-              <div>
-                <div style={{ color: "#94a3b8", fontSize: "12px" }}>
-                  Energy
-                </div>
-                <strong style={{ color: "#4ade80", fontSize: "20px" }}>
-                  {primaryVehicleTotalEnergy.toFixed(1)} kWh
-                </strong>
-              </div>
-
-              <div>
-                <div style={{ color: "#94a3b8", fontSize: "12px" }}>
-                  Charging Cost
-                </div>
-                <strong style={{ color: "#fbbf24", fontSize: "20px" }}>
-                  ₹{primaryVehicleTotalCost.toLocaleString(
-                    undefined,
-                    {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    }
-                  )}
-                </strong>
-              </div>
-            </div>
-
-            <p
-              style={{
-                margin: "14px 0 0",
-                color: "#cbd5e1",
-                fontSize: "13px",
-              }}
-            >
-              Your Primary Vehicle is used as the default vehicle across
-              EV Toolkit.
-            </p>
-          </>
-        ) : (
-          <>
-            <div
-              style={{
-                color: "#f97316",
-                fontSize: "12px",
-                fontWeight: 800,
-                letterSpacing: "0.09em",
-                textTransform: "uppercase",
-              }}
-            >
-              ⚡ Primary Vehicle
-            </div>
-
-            <div
-              style={{
-                marginTop: "6px",
-                color: "#ffffff",
-                fontSize: "22px",
-                fontWeight: 800,
-              }}
-            >
-              No Primary Vehicle Selected
-            </div>
-
-            <p
-              style={{
-                margin: "8px 0 14px",
-                color: "#94a3b8",
-                fontSize: "13px",
-              }}
-            >
-              Select your vehicle in Settings to personalise your
-              Dashboard and use it as the default across the app.
-            </p>
-
-            <button
-              type="button"
-              onClick={() => onNavigate?.("settings")}
-              style={{
-                border: "none",
-                borderRadius: "10px",
-                padding: "10px 14px",
-                background: "#f97316",
-                color: "#ffffff",
-                fontWeight: 800,
-                cursor: "pointer",
-              }}
-            >
-              Go to Settings
-            </button>
-          </>
-        )}
-      </div>
-
-
       <div className="welcome">
 
         <h2>
-          Welcome 👋
+          📁 Document Vault
         </h2>
 
         <p>
-          Manage your EV charging
-          from one place.
+          Store and manage all your
+          vehicle-related documents
+          in one place.
         </p>
 
       </div>
 
 
-      {/* ======================================================
-          FAMILY-WIDE STATS
-          ====================================================== */}
+      {subscriptionPlan === "premium_plus" ? (
+      <>
+      {/* =====================================================
+          ADD / EDIT DOCUMENT
+          ===================================================== */}
 
-      <div
-        className="statsGrid"
-        style={{
-          gap: "14px",
-        }}
-      >
+      <div className="card">
 
-        {/* ==================================================
-            TOTAL COST
-            ================================================== */}
+        <h3>
+          {editingId !== null
+            ? "Edit Document"
+            : "Add Document"}
+        </h3>
 
-        <div
-          className="statCard"
-          style={{
-            background:
-              "linear-gradient(145deg, rgba(120,53,15,0.34), rgba(15,23,42,0.96))",
-            border:
-              "1px solid rgba(245,158,11,0.48)",
-            borderRadius:
-              "16px",
-            boxShadow:
-              "0 8px 24px rgba(245,158,11,0.22)",
-            minHeight:
-              "138px",
-            minWidth:
-              0,
-            padding:
-              "16px 10px",
-            overflow:
-              "hidden",
-          }}
-        >
 
-          <div
-            style={{
-              display:
-                "flex",
-              alignItems:
-                "center",
-              justifyContent:
-                "center",
-              gap:
-                "7px",
-              marginBottom:
-                "9px",
-              minWidth:
-                0,
-            }}
-          >
+        <div className="formGrid">
+
+          {/* =================================================
+              VEHICLE
+              ================================================= */}
+
+          <div>
+            <label>
+              Vehicle
+            </label>
 
             <div
+              className="evtoolkitCustomFieldRow"
               style={{
-                width:
-                  "34px",
-                height:
-                  "34px",
-                borderRadius:
-                  "50%",
-                display:
-                  "flex",
-                alignItems:
-                  "center",
-                justifyContent:
-                  "center",
-                background:
-                  "linear-gradient(145deg, #f59e0b, #d97706)",
-                color:
-                  "#ffffff",
-                fontSize:
-                  "18px",
-                fontWeight:
-                  800,
-                boxShadow:
-                  "0 0 18px rgba(245,158,11,0.22)",
-                flexShrink:
-                  0,
+                display: "flex",
+                gap: "8px",
+                alignItems: "flex-start",
               }}
             >
-              ₹
+              <div
+                className="evtoolkitCustomFieldControl"
+                ref={vehicleDropdownRef}
+                style={{ position: "relative", flex: 1 }}
+              >
+                <input
+                  type="text"
+                  placeholder="Type vehicle name to search..."
+                  value={showVehicleSuggestions ? vehicleSearch : form.vehicle}
+                  onFocus={() => {
+                    setShowVehicleSuggestions(true);
+                    if (!vehicleSearch) setVehicleSearch(form.vehicle);
+                  }}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setVehicleSearch(value);
+                    setShowVehicleSuggestions(true);
+                    setForm((previous) => ({
+                      ...previous,
+                      vehicle: value,
+                    }));
+                  }}
+                  onBlur={handleAutosaveBlur}
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    paddingRight: "44px",
+                  }}
+                />
+
+                <button
+                  type="button"
+                  aria-label="Show vehicle list"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setShowVehicleSuggestions((open) => !open);
+                    if (!showVehicleSuggestions) setVehicleSearch("");
+                  }}
+                  style={{
+                    position: "absolute",
+                    right: "6px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    width: "32px",
+                    height: "32px",
+                    border: "none",
+                    borderRadius: "6px",
+                    background: "#374151",
+                    color: "#f9fafb",
+                    cursor: "pointer",
+                    fontSize: "18px",
+                    lineHeight: 1,
+                    padding: 0,
+                  }}
+                >
+                  ▾
+                </button>
+
+                {showVehicleSuggestions && (
+                  <div
+                    style={{
+                      marginTop: "4px",
+                      width: "100%",
+                      boxSizing: "border-box",
+                      background: "#1f2937",
+                      border: "1px solid #374151",
+                      borderRadius: "8px",
+                      maxHeight: "220px",
+                      overflowY: "auto",
+                      boxShadow: "0 8px 20px rgba(0,0,0,0.35)",
+                      zIndex: 100,
+                    }}
+                  >
+                    {filteredVehicleOptions.length > 0 ? (
+                      filteredVehicleOptions.map((vehicle) => (
+                        <button
+                          key={vehicle.value}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setForm((previous) => ({
+                              ...previous,
+                              vehicle: vehicle.value,
+                            }));
+                            setVehicleSearch(vehicle.value);
+                            setShowVehicleSuggestions(false);
+                          }}
+                          style={{
+                            display: "block",
+                            width: "100%",
+                            textAlign: "left",
+                            border: "none",
+                            borderBottom: "1px solid #374151",
+                            background: "transparent",
+                            color: "#f9fafb",
+                            padding: "10px 12px",
+                            cursor: "pointer",
+                          }}
+                        >
+                          {vehicle.label}
+                        </button>
+                      ))
+                    ) : (
+                      <div style={{ padding: "10px 12px", color: "#9ca3af", fontSize: "13px" }}>
+                        No matching vehicle found. Add a custom vehicle from Settings first.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
-
-            <h3
-              style={{
-                margin:
-                  0,
-                color:
-                  "#f8fafc",
-                fontFamily:
-                  '"Inter", "Segoe UI", Arial, sans-serif',
-                fontSize:
-                  "12px",
-                fontWeight:
-                  750,
-                lineHeight:
-                  1.15,
-                textAlign:
-                  "center",
-                whiteSpace:
-                  "normal",
-                overflowWrap:
-                  "anywhere",
-                minWidth:
-                  0,
-                flex:
-                  "1 1 auto",
-              }}
-            >
-              Total Cost
-            </h3>
 
           </div>
 
 
-          <h1
-            style={{
-              margin:
-                0,
-              color:
-                "#fbbf24",
-              fontFamily:
-                '"Inter", "Segoe UI", Arial, sans-serif',
-              fontSize:
-                "23px",
-              lineHeight:
-                1.05,
-              fontWeight:
-                800,
-              letterSpacing:
-                "-0.035em",
-              textAlign:
-                "center",
-              maxWidth:
-                "100%",
-              overflowWrap:
-                "anywhere",
-              textShadow:
-                "0 0 18px rgba(245,158,11,0.22)",
-              whiteSpace:
-                "nowrap",
-            }}
-          >
-            ₹{totalCost.toLocaleString(
-              undefined,
-              {
-                minimumFractionDigits:
-                  2,
-                maximumFractionDigits:
-                  2,
-              }
+          {/* =================================================
+              CATEGORY
+              ================================================= */}
+
+          <div>
+            <label>
+              Category
+            </label>
+
+            <div
+              className="evtoolkitCustomFieldRow"
+              style={{
+                display: "flex",
+                gap: "8px",
+                alignItems: "flex-start",
+              }}
+            >
+              <div
+                className="evtoolkitCustomFieldControl"
+                ref={categoryDropdownRef}
+                style={{ position: "relative", flex: 1 }}
+              >
+                <input
+                  type="text"
+                  placeholder="Type category to search..."
+                  value={showCategorySuggestions ? categorySearch : form.category}
+                  onFocus={() => {
+                    setShowCategorySuggestions(true);
+                    if (!categorySearch) setCategorySearch(form.category);
+                  }}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setCategorySearch(value);
+                    setShowCategorySuggestions(true);
+                    setForm((previous) => ({
+                      ...previous,
+                      category: value,
+                    }));
+                  }}
+                  onBlur={handleAutosaveBlur}
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    paddingRight: "44px",
+                  }}
+                />
+
+                <button
+                  type="button"
+                  aria-label="Show category list"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setShowCategorySuggestions((open) => !open);
+                    if (!showCategorySuggestions) setCategorySearch("");
+                  }}
+                  style={{
+                    position: "absolute",
+                    right: "6px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    width: "32px",
+                    height: "32px",
+                    border: "none",
+                    borderRadius: "6px",
+                    background: "#374151",
+                    color: "#f9fafb",
+                    cursor: "pointer",
+                    fontSize: "18px",
+                    lineHeight: 1,
+                    padding: 0,
+                  }}
+                >
+                  ▾
+                </button>
+
+                {showCategorySuggestions && (
+                  <div
+                    style={{
+                      marginTop: "4px",
+                      width: "100%",
+                      boxSizing: "border-box",
+                      background: "#1f2937",
+                      border: "1px solid #374151",
+                      borderRadius: "8px",
+                      maxHeight: "220px",
+                      overflowY: "auto",
+                      boxShadow: "0 8px 20px rgba(0,0,0,0.35)",
+                      zIndex: 100,
+                    }}
+                  >
+                    {filteredCategoryOptions.length > 0 ? (
+                      filteredCategoryOptions.map((category) => (
+                        <button
+                          key={category}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setForm((previous) => ({
+                              ...previous,
+                              category,
+                            }));
+                            setCategorySearch(category);
+                            setShowCategorySuggestions(false);
+                          }}
+                          style={{
+                            display: "block",
+                            width: "100%",
+                            textAlign: "left",
+                            border: "none",
+                            borderBottom: "1px solid #374151",
+                            background: "transparent",
+                            color: "#f9fafb",
+                            padding: "10px 12px",
+                            cursor: "pointer",
+                          }}
+                        >
+                          {category}
+                        </button>
+                      ))
+                    ) : (
+                      <div style={{ padding: "10px 12px", color: "#9ca3af", fontSize: "13px" }}>
+                        No matching category found. Use ＋ Or Add Custom Category to create one.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                className="saveButton evtoolkitCustomFieldButton"
+                onClick={() => setShowCategoryForm((value) => !value)}
+                style={{
+                  whiteSpace: "nowrap",
+                  height: "44px",
+                  minHeight: "44px",
+                  boxSizing: "border-box",
+                  transform: "translateY(6px)",
+                }}
+              >
+                ＋ Or Add Custom Category
+              </button>
+            </div>
+
+            {showCategoryForm && (
+              <div
+                style={{
+                  marginTop: "10px",
+                  padding: "12px",
+                  border:
+                    "1px solid #e5e7eb",
+                  borderRadius: "8px",
+                }}
+              >
+
+                <input
+                  type="text"
+                  placeholder="Category name"
+                  value={
+                    categoryName
+                  }
+                  onChange={(e) =>
+                    setCategoryName(
+                      e.target.value
+                    )
+                  }
+                />
+
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    marginTop: "10px",
+                  }}
+                >
+
+                  <button
+                    type="button"
+                    className="saveButton"
+                    disabled={
+                      savingCategory
+                    }
+                    onClick={() =>
+                      void handleAddCategory()
+                    }
+                  >
+                    {savingCategory
+                      ? "Saving..."
+                      : "Save Category"}
+                  </button>
+
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCategoryForm(
+                        false
+                      );
+                      setCategoryName(
+                        ""
+                      );
+                    }}
+                  >
+                    Cancel
+                  </button>
+
+                </div>
+
+              </div>
             )}
-          </h1>
+
+          </div>
+
+
+          {/* =================================================
+              TITLE
+              ================================================= */}
+
+          <div>
+            <label>
+              Document Title
+            </label>
+
+            <input
+              type="text"
+              value={
+                form.title
+              }
+              onBlur={handleAutosaveBlur}
+                onChange={(e) =>
+                setForm({
+                  ...form,
+                  title:
+                    e.target.value,
+                })
+              }
+              placeholder="Insurance Policy 2026"
+            />
+          </div>
+
+
+          {/* =================================================
+              DATE
+              ================================================= */}
+
+          <div>
+            <label>
+              Document Date
+            </label>
+
+            <input
+              type="date"
+              value={
+                form.documentDate
+              }
+              max={today}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  documentDate:
+                    e.target.value,
+                })
+              }
+            />
+
+            <p
+              style={{
+                fontSize:
+                  "12px",
+                color:
+                  "#6b7280",
+                marginTop:
+                  "6px",
+              }}
+            >
+              Document date cannot
+              be in the future.
+            </p>
+
+          </div>
 
         </div>
 
 
-        {/* ==================================================
-            TOTAL ENERGY
-            ================================================== */}
+        <label>
+          Notes
+        </label>
 
-        <div
-          className="statCard"
+
+        <textarea
+          rows={4}
+          value={
+            form.notes
+          }
+          placeholder="If you want to add a note, write it here..."
+          onBlur={handleAutosaveBlur}
+          onChange={(e) =>
+            setForm({
+              ...form,
+              notes:
+                e.target.value,
+            })
+          }
           style={{
-            background:
-              "linear-gradient(145deg, rgba(6,95,70,0.34), rgba(15,23,42,0.96))",
-            border:
-              "1px solid rgba(34,197,94,0.48)",
-            borderRadius:
-              "16px",
-            boxShadow:
-              "0 8px 24px rgba(34,197,94,0.22)",
-            minHeight:
-              "138px",
-            minWidth:
-              0,
-            padding:
-              "16px 10px",
-            overflow:
-              "hidden",
+            width: "100%",
+            minHeight: "110px",
+            resize: "vertical",
+            boxSizing: "border-box",
           }}
-        >
+        />
 
-          <div
-            style={{
-              display:
-                "flex",
-              alignItems:
-                "center",
-              justifyContent:
-                "center",
-              gap:
-                "7px",
-              marginBottom:
-                "9px",
-              minWidth:
-                0,
-            }}
-          >
 
-            <div
-              style={{
-                width:
-                  "34px",
-                height:
-                  "34px",
-                borderRadius:
-                  "50%",
-                display:
-                  "flex",
-                alignItems:
-                  "center",
-                justifyContent:
-                  "center",
-                background:
-                  "linear-gradient(145deg, #22c55e, #16a34a)",
-                color:
-                  "#ffffff",
-                fontSize:
-                  "22px",
-                fontWeight:
-                  800,
-                boxShadow:
-                  "0 0 18px rgba(34,197,94,0.22)",
-                flexShrink:
-                  0,
-              }}
-            >
-              ϟ
+        <br />
+
+
+        <label>
+          Attachment
+        </label>
+
+        {canUseFileUploads(subscriptionPlan) ? (
+          <>
+            <div className="documentVaultFileUpload">
+              <ReceiptUploader
+                value={form.file}
+                fileName={form.attachment_name}
+                onChange={(file) => {
+                  setForm({
+                    ...form,
+                    file,
+                  });
+                  handleAutosaveBlur();
+                }}
+                onFileNameChange={(attachment_name) => {
+                  setForm({
+                    ...form,
+                    attachment_name,
+                  });
+                  handleAutosaveBlur();
+                }}
+              />
             </div>
 
-
-            <h3
+            <p
               style={{
-                margin:
-                  0,
-                color:
-                  "#f8fafc",
-                fontFamily:
-                  '"Inter", "Segoe UI", Arial, sans-serif',
-                fontSize:
-                  "12px",
-                fontWeight:
-                  750,
-                lineHeight:
-                  1.15,
-                textAlign:
-                  "center",
-                whiteSpace:
-                  "normal",
-                overflowWrap:
-                  "anywhere",
-                minWidth:
-                  0,
-                flex:
-                  "1 1 auto",
+                fontSize: 12,
+                color: "#666",
+                marginTop: 8,
               }}
             >
-              Total Energy
-            </h3>
-
-          </div>
-
-
-          <h1
+              You can upload PDF,
+              images, Word, Excel and
+              other document formats.
+              Recommended maximum
+              file size:{" "}
+              <strong>
+                5 MB
+              </strong>
+              .
+            </p>
+          </>
+        ) : (
+          <div
             style={{
-              margin:
-                0,
-              color:
-                "#4ade80",
-              fontFamily:
-                '"Inter", "Segoe UI", Arial, sans-serif',
-              fontSize:
-                "27px",
-              lineHeight:
-                1.05,
-              fontWeight:
-                800,
-              letterSpacing:
-                "-0.03em",
-              textAlign:
-                "center",
-              maxWidth:
-                "100%",
-              overflowWrap:
-                "anywhere",
-              textShadow:
-                "0 0 18px rgba(34,197,94,0.22)",
-              whiteSpace:
-                "nowrap",
+              marginTop: "8px",
+              padding: "12px 14px",
+              border: "1px solid #93c5fd",
+              borderRadius: "8px",
+              background: "#eff6ff",
+              color: "#1d4ed8",
+              fontSize: "13px",
             }}
           >
-            {totalEnergy.toFixed(1)}{" "}
+            <strong>Premium Plus feature</strong>
+            <div style={{ marginTop: "4px" }}>
+              Document uploads are available only with Premium Plus. Premium Plus is coming soon.
+            </div>
+          </div>
+        )}
+
+
+        <br />
+
+
+        <div
+          style={{
+            minHeight: "20px",
+            marginBottom: "8px",
+            fontSize: "13px",
+          }}
+        >
+          {draftStatus === "loading" && (
+            <span style={{ color: "#6b7280" }}>
+              Loading draft...
+            </span>
+          )}
+          {draftStatus === "saving" && (
+            <span style={{ color: "#d97706" }}>
+              Saving...
+            </span>
+          )}
+          {draftStatus === "saved" && (
             <span
               style={{
-                fontSize:
-                  "0.68em",
-                whiteSpace:
-                  "nowrap",
+                color: "#16a34a",
+                fontWeight: 600,
               }}
             >
-              kWh
+              ✓ Saved
             </span>
-          </h1>
-
+          )}
+          {draftStatus === "error" && (
+            <span style={{ color: "#dc2626" }}>
+              Draft save failed
+            </span>
+          )}
         </div>
 
-
-        {/* ==================================================
-            TOTAL SESSIONS
-            ================================================== */}
+        <button
+          className="saveButton"
+          onClick={() =>
+            void handleSave()
+          }
+        >
+          {editingId !== null
+            ? "Update Document"
+            : "Add Document"}
+        </button>
 
         <div
-          className="statCard"
           style={{
-            background:
-              "linear-gradient(145deg, rgba(30,64,175,0.30), rgba(15,23,42,0.96))",
-            border:
-              "1px solid rgba(59,130,246,0.48)",
-            borderRadius:
-              "16px",
-            boxShadow:
-              "0 8px 24px rgba(59,130,246,0.22)",
-            minHeight:
-              "138px",
-            minWidth:
-              0,
-            padding:
-              "16px 10px",
-            overflow:
-              "hidden",
+            display: "flex",
+            justifyContent: "flex-end",
+            marginTop: "16px",
           }}
         >
-
-          <div
+          <button
+            type="button"
+            onClick={handleReset}
             style={{
-              display:
-                "flex",
-              alignItems:
-                "center",
-              justifyContent:
-                "center",
-              gap:
-                "7px",
-              marginBottom:
-                "9px",
-              minWidth:
-                0,
+              background: "#dc2626",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "6px",
+              padding: "10px 18px",
+              cursor: "pointer",
+              fontWeight: 600,
             }}
           >
+            Reset
+          </button>
+        </div>
 
-            <div
-              style={{
-                width:
-                  "34px",
-                height:
-                  "34px",
-                borderRadius:
-                  "50%",
-                display:
-                  "flex",
-                alignItems:
-                  "center",
-                justifyContent:
-                  "center",
-                background:
-                  "linear-gradient(145deg, #3b82f6, #2563eb)",
-                color:
-                  "#ffffff",
-                fontSize:
-                  "20px",
-                fontWeight:
-                  800,
-                boxShadow:
-                  "0 0 18px rgba(59,130,246,0.22)",
-                flexShrink:
-                  0,
-              }}
-            >
-              ▦
-            </div>
+      </div>
 
 
-            <h3
-              style={{
-                margin:
-                  0,
-                color:
-                  "#f8fafc",
-                fontFamily:
-                  '"Inter", "Segoe UI", Arial, sans-serif',
-                fontSize:
-                  "12px",
-                fontWeight:
-                  750,
-                lineHeight:
-                  1.15,
-                textAlign:
-                  "center",
-                whiteSpace:
-                  "normal",
-                overflowWrap:
-                  "anywhere",
-                minWidth:
-                  0,
-                flex:
-                  "1 1 auto",
-              }}
-            >
-              Total Sessions
-            </h3>
+      {/* =====================================================
+          KPIs
+          ===================================================== */}
 
-          </div>
+      <div className="kpiGrid">
+
+        <div className="kpiCard">
+
+          <h3>
+            Total Documents
+          </h3>
+
+          <h2>
+            {
+              totalDocuments
+            }
+          </h2>
+
+        </div>
 
 
-          <h1
-            style={{
-              margin:
-                0,
-              color:
-                "#38bdf8",
-              fontFamily:
-                '"Inter", "Segoe UI", Arial, sans-serif',
-              fontSize:
-                "32px",
-              lineHeight:
-                1.05,
-              fontWeight:
-                800,
-              letterSpacing:
-                "-0.03em",
-              textAlign:
-                "center",
-              maxWidth:
-                "100%",
-              overflowWrap:
-                "anywhere",
-              textShadow:
-                "0 0 18px rgba(59,130,246,0.22)",
-            }}
-          >
-            {totalSessions}
-          </h1>
+        <div className="kpiCard">
+
+          <h3>
+            Categories
+          </h3>
+
+          <h2>
+            {
+              new Set(
+                filtered.map(
+                  (d) =>
+                    d.category
+                )
+              ).size
+            }
+          </h2>
+
+        </div>
+
+
+        <div className="kpiCard">
+
+          <h3>
+            Vehicles
+          </h3>
+
+          <h2>
+            {
+              new Set(
+                filtered.map(
+                  (d) =>
+                    d.vehicle
+                )
+              ).size
+            }
+          </h2>
 
         </div>
 
       </div>
 
 
-      {/* ======================================================
-          CHARGING SUMMARY
-          ====================================================== */}
+      {/* =====================================================
+          DOCUMENT TABLE
+          ===================================================== */}
 
       <div className="card">
 
-        <h3>
-          Charging Summary
-        </h3>
+        <input
+          type="text"
+          placeholder="Search documents..."
+          value={
+            search
+          }
+          onChange={(e) =>
+            setSearch(
+              e.target.value
+            )
+          }
+        />
 
 
-        {loading ? (
-
-          <p
-            style={{
-              marginTop: 12,
-              color: "#94a3b8",
-            }}
-          >
-            Loading family charging
-            data...
-          </p>
-
-        ) : (
+        <div className="tableContainer">
 
           <table className="table">
 
-            <tbody>
+            <thead>
 
               <tr>
 
-                <td>
-                  Total Sessions
-                </td>
+                <th>
+                  #
+                </th>
 
-                <td>
-                  {totalSessions}
-                </td>
-
-              </tr>
-
-
-              <tr>
-
-                <td>
-                  Total Energy Charged
-                </td>
-
-                <td>
-                  {totalEnergy.toFixed(1)}
-                  {" "}
-                  kWh
-                </td>
-
-              </tr>
-
-
-              <tr>
-
-                <td>
-                  Total Spend
-                </td>
-
-                <td>
-                  ₹
-                  {totalCost.toLocaleString()}
-                </td>
-
-              </tr>
-
-
-              <tr>
-
-                <td>
-                  Average Cost / Session
-                </td>
-
-                <td>
-                  ₹
-                  {averageCost.toFixed(2)}
-                </td>
-
-              </tr>
-
-            </tbody>
-
-          </table>
-
-        )}
-
-      </div>
-
-
-      {/* ======================================================
-          RECENT FAMILY ACTIVITY
-          ====================================================== */}
-
-      <div className="card">
-
-        <h3>
-          Recent Family Activity
-        </h3>
-
-
-        {loading ? (
-
-          <p
-            style={{
-              marginTop: 12,
-              color: "#94a3b8",
-            }}
-          >
-            Loading...
-          </p>
-
-        ) : lastSession ? (
-
-          <table className="table">
-
-            <tbody>
-
-              <tr>
-
-                <td>
+                <th>
                   Vehicle
-                </td>
+                </th>
 
-                <td>
-                  {lastSession.vehicle}
-                </td>
+                <th>
+                  Category
+                </th>
 
-              </tr>
+                <th>
+                  Title
+                </th>
 
-
-              <tr>
-
-                <td>
+                <th>
                   Date
-                </td>
+                </th>
 
-                <td>
-                  {lastSession.date}
-                </td>
+                <th>
+                  Attachment
+                </th>
 
-              </tr>
-
-
-              <tr>
-
-                <td>
-                  Charging Type
-                </td>
-
-                <td>
-                  {lastSession.charger}
-                </td>
+                <th>
+                  Actions
+                </th>
 
               </tr>
 
-
-              <tr>
-
-                <td>
-                  Station
-                </td>
-
-                <td>
-                  {lastSession.station ||
-                    "-"}
-                </td>
-
-              </tr>
+            </thead>
 
 
-              <tr>
+            <tbody>
 
-                <td>
-                  Energy
-                </td>
+              {filtered.length ===
+              0 ? (
 
-                <td>
-                  {lastSession.energy.toFixed(
-                    1
-                  )}
-                  {" "}
-                  kWh
-                </td>
+                <tr>
 
-              </tr>
+                  <td colSpan={7}>
+                    No documents
+                    found.
+                  </td>
+
+                </tr>
+
+              ) : (
+
+                filtered.map(
+                  (
+                    record,
+                    index
+                  ) => {
+
+                    const isOwner =
+                      currentUserId !==
+                        null &&
+                      record.user_id ===
+                        currentUserId;
 
 
-              <tr>
+                    return (
+                      <tr
+                        key={
+                          record.id
+                        }
+                      >
 
-                <td>
-                  Cost
-                </td>
+                        <td>
+                          {
+                            index + 1
+                          }
+                        </td>
 
-                <td>
-                  ₹
-                  {lastSession.cost.toLocaleString()}
-                </td>
 
-              </tr>
+                        <td>
+                          {
+                            record.vehicle
+                          }
+                          {record.user_id !== currentUserId &&
+                            getFamilyMemberName(record.user_id) && (
+                              <span
+                                style={{
+                                  marginLeft: "6px",
+                                  color: "#9ca3af",
+                                  fontSize: "12px",
+                                }}
+                              >
+                                ({getFamilyMemberName(record.user_id)})
+                              </span>
+                            )}
+                        </td>
+
+
+                        <td>
+                          {
+                            record.category
+                          }
+                        </td>
+
+
+                        <td>
+                          {
+                            record.title
+                          }
+                        </td>
+
+
+                        <td>
+                          {
+                            record.documentDate
+                          }
+                        </td>
+
+
+                        <td>
+
+                          {record.file ? (
+
+                            <>
+
+
+                            <a
+                              href={
+                                record.file
+                              }
+                              download={
+                                record.title
+                              }
+                              className="downloadButton"
+                            >
+                              ⬇
+                              Download
+                            </a>
+
+                            {record.attachment_name && (
+                              <div
+                                style={{
+                                  marginTop: "5px",
+                                  fontSize: "12px",
+                                  color: "#6b7280",
+                                  wordBreak: "break-word",
+                                }}
+                              >
+                                📎 {record.attachment_name}
+                              </div>
+                            )}
+
+                            </>
+
+                          ) : (
+                            "-"
+                          )}
+
+                        </td>
+
+
+                        <td>
+
+                          {isOwner ? (
+
+                            <div className="actionButtons">
+
+                              <button
+                                className="editButton"
+                                onClick={() =>
+                                  handleEdit(
+                                    record
+                                  )
+                                }
+                              >
+                                Edit
+                              </button>
+
+
+                              <button
+                                className="deleteButton"
+                                onClick={() =>
+                                  void handleDelete(
+                                    record
+                                  )
+                                }
+                              >
+                                Delete
+                              </button>
+
+                            </div>
+
+                          ) : (
+
+                            <span
+                              style={{
+                                color:
+                                  "#6b7280",
+                                fontSize:
+                                  "13px",
+                              }}
+                            >
+                              View only
+                            </span>
+
+                          )}
+
+                        </td>
+
+                      </tr>
+                    );
+                  }
+                )
+
+              )}
 
             </tbody>
 
           </table>
 
-        ) : (
+        </div>
+
+      </div>
+      </>
+      ) : (
+        <div
+          className="card"
+          style={{
+            border: "1px solid #2563eb",
+            background: "#eff6ff",
+            textAlign: "center",
+            padding: "32px 20px",
+          }}
+        >
+          <h3
+            style={{
+              color: "#1d4ed8",
+              marginBottom: "10px",
+            }}
+          >
+            Premium Plus — Coming Soon
+          </h3>
 
           <p
             style={{
-              marginTop: 12,
-              color: "#94a3b8",
+              color: "#1e40af",
+              margin: 0,
+              lineHeight: 1.6,
             }}
           >
-            No charging sessions
-            recorded yet.
+            Document Vault will be available for
+            <strong> Premium Plus </strong>
+            users. Premium Plus is coming soon and
+            will include secure document file uploads
+            and additional cloud features.
           </p>
-
-        )}
-
-      </div>
+        </div>
+      )}
+      </>
+      )}
     </>
   );
 }
-
-
-export default Dashboard;

@@ -820,28 +820,6 @@ export default function Insurance({
   }
 
 
-  async function loadCustomVehicles() {
-    try {
-      const data =
-        await getCustomVehicles();
-
-      setCustomVehicles(
-        data
-      );
-
-    } catch (err) {
-      console.error(
-        "Failed to load custom vehicles:",
-        err
-      );
-
-      alert(
-        "Failed to load custom vehicles."
-      );
-    }
-  }
-
-
   /*
    * =========================================================
    * VEHICLE LIST
