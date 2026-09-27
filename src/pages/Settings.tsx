@@ -202,6 +202,9 @@ function Settings({ onNavigate }: SettingsProps) {
   const [removingMemberId, setRemovingMemberId] =
     useState<number | null>(null);
 
+  const [leavingFamily, setLeavingFamily] =
+    useState(false);
+
 
   const fileInputRef =
     useRef<HTMLInputElement>(null);
@@ -1849,22 +1852,25 @@ function Settings({ onNavigate }: SettingsProps) {
 
     try {
       const {
+        data,
         error,
-      } = await supabase
-        .from("family_members")
-        .delete()
-        .eq(
-          "id",
-          member.member_id
-        )
-        .eq(
-          "family_id",
-          member.family_id
-        );
+      } = await supabase.rpc(
+        "remove_family_member",
+        {
+          p_member_id:
+            member.member_id,
+        }
+      );
 
 
       if (error) {
         throw error;
+      }
+
+      if (!data) {
+        throw new Error(
+          "The family member could not be removed."
+        );
       }
 
 
@@ -1891,6 +1897,76 @@ function Settings({ onNavigate }: SettingsProps) {
       setRemovingMemberId(
         null
       );
+    }
+  }
+
+
+  /*
+   * ============================================================
+   * LEAVE FAMILY
+   * ============================================================
+   */
+
+  async function handleLeaveFamily() {
+    if (
+      !family?.family_id ||
+      isFamilyOwner ||
+      leavingFamily
+    ) {
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        "Leave this family? You will no longer have access to this family's shared EV Toolkit data. You can be invited again later if needed."
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setLeavingFamily(true);
+
+    try {
+      const {
+        data,
+        error,
+      } = await supabase.rpc(
+        "leave_family",
+        {
+          p_family_id:
+            family.family_id,
+        }
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data) {
+        throw new Error(
+          "Unable to leave the family."
+        );
+      }
+
+      alert(
+        "You have left the family successfully."
+      );
+
+      await loadFamilyData();
+    } catch (error) {
+      console.error(
+        "Leave family error:",
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to leave the family."
+      );
+    } finally {
+      setLeavingFamily(false);
     }
   }
 
@@ -2993,6 +3069,53 @@ function Settings({ onNavigate }: SettingsProps) {
               </div>
             </div>
 
+            {!isFamilyOwner && (
+              <div
+                style={{
+                  marginTop: "18px",
+                  padding: "14px",
+                  border: "1px solid #7f1d1d",
+                  borderRadius: "8px",
+                  background: "#1f1720",
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: 700,
+                    color: "#f8fafc",
+                  }}
+                >
+                  Family Membership
+                </div>
+
+                <p
+                  style={{
+                    marginTop: "6px",
+                    marginBottom: "10px",
+                    fontSize: "13px",
+                    lineHeight: 1.5,
+                    color: "#cbd5e1",
+                  }}
+                >
+                  You are currently a member of this family.
+                  You can leave the family at any time.
+                </p>
+
+                <button
+                  type="button"
+                  className="deleteButton"
+                  disabled={leavingFamily}
+                  onClick={() =>
+                    void handleLeaveFamily()
+                  }
+                >
+                  {leavingFamily
+                    ? "Leaving Family..."
+                    : "Leave Family"}
+                </button>
+              </div>
+            )}
+
             {isFamilyOwner && (
               <div
                 style={{
@@ -3070,19 +3193,17 @@ function Settings({ onNavigate }: SettingsProps) {
                     !selectedUser && (
                     <div
                       style={{
-                        position: "absolute",
-                        top: "100%",
-                        left: 0,
-                        right: 0,
-                        zIndex: 20,
+                        position: "relative",
+                        zIndex: 1,
+                        width: "100%",
                         background: "#1f2937",
                         border: "1px solid #4b5563",
                         borderRadius: "8px",
-                        marginTop: "4px",
+                        marginTop: "8px",
                         maxHeight: "280px",
                         overflowY: "auto",
                         boxShadow:
-                          "0 4px 12px rgba(0,0,0,0.08)",
+                          "0 4px 12px rgba(0,0,0,0.25)",
                       }}
                     >
                       {searchingInvitableUsers ? (
@@ -3311,8 +3432,13 @@ function Settings({ onNavigate }: SettingsProps) {
                       style={{
                         border: "none",
                         background: "transparent",
+                        color: "#dc2626",
                         cursor: "pointer",
-                        fontSize: "18px",
+                        fontSize: "22px",
+                        fontWeight: 700,
+                        lineHeight: 1,
+                        padding: "2px 4px",
+                        flexShrink: 0,
                       }}
                       aria-label="Clear selected user"
                     >
