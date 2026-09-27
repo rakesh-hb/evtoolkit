@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { usePrimaryVehicle } from "../context/PrimaryVehicleContext";
+import { supabase } from "../lib/supabase";
 
 import {
   getChargingSessions,
   addChargingSession,
   updateChargingSession,
-  deleteChargingSession,
   getChargingStations,
   addChargingStation,
   type ChargingSession,
@@ -153,6 +153,16 @@ function Tracker({ onNavigate }: TrackerProps) {
    */
   const [currentUserId, setCurrentUserId] =
     useState<string | null>(null);
+
+  interface FamilyMemberDirectoryEntry {
+    user_id: string;
+    display_name: string | null;
+    email: string;
+    role: string;
+  }
+
+  const [familyMemberDirectory, setFamilyMemberDirectory] =
+    useState<FamilyMemberDirectoryEntry[]>([]);
 
 
   const [subscriptionPlan, setSubscriptionPlan] =
@@ -385,12 +395,32 @@ function Tracker({ onNavigate }: TrackerProps) {
 
         setCurrentUserId(userId);
 
-        const plan = await getCurrentPlan();
-        setSubscriptionPlan(plan);
+        const [
+          plan,
+          sessionsData,
+          stationsData,
+          customVehiclesData,
+          familyDirectoryData,
+        ] = await Promise.all([
+          getCurrentPlan(),
+          getChargingSessions(),
+          getChargingStations(),
+          getCustomVehicles(),
+          supabase.rpc("get_my_family_member_directory"),
+        ]);
 
-        await loadSessions();
-        await loadStations();
-        await loadCustomVehicles();
+        setSubscriptionPlan(plan);
+        setSessions(sessionsData);
+        setCustomStations(stationsData);
+        setCustomVehicles(customVehiclesData);
+
+        if (familyDirectoryData.error) {
+          throw familyDirectoryData.error;
+        }
+
+        setFamilyMemberDirectory(
+          (familyDirectoryData.data ?? []) as FamilyMemberDirectoryEntry[]
+        );
 
         await restoreDraft(
           "charging-session:new"
@@ -944,12 +974,54 @@ function Tracker({ onNavigate }: TrackerProps) {
   }
 
 
+  function getFamilyMemberName(userId: string) {
+    const member = familyMemberDirectory.find(
+      (item) => item.user_id === userId
+    );
+
+    if (!member) {
+      return "";
+    }
+
+    return (
+      member.display_name?.trim() ||
+      member.email?.trim() ||
+      "Family member"
+    );
+  }
+
+  function isFamilyOwner() {
+    return familyMemberDirectory.some(
+      (member) =>
+        member.user_id === currentUserId &&
+        member.role === "owner"
+    );
+  }
+
   async function deleteSession(
-    id: number
+    id: number,
+    recordUserId?: string
   ) {
+    const session = sessions.find(
+      (item) => item.id === id
+    );
+
+    const targetUserId =
+      recordUserId ?? session?.user_id ?? currentUserId;
+
+    const isOwnRecord =
+      targetUserId === currentUserId;
+
+    const familyMemberName =
+      targetUserId
+        ? getFamilyMemberName(targetUserId)
+        : "";
+
     const confirmed =
       window.confirm(
-        "Are you sure you want to delete this charging session?\n\nThis action cannot be undone."
+        isOwnRecord
+          ? "Are you sure you want to delete this charging session?\\n\\nThis action cannot be undone."
+          : `⚠️ Delete Family Member's Data?\\n\\nYou are deleting this charging session belonging to ${familyMemberName}.\\n\\nThis data will also be permanently deleted from that family member's EV Toolkit account.\\n\\nThis action cannot be undone.`
       );
 
     if (!confirmed) {
@@ -957,9 +1029,16 @@ function Tracker({ onNavigate }: TrackerProps) {
     }
 
     try {
-      await deleteChargingSession(
-        id
-      );
+      await supabase.rpc(
+        "delete_family_charging_session",
+        {
+          p_session_id: id,
+        }
+      ).then(({ error }) => {
+        if (error) {
+          throw error;
+        }
+      });
 
       await loadSessions();
 
@@ -1847,10 +1926,21 @@ function Tracker({ onNavigate }: TrackerProps) {
                      */
 
                     const isOwner =
-                      currentUserId !==
-                        null &&
-                      session.user_id ===
-                        currentUserId;
+                      currentUserId !== null &&
+                      session.user_id === currentUserId;
+
+                    const isFamilyMemberRecord =
+                      session.user_id !== currentUserId &&
+                      getFamilyMemberName(session.user_id) !== "";
+
+                    const canDeleteFamilyMemberRecord =
+                      isFamilyOwner() &&
+                      isFamilyMemberRecord;
+
+                    const recordOwnerName =
+                      isFamilyMemberRecord
+                        ? getFamilyMemberName(session.user_id)
+                        : "";
 
 
                     return (
@@ -1873,9 +1963,18 @@ function Tracker({ onNavigate }: TrackerProps) {
 
 
                         <td>
-                          {
-                            session.vehicle
-                          }
+                          {session.vehicle}
+                          {recordOwnerName && (
+                            <span
+                              style={{
+                                marginLeft: "6px",
+                                color: "#9ca3af",
+                                fontSize: "12px",
+                              }}
+                            >
+                              ({recordOwnerName})
+                            </span>
+                          )}
                         </td>
 
 
@@ -1930,9 +2029,10 @@ function Tracker({ onNavigate }: TrackerProps) {
 
 
                         <td>
-                          {isOwner ? (
+                          {isOwner || canDeleteFamilyMemberRecord ? (
                             <div className="actionButtons">
 
+                              {isOwner && (
                               <button
                                 className="editButton"
                                 onClick={() => {
@@ -1999,26 +2099,16 @@ function Tracker({ onNavigate }: TrackerProps) {
                               >
                                 Edit
                               </button>
+                              )}
 
 
                               <button
                                 className="deleteButton"
                                 onClick={() => {
 
-                                  if (
-                                    session.user_id !==
-                                    currentUserId
-                                  ) {
-                                    alert(
-                                      "You can only delete your own charging sessions."
-                                    );
-
-                                    return;
-                                  }
-
-
                                   void deleteSession(
-                                    session.id
+                                    session.id,
+                                    session.user_id
                                   );
                                 }}
                               >
