@@ -18,6 +18,10 @@ import {
   restoreBackup,
 } from "../services/backupService";
 import {
+  createCloudBackup,
+} from "../services/manualBackupService";
+
+import {
   addCustomVehicle,
   getCustomVehicles,
   type CustomVehicleRecord,
@@ -70,8 +74,11 @@ interface BackupSchedule {
   run_time: string;
   weekday: number | null;
   day_of_month: number | null;
+  timezone: string;
   created_at: string;
   updated_at: string;
+  last_run_key: string | null;
+  last_run_at: string | null;
 }
 
 
@@ -126,7 +133,7 @@ function Settings({ onNavigate }: SettingsProps) {
     clearDashboardAlias,
   } = usePrimaryVehicle();
 
-  const [, setBackupSchedule] =
+  const [backupSchedule, setBackupSchedule] =
     useState<BackupSchedule | null>(null);
 
   const [backupFrequency, setBackupFrequency] =
@@ -140,6 +147,11 @@ function Settings({ onNavigate }: SettingsProps) {
 
   const [backupDayOfMonth, setBackupDayOfMonth] =
     useState("1");
+
+  const [backupTimezone, setBackupTimezone] =
+    useState(
+      Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+    );
 
   const [backupEnabled, setBackupEnabled] =
     useState(false);
@@ -202,9 +214,6 @@ function Settings({ onNavigate }: SettingsProps) {
   const [removingMemberId, setRemovingMemberId] =
     useState<number | null>(null);
 
-  const [leavingFamily, setLeavingFamily] =
-    useState(false);
-
 
   const fileInputRef =
     useRef<HTMLInputElement>(null);
@@ -214,6 +223,9 @@ function Settings({ onNavigate }: SettingsProps) {
 
 
   const [lastBackupAt, setLastBackupAt] =
+    useState<string | null>(null);
+
+  const [lastAutomaticBackupAt, setLastAutomaticBackupAt] =
     useState<string | null>(null);
 
   const [settingsVehicles, setSettingsVehicles] =
@@ -749,7 +761,10 @@ function Settings({ onNavigate }: SettingsProps) {
       }
 
       if (plan === "premium_plus") {
-        await loadBackupSchedule();
+        await Promise.all([
+          loadBackupSchedule(),
+          loadLastAutomaticBackup(user.id),
+        ]);
       } else {
         setLoadingBackupSchedule(false);
       }
@@ -868,6 +883,40 @@ function Settings({ onNavigate }: SettingsProps) {
   }
 
 
+  async function loadLastAutomaticBackup(
+    userId: string
+  ) {
+    try {
+      const {
+        data,
+        error,
+      } = await supabase
+        .from("backup_registry")
+        .select("created_at")
+        .eq("user_id", userId)
+        .eq("backup_type", "automatic")
+        .order("created_at", {
+          ascending: false,
+        })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        throw error;
+      }
+
+      setLastAutomaticBackupAt(
+        data?.created_at ?? null
+      );
+    } catch (error) {
+      console.error(
+        "Last automatic backup load error:",
+        error
+      );
+    }
+  }
+
+
   async function loadBackupSchedule() {
     setLoadingBackupSchedule(true);
 
@@ -917,6 +966,11 @@ function Settings({ onNavigate }: SettingsProps) {
       setBackupDayOfMonth(
         String(schedule?.day_of_month ?? 1)
       );
+      setBackupTimezone(
+        schedule?.timezone ||
+          Intl.DateTimeFormat().resolvedOptions().timeZone ||
+          "UTC"
+      );
     } catch (error) {
       console.error(
         "Auto backup schedule load error:",
@@ -926,6 +980,70 @@ function Settings({ onNavigate }: SettingsProps) {
       setLoadingBackupSchedule(false);
     }
   }
+
+
+  function getBackupPeriodKey(
+    frequency: "daily" | "weekly" | "monthly",
+    timezone: string,
+    date = new Date()
+  ) {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone || "UTC",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(date);
+
+    const getPart = (type: string) =>
+      parts.find((part) => part.type === type)?.value ?? "";
+
+    const year = Number(getPart("year"));
+    const month = Number(getPart("month"));
+    const day = Number(getPart("day"));
+
+    if (frequency === "daily") {
+      return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+
+    if (frequency === "monthly") {
+      return `${year}-${String(month).padStart(2, "0")}`;
+    }
+
+    const localDate = new Date(
+      Date.UTC(year, month - 1, day)
+    );
+    const dayOfWeek = localDate.getUTCDay() || 7;
+    localDate.setUTCDate(
+      localDate.getUTCDate() + 4 - dayOfWeek
+    );
+
+    const isoYear = localDate.getUTCFullYear();
+    const yearStart = new Date(
+      Date.UTC(isoYear, 0, 1)
+    );
+    const weekNumber = Math.ceil(
+      (((localDate.getTime() - yearStart.getTime()) / 86400000) + 1) / 7
+    );
+
+    return `${isoYear}-${String(weekNumber).padStart(2, "0")}`;
+  }
+
+  const automaticBackupAlreadyRanForCurrentPeriod =
+    backupEnabled &&
+    backupSchedule?.enabled === true &&
+    backupSchedule.frequency === backupFrequency &&
+    backupSchedule.last_run_key ===
+      getBackupPeriodKey(
+        backupFrequency,
+        backupSchedule.timezone || backupTimezone
+      );
+
+  const automaticBackupPeriodLabel =
+    backupFrequency === "daily"
+      ? "today"
+      : backupFrequency === "weekly"
+        ? "this week"
+        : "this month";
 
 
   async function handleSaveBackupSchedule() {
@@ -975,6 +1093,7 @@ function Settings({ onNavigate }: SettingsProps) {
           backupFrequency === "monthly"
             ? Number(backupDayOfMonth)
             : null,
+        timezone: backupTimezone,
       };
 
       const {
@@ -995,9 +1114,17 @@ function Settings({ onNavigate }: SettingsProps) {
         throw error;
       }
 
-      setBackupSchedule(
-        data as BackupSchedule
-      );
+      const savedSchedule =
+        data as BackupSchedule;
+
+      setBackupSchedule(savedSchedule);
+
+      if (
+        savedSchedule.enabled &&
+        savedSchedule.last_run_key
+      ) {
+        await loadLastAutomaticBackup(currentUserId);
+      }
 
       alert(
         backupEnabled
@@ -1852,25 +1979,22 @@ function Settings({ onNavigate }: SettingsProps) {
 
     try {
       const {
-        data,
         error,
-      } = await supabase.rpc(
-        "remove_family_member",
-        {
-          p_member_id:
-            member.member_id,
-        }
-      );
+      } = await supabase
+        .from("family_members")
+        .delete()
+        .eq(
+          "id",
+          member.member_id
+        )
+        .eq(
+          "family_id",
+          member.family_id
+        );
 
 
       if (error) {
         throw error;
-      }
-
-      if (!data) {
-        throw new Error(
-          "The family member could not be removed."
-        );
       }
 
 
@@ -1903,87 +2027,21 @@ function Settings({ onNavigate }: SettingsProps) {
 
   /*
    * ============================================================
-   * LEAVE FAMILY
-   * ============================================================
-   */
-
-  async function handleLeaveFamily() {
-    if (
-      !family?.family_id ||
-      isFamilyOwner ||
-      leavingFamily
-    ) {
-      return;
-    }
-
-    const confirmed =
-      window.confirm(
-        "Leave this family? You will no longer have access to this family's shared EV Toolkit data. You can be invited again later if needed."
-      );
-
-    if (!confirmed) {
-      return;
-    }
-
-    setLeavingFamily(true);
-
-    try {
-      const {
-        data,
-        error,
-      } = await supabase.rpc(
-        "leave_family",
-        {
-          p_family_id:
-            family.family_id,
-        }
-      );
-
-      if (error) {
-        throw error;
-      }
-
-      if (!data) {
-        throw new Error(
-          "Unable to leave the family."
-        );
-      }
-
-      alert(
-        "You have left the family successfully."
-      );
-
-      await loadFamilyData();
-    } catch (error) {
-      console.error(
-        "Leave family error:",
-        error
-      );
-
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Failed to leave the family."
-      );
-    } finally {
-      setLeavingFamily(false);
-    }
-  }
-
-
-  /*
-   * ============================================================
    * BACKUP / RESTORE
    * ============================================================
    */
 
-  async function handleCreateBackup() {
+  async function handleCreateBackup(destination: "local" | "cloud" = "local") {
     if (subscriptionPlan === "free") {
       return;
     }
 
     try {
-      await createBackup();
+      if (destination === "cloud") {
+        await createCloudBackup();
+      } else {
+        await createBackup();
+      }
 
       if (currentUserId) {
         await loadLastBackup(currentUserId);
@@ -3069,53 +3127,6 @@ function Settings({ onNavigate }: SettingsProps) {
               </div>
             </div>
 
-            {!isFamilyOwner && (
-              <div
-                style={{
-                  marginTop: "18px",
-                  padding: "14px",
-                  border: "1px solid #7f1d1d",
-                  borderRadius: "8px",
-                  background: "#1f1720",
-                }}
-              >
-                <div
-                  style={{
-                    fontWeight: 700,
-                    color: "#f8fafc",
-                  }}
-                >
-                  Family Membership
-                </div>
-
-                <p
-                  style={{
-                    marginTop: "6px",
-                    marginBottom: "10px",
-                    fontSize: "13px",
-                    lineHeight: 1.5,
-                    color: "#cbd5e1",
-                  }}
-                >
-                  You are currently a member of this family.
-                  You can leave the family at any time.
-                </p>
-
-                <button
-                  type="button"
-                  className="deleteButton"
-                  disabled={leavingFamily}
-                  onClick={() =>
-                    void handleLeaveFamily()
-                  }
-                >
-                  {leavingFamily
-                    ? "Leaving Family..."
-                    : "Leave Family"}
-                </button>
-              </div>
-            )}
-
             {isFamilyOwner && (
               <div
                 style={{
@@ -3193,17 +3204,19 @@ function Settings({ onNavigate }: SettingsProps) {
                     !selectedUser && (
                     <div
                       style={{
-                        position: "relative",
-                        zIndex: 1,
-                        width: "100%",
+                        position: "absolute",
+                        top: "100%",
+                        left: 0,
+                        right: 0,
+                        zIndex: 20,
                         background: "#1f2937",
                         border: "1px solid #4b5563",
                         borderRadius: "8px",
-                        marginTop: "8px",
+                        marginTop: "4px",
                         maxHeight: "280px",
                         overflowY: "auto",
                         boxShadow:
-                          "0 4px 12px rgba(0,0,0,0.25)",
+                          "0 4px 12px rgba(0,0,0,0.08)",
                       }}
                     >
                       {searchingInvitableUsers ? (
@@ -3432,13 +3445,8 @@ function Settings({ onNavigate }: SettingsProps) {
                       style={{
                         border: "none",
                         background: "transparent",
-                        color: "#dc2626",
                         cursor: "pointer",
-                        fontSize: "22px",
-                        fontWeight: 700,
-                        lineHeight: 1,
-                        padding: "2px 4px",
-                        flexShrink: 0,
+                        fontSize: "18px",
                       }}
                       aria-label="Clear selected user"
                     >
@@ -3840,14 +3848,36 @@ function Settings({ onNavigate }: SettingsProps) {
           }}
         >
 
-          <button
-            className="primaryButton"
-            onClick={() =>
-              void handleCreateBackup()
-            }
-          >
-            📥 Create Backup
-          </button>
+          {subscriptionPlan === "premium_plus" ? (
+            <>
+              <button
+                className="primaryButton"
+                onClick={() =>
+                  void handleCreateBackup("local")
+                }
+              >
+                📥 Create Backup Locally
+              </button>
+
+              <button
+                className="primaryButton"
+                onClick={() =>
+                  void handleCreateBackup("cloud")
+                }
+              >
+                ☁️ Create Backup in Cloud
+              </button>
+            </>
+          ) : (
+            <button
+              className="primaryButton"
+              onClick={() =>
+                void handleCreateBackup("local")
+              }
+            >
+              📥 Create Backup
+            </button>
+          )}
 
 
           <input
@@ -3900,6 +3930,19 @@ function Settings({ onNavigate }: SettingsProps) {
           Insurance and future supported
           modules.
         </p>
+
+        {subscriptionPlan === "premium_plus" && (
+          <p
+            style={{
+              fontSize: "12px",
+              color: "#6b7280",
+              marginTop: "8px",
+              lineHeight: 1.5,
+            }}
+          >
+            Premium Plus users can save a manual backup either locally on this device or securely in the EV Toolkit cloud.
+          </p>
+        )}
 
         </div>
       )}
@@ -4053,15 +4096,62 @@ function Settings({ onNavigate }: SettingsProps) {
                     </div>
                   )}
 
+                  <div>
+                    <label>Backup Time Zone</label>
+                    <input
+                      type="text"
+                      value={backupTimezone}
+                      readOnly
+                      disabled={savingBackupSchedule}
+                      style={{
+                        width: "100%",
+                        maxWidth: 520,
+                      }}
+                    />
+                    <p
+                      style={{
+                        fontSize: 12,
+                        color: "#6b7280",
+                        marginTop: 6,
+                      }}
+                    >
+                      Backups run according to this device time zone.
+                    </p>
+                  </div>
+
+                  {automaticBackupAlreadyRanForCurrentPeriod && (
+                    <div
+                      style={{
+                        padding: "12px 14px",
+                        borderRadius: 8,
+                        border: "1px solid #f59e0b",
+                        background: "rgba(245, 158, 11, 0.10)",
+                        color: "#fbbf24",
+                        lineHeight: 1.5,
+                        fontSize: 13,
+                      }}
+                    >
+                      <strong>Automatic backup already completed {automaticBackupPeriodLabel}.</strong>
+                      <div style={{ marginTop: 4 }}>
+                        If you want to create another backup now, use the <strong>Create Backup</strong> button above.
+                      </div>
+                    </div>
+                  )}
+
                   <button
                     className="primaryButton"
-                    disabled={savingBackupSchedule}
+                    disabled={
+                      savingBackupSchedule ||
+                      automaticBackupAlreadyRanForCurrentPeriod
+                    }
                     onClick={() =>
                       void handleSaveBackupSchedule()
                     }
                     style={{
                       marginTop: 4,
                       alignSelf: "flex-start",
+                      opacity: automaticBackupAlreadyRanForCurrentPeriod ? 0.55 : 1,
+                      cursor: automaticBackupAlreadyRanForCurrentPeriod ? "not-allowed" : "pointer",
                     }}
                   >
                     {savingBackupSchedule
@@ -4070,6 +4160,36 @@ function Settings({ onNavigate }: SettingsProps) {
                   </button>
                 </>
               )}
+            </div>
+
+            <div
+              style={{
+                marginTop: 14,
+                padding: "12px 14px",
+                border: "1px solid #e5e7eb",
+                borderRadius: "8px",
+                maxWidth: "520px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 13,
+                  color: "#6b7280",
+                }}
+              >
+                Last Automatic Backup
+              </div>
+
+              <div
+                style={{
+                  marginTop: 4,
+                  fontWeight: 600,
+                }}
+              >
+                {lastAutomaticBackupAt
+                  ? new Date(lastAutomaticBackupAt).toLocaleString()
+                  : "No automatic backup created yet"}
+              </div>
             </div>
 
             <p
