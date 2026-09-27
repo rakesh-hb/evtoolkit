@@ -365,54 +365,6 @@ export default function DocumentVault({
   }
 
 
-  async function loadCustomVehicles() {
-    try {
-      const data =
-        await getCustomVehicles();
-
-      setCustomVehicles(
-        data
-      );
-
-    } catch (err) {
-      console.error(
-        "Failed to load custom vehicles:",
-        err
-      );
-
-      alert(
-        "Failed to load custom vehicles."
-      );
-    }
-  }
-
-
-  async function loadCustomCategories() {
-    try {
-      const data =
-        await getDocumentCategories();
-
-      setCustomCategories(
-        data
-      );
-
-    } catch (err) {
-      console.error(
-        "Failed to load custom categories:",
-        err
-      );
-
-      alert(
-        "Failed to load document categories."
-      );
-    }
-  }
-
-
-  /* =========================================================
-     VEHICLE LIST
-     ========================================================= */
-
   const allVehicles = useMemo(() => {
     const builtInVehicles =
       vehicles.map(
