@@ -226,8 +226,8 @@ export default function Login({
       } else {
         alert(
           selectedPlan === "premium"
-            ? "Account created successfully.\n\nPlease check your email to confirm your account. After confirmation, complete the ₹69 one-time payment to activate Premium features."
-            : "Account created successfully.\n\nPlease check your email to confirm your account before signing in."
+            ? "Account created successfully.\n\nPlease check your email to confirm your account. If you do not see the email in your inbox, please check your spam or junk folder too. After confirmation, complete the ₹69 one-time payment to activate Premium features."
+            : "Account created successfully.\n\nPlease check your email to confirm your account before signing in. If you do not see the email in your inbox, please check your spam or junk folder too."
         );
       }
 

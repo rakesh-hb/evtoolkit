@@ -81,9 +81,6 @@ export default function UserProfile() {
   const [loadingSubscriptionPlan, setLoadingSubscriptionPlan] =
     useState(true);
 
-  const [showLogoutConfirmation, setShowLogoutConfirmation] =
-    useState(false);
-
   const [creatingPremiumOrder, setCreatingPremiumOrder] =
     useState(false);
 
@@ -573,11 +570,15 @@ export default function UserProfile() {
     }
   }
 
-  function handleLogout() {
-    setShowLogoutConfirmation(true);
-  }
+  async function handleLogout() {
+    const confirmed = window.confirm(
+      "Are you sure you want to log out?"
+    );
 
-  async function confirmLogout() {
+    if (!confirmed) {
+      return;
+    }
+
     try {
       const { error } =
         await supabase.auth.signOut();
@@ -585,8 +586,6 @@ export default function UserProfile() {
       if (error) {
         throw error;
       }
-
-      setShowLogoutConfirmation(false);
     } catch (error) {
       console.error(
         "Logout error:",
@@ -601,131 +600,8 @@ export default function UserProfile() {
     }
   }
 
-  function cancelLogout() {
-    setShowLogoutConfirmation(false);
-  }
-
   return (
     <>
-      {showLogoutConfirmation && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="profile-logout-confirmation-title"
-          onClick={cancelLogout}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(2,6,23,0.68)",
-            backdropFilter: "blur(3px)",
-            zIndex: 2000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "20px",
-            boxSizing: "border-box",
-          }}
-        >
-          <div
-            onClick={(event) => event.stopPropagation()}
-            style={{
-              width: "100%",
-              maxWidth: "380px",
-              borderRadius: "16px",
-              background: "#ffffff",
-              color: "#0f172a",
-              boxShadow: "0 24px 70px rgba(0,0,0,0.40)",
-              border: "1px solid rgba(15,23,42,0.10)",
-              padding: "22px",
-              boxSizing: "border-box",
-            }}
-          >
-            <div
-              style={{
-                width: "46px",
-                height: "46px",
-                borderRadius: "12px",
-                background: "#fee2e2",
-                color: "#dc2626",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "22px",
-                marginBottom: "14px",
-              }}
-            >
-              ⏻
-            </div>
-
-            <div
-              id="profile-logout-confirmation-title"
-              style={{
-                fontSize: "18px",
-                fontWeight: 800,
-                marginBottom: "7px",
-              }}
-            >
-              Are you sure you want to logout?
-            </div>
-
-            <div
-              style={{
-                fontSize: "13px",
-                lineHeight: 1.55,
-                color: "#64748b",
-                marginBottom: "20px",
-              }}
-            >
-              You will be signed out of EV Toolkit on this device.
-            </div>
-
-            <div
-              style={{
-                display: "flex",
-                gap: "10px",
-                justifyContent: "flex-end",
-              }}
-            >
-              <button
-                type="button"
-                onClick={cancelLogout}
-                style={{
-                  minHeight: "42px",
-                  padding: "9px 16px",
-                  border: "1px solid #cbd5e1",
-                  borderRadius: "10px",
-                  background: "#ffffff",
-                  color: "#334155",
-                  cursor: "pointer",
-                  fontSize: "13px",
-                  fontWeight: 700,
-                }}
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={() => void confirmLogout()}
-                style={{
-                  minHeight: "42px",
-                  padding: "9px 16px",
-                  border: "1px solid #dc2626",
-                  borderRadius: "10px",
-                  background: "#dc2626",
-                  color: "#ffffff",
-                  cursor: "pointer",
-                  fontSize: "13px",
-                  fontWeight: 700,
-                }}
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div
         style={{
           position: "relative",
@@ -950,6 +826,19 @@ export default function UserProfile() {
                   Razorpay Test Mode is currently being
                   used. Premium access is granted only
                   after successful payment verification.
+                </p>
+
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: "#6b7280",
+                    marginTop: 8,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  If you receive a payment or account email,
+                  but do not see it in your inbox, please check
+                  your spam or junk folder too.
                 </p>
               </>
             )}
