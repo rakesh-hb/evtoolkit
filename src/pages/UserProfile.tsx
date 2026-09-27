@@ -87,6 +87,9 @@ export default function UserProfile() {
   const [verifyingPremiumPayment, setVerifyingPremiumPayment] =
     useState(false);
 
+  const [showLogoutConfirm, setShowLogoutConfirm] =
+    useState(false);
+
   useEffect(() => {
     void loadProfile();
   }, []);
@@ -571,14 +574,6 @@ export default function UserProfile() {
   }
 
   async function handleLogout() {
-    const confirmed = window.confirm(
-      "Are you sure you want to log out?"
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
     try {
       const { error } =
         await supabase.auth.signOut();
@@ -586,6 +581,8 @@ export default function UserProfile() {
       if (error) {
         throw error;
       }
+
+      setShowLogoutConfirm(false);
     } catch (error) {
       console.error(
         "Logout error:",
@@ -827,19 +824,6 @@ export default function UserProfile() {
                   used. Premium access is granted only
                   after successful payment verification.
                 </p>
-
-                <p
-                  style={{
-                    fontSize: 12,
-                    color: "#6b7280",
-                    marginTop: 8,
-                    lineHeight: 1.5,
-                  }}
-                >
-                  If you receive a payment or account email,
-                  but do not see it in your inbox, please check
-                  your spam or junk folder too.
-                </p>
               </>
             )}
 
@@ -981,7 +965,7 @@ export default function UserProfile() {
       >
         <button
           type="button"
-          onClick={() => void handleLogout()}
+          onClick={() => setShowLogoutConfirm(true)}
           style={{
             display: "block",
             width: "100%",
@@ -998,6 +982,125 @@ export default function UserProfile() {
           Logout
         </button>
       </div>
+
+      {showLogoutConfirm && (
+        <div
+          role="presentation"
+          onClick={() => setShowLogoutConfirm(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 2000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+            background: "rgba(2, 6, 23, 0.68)",
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="logout-confirm-title"
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: "380px",
+              background: "#ffffff",
+              borderRadius: "16px",
+              padding: "22px",
+              boxSizing: "border-box",
+              boxShadow: "0 24px 70px rgba(0,0,0,0.30)",
+            }}
+          >
+            <div
+              style={{
+                width: "48px",
+                height: "48px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "12px",
+                background: "#fee2e2",
+                color: "#ef4444",
+                fontSize: "26px",
+                marginBottom: "16px",
+              }}
+              aria-hidden="true"
+            >
+              ⏻
+            </div>
+
+            <h3
+              id="logout-confirm-title"
+              style={{
+                margin: 0,
+                color: "#111827",
+                fontSize: "18px",
+                fontWeight: 800,
+                lineHeight: 1.3,
+              }}
+            >
+              Are you sure you want to logout?
+            </h3>
+
+            <p
+              style={{
+                margin: "8px 0 22px",
+                color: "#64748b",
+                fontSize: "13px",
+                lineHeight: 1.5,
+              }}
+            >
+              You will be signed out of EV Toolkit on this device.
+            </p>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "10px",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirm(false)}
+                style={{
+                  minWidth: "74px",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "9px",
+                  background: "#ffffff",
+                  color: "#475569",
+                  padding: "10px 16px",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  fontSize: "13px",
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void handleLogout()}
+                style={{
+                  minWidth: "78px",
+                  border: "1px solid #dc2626",
+                  borderRadius: "9px",
+                  background: "#dc2626",
+                  color: "#ffffff",
+                  padding: "10px 16px",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  fontSize: "13px",
+                }}
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
