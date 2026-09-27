@@ -18,6 +18,7 @@ import {
 } from "../services/tyreService";
 
 import { getCurrentUserId } from "../services/authHelper";
+import { supabase } from "../lib/supabase";
 
 import {
   getCurrentPlan,
@@ -71,6 +72,13 @@ interface TyreHistoryProps {
   onNavigate?: (page: string) => void;
 }
 
+interface FamilyMemberDirectoryEntry {
+  user_id: string;
+  display_name: string | null;
+  email: string;
+  role: string;
+}
+
 export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
   const [records, setRecords] =
     useState<TyreRecordWithAttachmentName[]>([]);
@@ -78,6 +86,9 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
 
   const [currentUserId, setCurrentUserId] =
     useState<string | null>(null);
+
+  const [familyMemberDirectory, setFamilyMemberDirectory] =
+    useState<FamilyMemberDirectoryEntry[]>([]);
 
   const [subscriptionPlan, setSubscriptionPlan] =
     useState<SubscriptionPlan>("free");
@@ -150,17 +161,36 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
   useEffect(() => {
     async function initialize() {
       try {
-        const userId =
-          await getCurrentUserId();
+        const [
+          userId,
+          plan,
+          tyresData,
+          familyDirectoryData,
+        ] = await Promise.all([
+          getCurrentUserId(),
+          getCurrentPlan(),
+          getTyres(),
+          supabase.rpc("get_my_family_member_directory"),
+        ]);
 
-        setCurrentUserId(
-          userId
-        );
-
-        const plan = await getCurrentPlan();
+        setCurrentUserId(userId);
         setSubscriptionPlan(plan);
 
-        await loadTyres();
+        setRecords(
+          tyresData.map((tyre) => ({
+            ...tyre,
+            attachment_name:
+              (tyre as TyreRecordWithAttachmentName).attachment_name ?? "",
+          }))
+        );
+
+        if (familyDirectoryData.error) {
+          throw familyDirectoryData.error;
+        }
+
+        setFamilyMemberDirectory(
+          (familyDirectoryData.data ?? []) as FamilyMemberDirectoryEntry[]
+        );
 
         await restoreDraft("tyre:new");
 
@@ -178,6 +208,20 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
 
     void initialize();
   }, []);
+
+  function getFamilyMemberName(userId: string) {
+    const member = familyMemberDirectory.find(
+      (item) => item.user_id === userId
+    );
+
+    if (!member) return "";
+
+    return (
+      member.display_name?.trim() ||
+      member.email?.trim() ||
+      "Family member"
+    );
+  }
 
   async function restoreDraft(draftKey: string) {
     try {
@@ -1379,6 +1423,18 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
                           {
                             record.brand
                           }
+                          {record.user_id !== currentUserId &&
+                            getFamilyMemberName(record.user_id) && (
+                              <span
+                                style={{
+                                  marginLeft: "6px",
+                                  color: "#9ca3af",
+                                  fontSize: "12px",
+                                }}
+                              >
+                                ({getFamilyMemberName(record.user_id)})
+                              </span>
+                            )}
                         </td>
 
 

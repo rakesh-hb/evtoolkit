@@ -17,6 +17,7 @@ import {
 } from "../services/serviceHistoryService";
 
 import { getCurrentUserId } from "../services/authHelper";
+import { supabase } from "../lib/supabase";
 
 import {
   getCurrentPlan,
@@ -66,6 +67,13 @@ interface ServiceHistoryProps {
   onNavigate?: (page: string) => void;
 }
 
+interface FamilyMemberDirectoryEntry {
+  user_id: string;
+  display_name: string | null;
+  email: string;
+  role: string;
+}
+
 export default function ServiceHistory({
   onNavigate,
 }: ServiceHistoryProps) {
@@ -79,6 +87,9 @@ export default function ServiceHistory({
 
   const [currentUserId, setCurrentUserId] =
     useState<string | null>(null);
+
+  const [familyMemberDirectory, setFamilyMemberDirectory] =
+    useState<FamilyMemberDirectoryEntry[]>([]);
 
   const [subscriptionPlan, setSubscriptionPlan] =
     useState<SubscriptionPlan>("free");
@@ -218,20 +229,32 @@ export default function ServiceHistory({
 
   async function initialize() {
     try {
-      const userId =
-        await getCurrentUserId();
-
-      setCurrentUserId(
-        userId
-      );
-
-      const plan = await getCurrentPlan();
-      setSubscriptionPlan(plan);
-
-      await Promise.all([
-        loadRecords(),
-        loadCustomVehicles(),
+      const [
+        userId,
+        plan,
+        recordsData,
+        customVehiclesData,
+        familyDirectoryData,
+      ] = await Promise.all([
+        getCurrentUserId(),
+        getCurrentPlan(),
+        getServiceRecords(),
+        getCustomVehicles(),
+        supabase.rpc("get_my_family_member_directory"),
       ]);
+
+      setCurrentUserId(userId);
+      setSubscriptionPlan(plan);
+      setRecords(recordsData);
+      setCustomVehicles(customVehiclesData);
+
+      if (familyDirectoryData.error) {
+        throw familyDirectoryData.error;
+      }
+
+      setFamilyMemberDirectory(
+        (familyDirectoryData.data ?? []) as FamilyMemberDirectoryEntry[]
+      );
 
       await restoreDraft("service-history:new");
 
@@ -248,65 +271,24 @@ export default function ServiceHistory({
     }
   }
 
-
   async function loadRecords() {
-    try {
-      const data =
-        await getServiceRecords();
-
-      setRecords(
-        data
-      );
-
-    } catch (err: any) {
-      console.error(
-        "Failed to load service history:",
-        err
-      );
-
-      setRecords([]);
-
-      alert(
-        JSON.stringify(
-          {
-            message:
-              err?.message,
-            details:
-              err?.details,
-            hint:
-              err?.hint,
-            code:
-              err?.code,
-          },
-          null,
-          2
-        )
-      );
-    }
+    const recordsData = await getServiceRecords();
+    setRecords(recordsData);
   }
 
+  function getFamilyMemberName(userId: string) {
+    const member = familyMemberDirectory.find(
+      (item) => item.user_id === userId
+    );
 
-  async function loadCustomVehicles() {
-    try {
-      const data =
-        await getCustomVehicles();
+    if (!member) return "";
 
-      setCustomVehicles(
-        data
-      );
-
-    } catch (err) {
-      console.error(
-        "Failed to load custom vehicles:",
-        err
-      );
-
-      alert(
-        "Failed to load custom vehicles."
-      );
-    }
+    return (
+      member.display_name?.trim() ||
+      member.email?.trim() ||
+      "Family member"
+    );
   }
-
 
 
   useEffect(() => {
@@ -1303,8 +1285,9 @@ export default function ServiceHistory({
               </p>
             )}
 
-          </div>
 
+
+          </div>
           </div>
 
 
@@ -2115,9 +2098,19 @@ export default function ServiceHistory({
 
 
                         <td>
-                          {
-                            record.vehicle
-                          }
+                          {record.vehicle}
+                          {record.user_id !== currentUserId &&
+                            getFamilyMemberName(record.user_id) && (
+                              <span
+                                style={{
+                                  marginLeft: "6px",
+                                  color: "#9ca3af",
+                                  fontSize: "12px",
+                                }}
+                              >
+                                ({getFamilyMemberName(record.user_id)})
+                              </span>
+                            )}
                         </td>
 
 

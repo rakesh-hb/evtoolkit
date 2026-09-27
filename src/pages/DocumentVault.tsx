@@ -17,6 +17,7 @@ import {
 } from "../services/documentVaultService";
 
 import { getCurrentUserId } from "../services/authHelper";
+import { supabase } from "../lib/supabase";
 
 import {
   getCurrentPlan,
@@ -103,6 +104,16 @@ export default function DocumentVault({
 
   const [subscriptionPlan, setSubscriptionPlan] =
     useState<SubscriptionPlan>("free");
+
+  const [familyMemberDirectory, setFamilyMemberDirectory] =
+    useState<
+      {
+        user_id: string;
+        display_name: string | null;
+        email: string;
+        role: string;
+      }[]
+    >([]);
 
   const [subscriptionPlanLoading, setSubscriptionPlanLoading] =
     useState(true);
@@ -262,23 +273,42 @@ export default function DocumentVault({
   useEffect(() => {
     async function initialize() {
       try {
-        const userId =
-          await getCurrentUserId();
+        const [
+          userId,
+          plan,
+          documentsData,
+          customVehiclesData,
+          customCategoriesData,
+          familyDirectoryData,
+        ] = await Promise.all([
+          getCurrentUserId(),
+          getCurrentPlan(),
+          getDocuments(),
+          getCustomVehicles(),
+          getDocumentCategories(),
+          supabase.rpc("get_my_family_member_directory"),
+        ]);
 
-        setCurrentUserId(
-          userId
-        );
-
-        const plan = await getCurrentPlan();
+        setCurrentUserId(userId);
         setSubscriptionPlan(plan);
         setSubscriptionPlanLoading(false);
 
-        await Promise.all([
-          loadDocuments(),
-          loadCustomVehicles(),
-          loadCustomCategories(),
-        ]);
+        setRecords(documentsData);
+        setCustomVehicles(customVehiclesData);
+        setCustomCategories(customCategoriesData);
 
+        if (familyDirectoryData.error) {
+          throw familyDirectoryData.error;
+        }
+
+        setFamilyMemberDirectory(
+          (familyDirectoryData.data ?? []) as {
+            user_id: string;
+            display_name: string | null;
+            email: string;
+            role: string;
+          }[]
+        );
 
         await restoreDraft("document-vault:new");
       } catch (err) {
@@ -299,6 +329,20 @@ export default function DocumentVault({
     void initialize();
   }, []);
 
+
+  function getFamilyMemberName(userId: string) {
+    const member = familyMemberDirectory.find(
+      (item) => item.user_id === userId
+    );
+
+    if (!member) return "";
+
+    return (
+      member.display_name?.trim() ||
+      member.email?.trim() ||
+      "Family member"
+    );
+  }
 
   async function loadDocuments() {
     try {
@@ -1899,6 +1943,18 @@ export default function DocumentVault({
                           {
                             record.vehicle
                           }
+                          {record.user_id !== currentUserId &&
+                            getFamilyMemberName(record.user_id) && (
+                              <span
+                                style={{
+                                  marginLeft: "6px",
+                                  color: "#9ca3af",
+                                  fontSize: "12px",
+                                }}
+                              >
+                                ({getFamilyMemberName(record.user_id)})
+                              </span>
+                            )}
                         </td>
 
 

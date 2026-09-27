@@ -620,6 +620,20 @@ async function exportAnalyticsPDF(reportData: any) {
       ]);
     }
 
+    if (reportData?.approximatePetrolCo2AvoidedKg !== undefined) {
+      approximateRows.push([
+        "Petrol CO2 Avoided",
+        `${formatNumber(reportData.approximatePetrolCo2AvoidedKg, 2)} kg`,
+      ]);
+    }
+
+    if (reportData?.approximateDieselCo2AvoidedKg !== undefined) {
+      approximateRows.push([
+        "Diesel CO2 Avoided",
+        `${formatNumber(reportData.approximateDieselCo2AvoidedKg, 2)} kg`,
+      ]);
+    }
+
     y = addTable(
       pdf,
       [["Metric", "Value"]],

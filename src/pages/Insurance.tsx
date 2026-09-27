@@ -18,6 +18,7 @@ import {
 } from "../services/insuranceService";
 
 import { getCurrentUserId } from "../services/authHelper";
+import { supabase } from "../lib/supabase";
 
 import {
   getCurrentPlan,
@@ -35,6 +36,7 @@ import {
 
 import {
   getCustomVehicles,
+  addCustomVehicle,
   type CustomVehicleRecord,
 } from "../services/customVehicleService";
 
@@ -62,6 +64,12 @@ const emptyPolicy: InsuranceRecord = {
   notes: "",
   attachment: "",
   attachment_name: "",
+};
+
+
+const emptyVehicleForm = {
+  brand: "",
+  model: "",
 };
 
 
@@ -400,6 +408,13 @@ interface InsuranceProps {
   onNavigate?: (page: string) => void;
 }
 
+interface FamilyMemberDirectoryEntry {
+  user_id: string;
+  display_name: string | null;
+  email: string;
+  role: string;
+}
+
 export default function Insurance({
   onNavigate,
 }: InsuranceProps) {
@@ -415,6 +430,11 @@ export default function Insurance({
     currentUserId,
     setCurrentUserId,
   ] = useState<string | null>(null);
+
+  const [
+    familyMemberDirectory,
+    setFamilyMemberDirectory,
+  ] = useState<FamilyMemberDirectoryEntry[]>([]);
 
   const [
     subscriptionPlan,
@@ -447,6 +467,24 @@ export default function Insurance({
     customVehicles,
     setCustomVehicles,
   ] = useState<CustomVehicleRecord[]>([]);
+
+  const [
+    showAddVehicle,
+    setShowAddVehicle,
+  ] = useState(false);
+
+  const [
+    newVehicle,
+    setNewVehicle,
+  ] = useState(
+    emptyVehicleForm
+  );
+
+  const [
+    addingVehicle,
+    setAddingVehicle,
+  ] = useState(false);
+
   const [
     vehicleSearch,
     setVehicleSearch,
@@ -617,20 +655,32 @@ export default function Insurance({
   useEffect(() => {
     async function initialize() {
       try {
-        const userId =
-          await getCurrentUserId();
-
-        setCurrentUserId(
-          userId
-        );
-
-        const plan = await getCurrentPlan();
-        setSubscriptionPlan(plan);
-
-        await Promise.all([
-          loadPolicies(),
-          loadCustomVehicles(),
+        const [
+          userId,
+          plan,
+          policiesData,
+          customVehiclesData,
+          familyDirectoryData,
+        ] = await Promise.all([
+          getCurrentUserId(),
+          getCurrentPlan(),
+          getInsurance(),
+          getCustomVehicles(),
+          supabase.rpc("get_my_family_member_directory"),
         ]);
+
+        setCurrentUserId(userId);
+        setSubscriptionPlan(plan);
+        setRecords(policiesData);
+        setCustomVehicles(customVehiclesData);
+
+        if (familyDirectoryData.error) {
+          throw familyDirectoryData.error;
+        }
+
+        setFamilyMemberDirectory(
+          (familyDirectoryData.data ?? []) as FamilyMemberDirectoryEntry[]
+        );
 
         await restoreDraft("insurance:new");
 
@@ -648,6 +698,20 @@ export default function Insurance({
 
     void initialize();
   }, []);
+
+  function getFamilyMemberName(userId: string) {
+    const member = familyMemberDirectory.find(
+      (item) => item.user_id === userId
+    );
+
+    if (!member) return "";
+
+    return (
+      member.display_name?.trim() ||
+      member.email?.trim() ||
+      "Family member"
+    );
+  }
 
   async function restoreDraft(draftKey: string) {
     try {
@@ -847,6 +911,111 @@ export default function Insurance({
     vehicleSearch,
   ]);
 
+
+  /*
+   * =========================================================
+   * ADD CUSTOM VEHICLE
+   * =========================================================
+   */
+
+  async function handleAddVehicle() {
+    const brand =
+      newVehicle.brand.trim();
+
+    const model =
+      newVehicle.model.trim();
+
+    if (!brand || !model) {
+      alert(
+        "Please enter both vehicle brand and model."
+      );
+
+      return;
+    }
+
+    const duplicate =
+      vehicleOptions.some(
+        (vehicle) =>
+          vehicle.value
+            .trim()
+            .toLowerCase() ===
+          `${brand} ${model}`
+            .trim()
+            .toLowerCase()
+      );
+
+    if (duplicate) {
+      alert(
+        "This vehicle already exists."
+      );
+
+      return;
+    }
+
+    try {
+      setAddingVehicle(true);
+
+      const created =
+        await addCustomVehicle({
+          brand,
+          model,
+        });
+
+      setCustomVehicles(
+        (current) => [
+          ...current,
+          created,
+        ]
+      );
+
+      const vehicleName =
+        `${created.brand} ${created.model}`;
+
+      setForm(
+        (current) => ({
+          ...current,
+          vehicle:
+            vehicleName,
+        })
+      );
+
+      setVehicleSearch(
+        vehicleName
+      );
+
+      setShowVehicleSuggestions(
+        false
+      );
+
+      setNewVehicle(
+        emptyVehicleForm
+      );
+
+      setShowAddVehicle(
+        false
+      );
+
+      alert(
+        "Vehicle added successfully."
+      );
+
+    } catch (err: any) {
+      console.error(
+        "Failed to add custom vehicle:",
+        err
+      );
+
+      alert(
+        err?.message ||
+          "Failed to add vehicle."
+      );
+
+    } finally {
+      setAddingVehicle(
+        false
+      );
+    }
+  }
 
 
   /*
@@ -1137,7 +1306,10 @@ export default function Insurance({
       ...emptyPolicy,
       vehicle: resetVehicle,
     });
-    setSelectedAddon("");    setVehicleSearch(resetVehicle);
+    setSelectedAddon("");
+    setShowAddVehicle(false);
+    setNewVehicle({ ...emptyVehicleForm });
+    setVehicleSearch(resetVehicle);
     setShowVehicleSuggestions(false);
     setDraftStatus("idle");
 
@@ -1318,6 +1490,8 @@ export default function Insurance({
       setSelectedAddon("");
       setVehicleSearch(primaryVehicleName);
       setShowVehicleSuggestions(false);
+      setShowAddVehicle(false);
+      setNewVehicle({ ...emptyVehicleForm });
 
       setDraftStatus("idle");
 
@@ -1558,12 +1732,32 @@ export default function Insurance({
                             fontSize: "13px",
                           }}
                         >
-                          No matching vehicle found. Add a custom vehicle from Settings first.
+                          No matching vehicle found. Use ＋ Or Add Custom Vehicle to create one.
                         </div>
                       )}
                     </div>
                   )}
               </div>
+
+              {editingId === null && (
+                <button
+                  type="button"
+                  className="saveButton evtoolkitCustomFieldButton"
+                  onClick={() =>
+                    setShowAddVehicle(
+                      (value) => !value
+                    )
+                  }
+                  style={{
+                    whiteSpace: "nowrap",
+                    height: "44px",
+                    position: "relative",
+                    top: "-4px",
+                  }}
+                >
+                  ＋ Or Add Custom Vehicle
+                </button>
+              )}
 
             </div>
 
@@ -1579,6 +1773,91 @@ export default function Insurance({
               </p>
             )}
 
+            {showAddVehicle &&
+              editingId === null && (
+                <div
+                  style={{
+                    marginTop: "10px",
+                    padding: "12px",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "8px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "8px",
+                    }}
+                  >
+                    <input
+                      type="text"
+                      placeholder="Brand"
+                      value={newVehicle.brand}
+                      onChange={(e) =>
+                        setNewVehicle({
+                          ...newVehicle,
+                          brand: e.target.value,
+                        })
+                      }
+                    />
+
+                    <input
+                      type="text"
+                      placeholder="Model"
+                      value={newVehicle.model}
+                      onChange={(e) =>
+                        setNewVehicle({
+                          ...newVehicle,
+                          model: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "8px",
+                      marginTop: "10px",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="saveButton"
+                      disabled={addingVehicle}
+                      onClick={() =>
+                        void handleAddVehicle()
+                      }
+                    >
+                      {addingVehicle
+                        ? "Saving..."
+                        : "Save Vehicle"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAddVehicle(false);
+                        setNewVehicle(
+                          emptyVehicleForm
+                        );
+                      }}
+                      style={{
+                        background: "#dc2626",
+                        color: "#ffffff",
+                        border: "none",
+                        borderRadius: "6px",
+                        padding: "10px 14px",
+                        cursor: "pointer",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
 
           </div>
 
@@ -2322,6 +2601,18 @@ export default function Insurance({
                           {
                             record.vehicle
                           }
+                          {record.user_id !== currentUserId &&
+                            getFamilyMemberName(record.user_id) && (
+                              <span
+                                style={{
+                                  marginLeft: "6px",
+                                  color: "#9ca3af",
+                                  fontSize: "12px",
+                                }}
+                              >
+                                ({getFamilyMemberName(record.user_id)})
+                              </span>
+                            )}
                         </td>
 
                         <td>
