@@ -615,32 +615,6 @@ function Tracker({ onNavigate }: TrackerProps) {
   }
 
 
-  async function loadCustomVehicles() {
-    try {
-      const data = await getCustomVehicles();
-      setCustomVehicles(data);
-    } catch (error) {
-      console.error("Failed to load custom vehicles:", error);
-      alert("Failed to load custom vehicles.");
-    }
-  }
-
-
-  async function loadStations() {
-    try {
-      const data =
-        await getChargingStations();
-
-      setCustomStations(data);
-    } catch (error) {
-      console.error(
-        "Failed to load charging stations:",
-        error
-      );
-    }
-  }
-
-
 
   async function handleAddStation() {
     const name = newStationName.trim();
