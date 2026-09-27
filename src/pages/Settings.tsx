@@ -58,6 +58,7 @@ interface InvitableUser {
   first_name: string;
   last_name: string;
   email: string;
+  subscription_plan: "free" | "premium" | "premium_plus";
 }
 
 
@@ -1363,7 +1364,7 @@ function Settings({ onNavigate }: SettingsProps) {
     if (
       !isFamilyOwner ||
       selectedUser ||
-      query.length < 2
+      query.length < 1
     ) {
       setInvitableUsers([]);
       setSearchingInvitableUsers(false);
@@ -1581,6 +1582,18 @@ function Settings({ onNavigate }: SettingsProps) {
     ) {
       alert(
         "An invitation is already pending for this user."
+      );
+
+      return;
+    }
+
+
+    if (
+      selectedUser.subscription_plan ===
+      "free"
+    ) {
+      alert(
+        "This invitation cannot be sent because this user is on the Free plan. The user must have Premium or Premium Plus to receive and review family invitations."
       );
 
       return;
@@ -3028,7 +3041,7 @@ function Settings({ onNavigate }: SettingsProps) {
                             color: "#6b7280",
                           }}
                         >
-                          Enter at least 2 characters to search.
+                          Enter at least 1 character to search.
                         </div>
                       ) : availableUsers.length >
                       0 ? (
@@ -3084,6 +3097,30 @@ function Settings({ onNavigate }: SettingsProps) {
                                   {
                                     user.email
                                   }
+                                </div>
+
+                                <div
+                                  style={{
+                                    fontSize: "12px",
+                                    marginTop: "6px",
+                                    fontWeight: 700,
+                                    color:
+                                      user.subscription_plan ===
+                                      "free"
+                                        ? "#dc2626"
+                                        : user.subscription_plan ===
+                                            "premium_plus"
+                                          ? "#2563eb"
+                                          : "#16a34a",
+                                  }}
+                                >
+                                  {user.subscription_plan ===
+                                  "premium_plus"
+                                    ? "Premium Plus — Invitation allowed"
+                                    : user.subscription_plan ===
+                                        "premium"
+                                      ? "Premium — Invitation allowed"
+                                      : "Free — Invitation cannot be sent"}
                                 </div>
                               </button>
                             );
@@ -3150,6 +3187,47 @@ function Settings({ onNavigate }: SettingsProps) {
                       >
                         Role: <strong>Member</strong>
                       </div>
+
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          marginTop: "6px",
+                          fontWeight: 700,
+                          color:
+                            selectedUser.subscription_plan ===
+                            "free"
+                              ? "#dc2626"
+                              : selectedUser.subscription_plan ===
+                                  "premium_plus"
+                                ? "#2563eb"
+                                : "#16a34a",
+                        }}
+                      >
+                        {selectedUser.subscription_plan ===
+                        "premium_plus"
+                          ? "Premium Plus — Invitation allowed"
+                          : selectedUser.subscription_plan ===
+                              "premium"
+                            ? "Premium — Invitation allowed"
+                            : "Free — Invitation cannot be sent"}
+                      </div>
+
+                      {selectedUser.subscription_plan ===
+                        "free" && (
+                        <div
+                          style={{
+                            marginTop: "8px",
+                            fontSize: "12px",
+                            lineHeight: 1.5,
+                            color: "#dc2626",
+                          }}
+                        >
+                          This user is on the Free plan.
+                          Invitation cannot be sent. The user must
+                          have Premium or Premium Plus to receive
+                          and review family invitations.
+                        </div>
+                      )}
                     </div>
 
                     <button
@@ -3184,6 +3262,8 @@ function Settings({ onNavigate }: SettingsProps) {
                   disabled={
                     sendingInvitation ||
                     !selectedUser ||
+                    selectedUser?.subscription_plan ===
+                      "free" ||
                     familyMemberLimitReached
                   }
                   onClick={() =>
