@@ -442,12 +442,12 @@ export default function Login({
                     padding: 14,
                     border:
                       selectedPlan === "premium"
-                        ? "2px solid #dc2626"
+                        ? "2px solid #16a34a"
                         : "1px solid #d1d5db",
                     borderRadius: 12,
                     background:
                       selectedPlan === "premium"
-                        ? "#fca5a5"
+                        ? "#86efac"
                         : "#ffffff",
                     cursor: loading
                       ? "not-allowed"
@@ -501,9 +501,9 @@ export default function Login({
                   style={{
                     textAlign: "left",
                     padding: 14,
-                    border: "2px solid #2563eb",
+                    border: "2px solid #dc2626",
                     borderRadius: 12,
-                    background: "#bfdbfe",
+                    background: "#ffffff",
                     color: "#1e3a8a",
                     position: "relative",
                   }}
@@ -542,9 +542,20 @@ export default function Login({
 
                   <div
                     style={{
+                      marginTop: 8,
+                      color: "#dc2626",
+                      fontSize: 12,
+                      fontWeight: 700,
+                    }}
+                  >
+                    CURRENTLY UNAVAILABLE
+                  </div>
+
+                  <div
+                    style={{
                       fontWeight: 700,
                       fontSize: 18,
-                      marginTop: 8,
+                      marginTop: 6,
                     }}
                   >
                     Subscription
