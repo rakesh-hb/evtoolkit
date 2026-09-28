@@ -757,9 +757,61 @@ function App() {
 
       {showFirstLoginGuide && (
         <FirstLoginGuide
-          onGetStarted={() =>
-            setShowFirstLoginGuide(false)
-          }
+          onGetStarted={async (
+            dontShowAgain
+          ) => {
+            if (
+              dontShowAgain &&
+              session?.user?.id
+            ) {
+              try {
+                const {
+                  error,
+                } = await supabase
+                  .from(
+                    "user_vehicle_preferences"
+                  )
+                  .upsert(
+                    {
+                      user_id:
+                        session.user.id,
+                      how_to_use_dismissed:
+                        true,
+                    },
+                    {
+                      onConflict:
+                        "user_id",
+                    }
+                  );
+
+                if (error) {
+                  console.error(
+                    "Failed to save How to Use preference:",
+                    error
+                  );
+
+                  /*
+                   * Keep the guide open if the user's
+                   * preference could not be saved.
+                   */
+                  return;
+                }
+              } catch (error) {
+                console.error(
+                  "Unexpected error saving How to Use preference:",
+                  error
+                );
+
+                /*
+                 * Keep the guide open if the preference
+                 * could not be saved.
+                 */
+                return;
+              }
+            }
+
+            setShowFirstLoginGuide(false);
+          }}
         />
       )}
     </>
