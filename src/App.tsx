@@ -85,6 +85,11 @@ const UserProfile =
     import("./pages/UserProfile")
   );
 
+const HowToUse =
+  lazy(() =>
+    import("./pages/HowToUse")
+  );
+
 /*
  * ============================================================
  * PAGE LOADING FALLBACK
@@ -133,6 +138,7 @@ function App() {
    *
    * This lets us detect a NEW login.
    */
+
   const wasAuthenticated =
     useRef(false);
 
@@ -166,6 +172,7 @@ function App() {
        * Check whether this user has previously
        * dismissed the automatic How to Use guide.
        */
+
       const checkHowToUsePreference =
         async () => {
           try {
@@ -195,6 +202,7 @@ function App() {
                * If the preference cannot be loaded,
                * do not block the application.
                */
+
               setShowFirstLoginGuide(
                 true
               );
@@ -206,6 +214,7 @@ function App() {
              * No preference row means this user has
              * not dismissed the guide yet.
              */
+
             if (
               !data ||
               data.how_to_use_dismissed !== true
@@ -228,6 +237,7 @@ function App() {
              * If the preference cannot be loaded,
              * keep the guide available.
              */
+
             setShowFirstLoginGuide(
               true
             );
@@ -581,6 +591,11 @@ function App() {
           <UserProfile />
         );
 
+      case "howto":
+        return (
+          <HowToUse />
+        );
+
       case "terms":
         return (
           <Terms />
@@ -794,6 +809,7 @@ function App() {
                    * Keep the guide open if the user's
                    * preference could not be saved.
                    */
+
                   return;
                 }
               } catch (error) {
@@ -806,6 +822,7 @@ function App() {
                  * Keep the guide open if the preference
                  * could not be saved.
                  */
+
                 return;
               }
             }

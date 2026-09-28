@@ -33,6 +33,7 @@ const sections = [
   {
     title: "Legal & Information",
     items: [
+      { key: "howto", icon: "?", label: "How to Use" },
       { key: "terms", icon: "▤", label: "Terms & Conditions" },
       { key: "privacy", icon: "🔒", label: "Privacy Policy" },
       { key: "refund", icon: "↩", label: "Return & Refund Policy" },
@@ -82,6 +83,7 @@ export default function SideDrawer({
           setSubscriptionPlan("free");
           setLoadingSubscriptionPlan(false);
         }
+
         return;
       }
 
@@ -137,7 +139,7 @@ export default function SideDrawer({
             background: "rgba(34,197,94,0.13)",
             color: "#86efac",
             border: "1px solid rgba(34,197,94,0.30)",
-        };
+          };
 
   function navigate(page: string) {
     onNavigate(page);
@@ -449,6 +451,7 @@ export default function SideDrawer({
               >
                 EV Toolkit
               </div>
+
               <div
                 style={{
                   marginTop: "2px",
