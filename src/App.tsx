@@ -15,6 +15,7 @@ import RefundPolicy from "./pages/RefundPolicy";
 import CancellationPolicy from "./pages/CancellationPolicy";
 
 import { useAuth } from "./context/AuthContext";
+import { supabase } from "./lib/supabase";
 
 import SideDrawer from "./components/SideDrawer";
 import FirstLoginGuide from "./components/FirstLoginGuide";
@@ -162,15 +163,78 @@ function App() {
       );
 
       /*
-       * TEMPORARY TEST:
-       * Show the first-login guide whenever
-       * an authenticated session is detected.
-       *
-       * The next step will change this so it
-       * appears only for users who have not
-       * completed the guide.
+       * Check whether this user has previously
+       * dismissed the automatic How to Use guide.
        */
-      setShowFirstLoginGuide(true);
+      const checkHowToUsePreference =
+        async () => {
+          try {
+            const {
+              data,
+              error,
+            } = await supabase
+              .from(
+                "user_vehicle_preferences"
+              )
+              .select(
+                "how_to_use_dismissed"
+              )
+              .eq(
+                "user_id",
+                session.user.id
+              )
+              .maybeSingle();
+
+            if (error) {
+              console.error(
+                "Failed to load How to Use preference:",
+                error
+              );
+
+              /*
+               * If the preference cannot be loaded,
+               * do not block the application.
+               */
+              setShowFirstLoginGuide(
+                true
+              );
+
+              return;
+            }
+
+            /*
+             * No preference row means this user has
+             * not dismissed the guide yet.
+             */
+            if (
+              !data ||
+              data.how_to_use_dismissed !== true
+            ) {
+              setShowFirstLoginGuide(
+                true
+              );
+            } else {
+              setShowFirstLoginGuide(
+                false
+              );
+            }
+          } catch (error) {
+            console.error(
+              "Unexpected error loading How to Use preference:",
+              error
+            );
+
+            /*
+             * If the preference cannot be loaded,
+             * keep the guide available.
+             */
+            setShowFirstLoginGuide(
+              true
+            );
+          }
+        };
+
+      void checkHowToUsePreference();
     }
 
     wasAuthenticated.current =
