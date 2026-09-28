@@ -796,6 +796,101 @@ export default function DocumentVault({
   }
 
 
+
+
+
+  async function removeStoredAttachment(attachment: string) {
+    if (!attachment) return;
+
+    if (
+      attachment.startsWith("data:") ||
+      attachment.startsWith("http://") ||
+      attachment.startsWith("https://")
+    ) {
+      return;
+    }
+
+    const { error } = await supabase.storage
+      .from("premium_plus_attachments")
+      .remove([attachment]);
+
+    if (error) {
+      console.error(
+        "Failed to remove stored document attachment:",
+        error
+      );
+    }
+  }
+
+
+  async function handleRemoveAttachment(
+    record: DocumentRecord
+  ) {
+    if (
+      record.user_id !==
+      currentUserId
+    ) {
+      alert(
+        "You can only remove attachments from your own documents."
+      );
+
+      return;
+    }
+
+    if (!record.file) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        "Remove this document attachment? The document itself will not be deleted."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await removeStoredAttachment(
+        record.file
+      );
+
+      await updateDocument({
+        ...record,
+        file: "",
+        attachment_name: "",
+      });
+
+      await loadDocuments();
+
+      if (editingId === record.id) {
+        attachmentRef.current = "";
+        attachmentNameRef.current = "";
+
+        setForm((previous) => ({
+          ...previous,
+          file: "",
+          attachment_name: "",
+        }));
+      }
+
+      alert(
+        "Attachment removed successfully."
+      );
+    } catch (error) {
+      console.error(
+        "Failed to remove document attachment:",
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to remove attachment."
+      );
+    }
+  }
+
+
   /* =========================================================
      DELETE
      ========================================================= */
@@ -1981,6 +2076,21 @@ export default function DocumentVault({
                               ⬇
                               Download
                             </button>
+
+                            {isOwner && (
+                              <button
+                                type="button"
+                                className="deleteButton"
+                                onClick={() =>
+                                  void handleRemoveAttachment(record)
+                                }
+                                style={{
+                                  marginTop: "6px",
+                                }}
+                              >
+                                🗑 Remove
+                              </button>
+                            )}
 
                             {record.attachment_name && (
                               <div

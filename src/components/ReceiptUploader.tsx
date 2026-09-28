@@ -9,6 +9,7 @@ interface Props {
   onChange: (value: string) => void;
   onFileNameChange?: (fileName: string) => void;
   onAttachmentChange?: (value: string, fileName: string) => void;
+  onRemove?: () => void;
 }
 
 const STORAGE_BUCKET = "premium_plus_attachments";
@@ -27,6 +28,7 @@ export default function ReceiptUploader({
   onChange,
   onFileNameChange,
   onAttachmentChange,
+  onRemove,
 }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -154,6 +156,21 @@ export default function ReceiptUploader({
     }
   };
 
+  function handleRemove() {
+    if (fileRef.current) {
+      fileRef.current.value = "";
+    }
+
+    if (onRemove) {
+      onRemove();
+      return;
+    }
+
+    onChange("");
+    onFileNameChange?.("");
+    onAttachmentChange?.("", "");
+  }
+
   return (
     <div>
       <input
@@ -185,6 +202,24 @@ export default function ReceiptUploader({
               </small>
             </div>
           )}
+
+          <button
+            type="button"
+            onClick={handleRemove}
+            style={{
+              marginTop: 8,
+              padding: "6px 10px",
+              border: "none",
+              borderRadius: 6,
+              background: "#ef4444",
+              color: "#ffffff",
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          >
+            🗑 Remove Attachment
+          </button>
         </div>
       )}
     </div>

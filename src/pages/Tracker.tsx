@@ -26,6 +26,7 @@ import {
   type CustomVehicleRecord,
 } from "../services/customVehicleService";
 import ReceiptUploader from "../components/ReceiptUploader";
+import { downloadAttachment } from "../services/attachmentService";
 import UserDetails from "../components/UserDetails";
 import {
   getCurrentPlan,
@@ -186,6 +187,13 @@ function Tracker({ onNavigate }: TrackerProps) {
 
   const [invoice, setInvoice] =
     useState("");
+
+  const [invoiceFileName, setInvoiceFileName] =
+    useState("");
+
+  // Attachment refs used to safely clean up removed/replaced Storage files.
+  const originalInvoiceRef = useRef("");
+  const removedInvoiceRef = useRef("");
 
 
   const [invoiceResetKey, setInvoiceResetKey] =
@@ -824,6 +832,115 @@ function Tracker({ onNavigate }: TrackerProps) {
     );
   }, [allStationOptions, stationSearch]);
 
+  function getInvoiceFileName(attachment: string, sessionDate?: string) {
+    if (!attachment) {
+      return sessionDate
+        ? `Charging-${sessionDate}-Invoice`
+        : "attachment";
+    }
+
+    if (
+      attachment.startsWith("data:") ||
+      attachment.startsWith("http://") ||
+      attachment.startsWith("https://")
+    ) {
+      return sessionDate
+        ? `Charging-${sessionDate}-Invoice`
+        : "attachment";
+    }
+
+    const storedName =
+      attachment.split("/").pop()?.split("?")[0] ?? "";
+
+    // Premium Plus storage paths are:
+    // user-id/random-uuid-original-file-name
+    const originalName = storedName.replace(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-/i,
+      ""
+    );
+
+    return originalName || (
+      sessionDate
+        ? `Charging-${sessionDate}-Invoice`
+        : "attachment"
+    );
+  }
+
+
+
+
+  async function removeStoredAttachment(attachment: string) {
+    if (!attachment) return;
+
+    if (
+      attachment.startsWith("data:") ||
+      attachment.startsWith("http://") ||
+      attachment.startsWith("https://")
+    ) {
+      return;
+    }
+
+    const { error } = await supabase.storage
+      .from("premium_plus_attachments")
+      .remove([attachment]);
+
+    if (error) {
+      console.error(
+        "Failed to remove charging session attachment from Storage:",
+        error
+      );
+    }
+  }
+
+
+  async function removeRecentSessionAttachment(session: ChargingSession) {
+    if (!session.invoice || !session.id) return;
+
+    if (!currentUserId || session.user_id !== currentUserId) return;
+
+    const confirmed = window.confirm(
+      "Remove the attachment from this charging session?\n\nThe attachment will be permanently removed."
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from("charging_sessions")
+        .update({ invoice: null })
+        .eq("id", session.id)
+        .eq("user_id", currentUserId);
+
+      if (error) {
+        throw error;
+      }
+
+      await removeStoredAttachment(session.invoice);
+
+      setSessions((current) =>
+        current.map((item) =>
+          item.id === session.id
+            ? { ...item, invoice: null }
+            : item
+        )
+      );
+
+      if (editingId === session.id) {
+        setInvoice("");
+        setInvoiceFileName("");
+        setInvoiceResetKey((current) => current + 1);
+      }
+
+      alert("Attachment removed successfully.");
+    } catch (error: any) {
+      console.error("Failed to remove charging session attachment:", error);
+      alert(
+        error?.message ||
+          "Failed to remove the attachment."
+      );
+    }
+  }
+
 
   async function saveSession() {
     if (
@@ -910,6 +1027,19 @@ function Tracker({ onNavigate }: TrackerProps) {
         await addChargingSession(
           session
         );
+      }
+
+
+      // Remove the old attachment only after the database save succeeds.
+      // This covers both removing an existing file and replacing it.
+      const attachmentToRemove =
+        originalInvoiceRef.current || removedInvoiceRef.current;
+
+      if (
+        attachmentToRemove &&
+        attachmentToRemove !== invoice
+      ) {
+        await removeStoredAttachment(attachmentToRemove);
       }
 
 
@@ -1061,6 +1191,9 @@ function Tracker({ onNavigate }: TrackerProps) {
     setStation("");
     setDate("");
     setInvoice("");
+    setInvoiceFileName("");
+    originalInvoiceRef.current = "";
+    removedInvoiceRef.current = "";
 
     setDraftStatus("idle");
 
@@ -1757,9 +1890,22 @@ function Tracker({ onNavigate }: TrackerProps) {
                   invoiceResetKey
                 }
                 value={invoice}
-                onChange={(value) =>
-                  setInvoice(value)
-                }
+                fileName={invoiceFileName}
+                onChange={(value) => {
+                  setInvoice(value);
+                  setInvoiceFileName(
+                    getInvoiceFileName(value)
+                  );
+                }}
+                onAttachmentChange={(value, fileName) => {
+                  setInvoice(value);
+                  setInvoiceFileName(fileName);
+                }}
+                onRemove={() => {
+                  removedInvoiceRef.current = invoice;
+                  setInvoice("");
+                  setInvoiceFileName("");
+                }}
               />
             </div>
 
@@ -1985,17 +2131,53 @@ function Tracker({ onNavigate }: TrackerProps) {
 
                         <td>
                           {session.invoice ? (
-                            <a
-                              href={
-                                session.invoice
-                              }
-                              download={`Charging-${session.date}-Invoice`}
-                              className="downloadButton"
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "6px",
+                                alignItems: "flex-start",
+                              }}
                             >
-                              ⬇ Download
-                            </a>
+                              <button
+                                type="button"
+                                className="downloadButton"
+                                onClick={() =>
+                                  void downloadAttachment(
+                                    session.invoice,
+                                    getInvoiceFileName(
+                                      session.invoice,
+                                      session.date
+                                    )
+                                  )
+                                }
+                              >
+                                ⬇ Download
+                              </button>
+
+                              {session.user_id === currentUserId && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void removeRecentSessionAttachment(
+                                      session
+                                    )
+                                  }
+                                  style={{
+                                    padding: "6px 10px",
+                                    border: "1px solid #dc2626",
+                                    borderRadius: "6px",
+                                    background: "transparent",
+                                    color: "#dc2626",
+                                    cursor: "pointer",
+                                    fontSize: "12px",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  🗑 Remove
+                                </button>
+                              )}
+                            </div>
                           ) : (
                             "-"
                           )}
@@ -2062,6 +2244,19 @@ function Tracker({ onNavigate }: TrackerProps) {
                                     session.invoice ||
                                       ""
                                   );
+
+                                  setInvoiceFileName(
+                                    session.invoice
+                                      ? getInvoiceFileName(
+                                          session.invoice,
+                                          session.date
+                                        )
+                                      : ""
+                                  );
+
+                                  originalInvoiceRef.current =
+                                    session.invoice || "";
+                                  removedInvoiceRef.current = "";
 
 
                                   window.scrollTo({
