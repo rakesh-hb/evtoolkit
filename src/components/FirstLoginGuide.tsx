@@ -99,11 +99,13 @@ export default function FirstLoginGuide({
           boxShadow: "0 20px 60px rgba(0, 0, 0, 0.30)",
         }}
       >
+        {/* Main guide content */}
         <div
           style={{
-            display: "flex",
+            display: "grid",
+            gridTemplateColumns: "40px minmax(0, 1fr) 40px",
             alignItems: "center",
-            gap: "10px",
+            columnGap: "10px",
             width: "100%",
           }}
         >
@@ -117,28 +119,43 @@ export default function FirstLoginGuide({
               flexShrink: 0,
               width: "40px",
               height: "40px",
+              padding: 0,
+              margin: 0,
               borderRadius: "50%",
               border: "1px solid #d1d5db",
               background: isFirstCard ? "#f3f4f6" : "#ffffff",
               color: isFirstCard ? "#c7cbd1" : "#374151",
-              fontSize: "24px",
-              lineHeight: 1,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               cursor: isFirstCard ? "default" : "pointer",
+              boxSizing: "border-box",
             }}
           >
-            ‹
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "100%",
+                height: "100%",
+                fontSize: "24px",
+                lineHeight: 1,
+                transform: "translateY(-1px)",
+              }}
+            >
+              ‹
+            </span>
           </button>
 
           {/* Card content */}
           <div
             style={{
-              flex: 1,
               minWidth: 0,
+              width: "100%",
               textAlign: "center",
               padding: "4px 2px",
+              boxSizing: "border-box",
             }}
           >
             <div
@@ -178,28 +195,38 @@ export default function FirstLoginGuide({
           <button
             type="button"
             onClick={handleNext}
-            aria-label={
-              isLastCard
-                ? "Finish guide"
-                : "Next guide card"
-            }
+            aria-label={isLastCard ? "Finish guide" : "Next guide card"}
             style={{
               flexShrink: 0,
               width: "40px",
               height: "40px",
+              padding: 0,
+              margin: 0,
               borderRadius: "50%",
               border: "1px solid #d1d5db",
               background: "#ffffff",
               color: "#374151",
-              fontSize: "24px",
-              lineHeight: 1,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               cursor: "pointer",
+              boxSizing: "border-box",
             }}
           >
-            ›
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "100%",
+                height: "100%",
+                fontSize: "24px",
+                lineHeight: 1,
+                transform: "translateY(-1px)",
+              }}
+            >
+              ›
+            </span>
           </button>
         </div>
 
@@ -220,18 +247,13 @@ export default function FirstLoginGuide({
               aria-label={`Go to guide card ${index + 1}`}
               onClick={() => setCurrentCard(index)}
               style={{
-                width:
-                  index === currentCard
-                    ? "22px"
-                    : "8px",
+                width: index === currentCard ? "22px" : "8px",
                 height: "8px",
                 padding: 0,
                 border: "none",
                 borderRadius: "999px",
                 background:
-                  index === currentCard
-                    ? "#f97316"
-                    : "#d1d5db",
+                  index === currentCard ? "#f97316" : "#d1d5db",
                 cursor: "pointer",
                 transition: "all 0.2s ease",
               }}
@@ -254,42 +276,49 @@ export default function FirstLoginGuide({
               textAlign: "center",
             }}
           >
-            💡 <strong>Tip:</strong> You can open this guide
-            anytime from the <strong>How to Use</strong> option
-            in the side menu.
+            💡 <strong>Tip:</strong> You can open this guide anytime from
+            the <strong>How to Use</strong> option in the side menu.
           </div>
         )}
 
         {/* Don't show again */}
-        <label
+        <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            cursor: "pointer",
-            fontSize: "14px",
-            color: "#374151",
-            marginBottom: "20px",
+            width: "100%",
+            maxWidth: "500px",
+            margin: "0 auto 20px",
+            boxSizing: "border-box",
           }}
         >
-          <input
-            type="checkbox"
-            checked={dontShowAgain}
-            onChange={(event) =>
-              setDontShowAgain(
-                event.target.checked
-              )
-            }
+          <label
             style={{
-              width: "17px",
-              height: "17px",
-              accentColor: "#f97316",
-              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              cursor: "pointer",
+              fontSize: "14px",
+              color: "#374151",
+              width: "fit-content",
             }}
-          />
+          >
+            <input
+              type="checkbox"
+              checked={dontShowAgain}
+              onChange={(event) =>
+                setDontShowAgain(event.target.checked)
+              }
+              style={{
+                width: "17px",
+                height: "17px",
+                accentColor: "#f97316",
+                flexShrink: 0,
+                margin: 0,
+              }}
+            />
 
-          Don't show this guide automatically again
-        </label>
+            <span>Don't show this guide automatically again</span>
+          </label>
+        </div>
 
         {/* Bottom controls */}
         <div
@@ -331,9 +360,7 @@ export default function FirstLoginGuide({
               minWidth: "120px",
             }}
           >
-            {isLastCard
-              ? "Get Started"
-              : "Next"}
+            {isLastCard ? "Get Started" : "Next"}
           </button>
         </div>
       </div>
