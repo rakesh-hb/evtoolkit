@@ -69,6 +69,8 @@ export function AuthProvider({
       }
     };
 
+    void initializeAuth();
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(
@@ -78,8 +80,6 @@ export function AuthProvider({
         }
       }
     );
-
-    void initializeAuth();
 
     return () => {
       mounted = false;
