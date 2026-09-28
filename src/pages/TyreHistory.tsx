@@ -123,6 +123,17 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
   const draftLoadedRef =
     useRef(false);
 
+  // Keep attachment state stable when Save is clicked and when an existing
+  // attachment is removed from the form before the record is updated.
+  const attachmentRef = useRef(form.receipt);
+  const attachmentNameRef = useRef(form.attachment_name);
+  const removedAttachmentRef = useRef("");
+
+  useEffect(() => {
+    attachmentRef.current = form.receipt || "";
+    attachmentNameRef.current = form.attachment_name || "";
+  }, [form.receipt, form.attachment_name]);
+
   const getDraftKey = () =>
     editingId !== null
       ? `tyre:${editingId}`
@@ -448,6 +459,26 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
   }
 
 
+  async function removeStoredAttachment(attachment: string) {
+    if (!attachment) return;
+
+    if (
+      attachment.startsWith("data:") ||
+      attachment.startsWith("http://") ||
+      attachment.startsWith("https://")
+    ) {
+      return;
+    }
+
+    const { error } = await supabase.storage
+      .from("premium_plus_attachments")
+      .remove([attachment]);
+
+    if (error) {
+      console.error("Failed to remove stored tyre attachment:", error);
+    }
+  }
+
   /* =========================================================
      START EDIT
      ========================================================= */
@@ -481,6 +512,9 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
       record.id
     );
 
+    removedAttachmentRef.current = "";
+    attachmentRef.current = record.receipt || "";
+    attachmentNameRef.current = record.attachment_name || "";
 
     setForm(
       record
@@ -581,6 +615,9 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
     });
 
     setEditingId(null);
+    removedAttachmentRef.current = "";
+    attachmentRef.current = "";
+    attachmentNameRef.current = "";
     setForm({ ...emptyRecord });
     setDraftStatus("idle");
 
@@ -650,6 +687,12 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
 
 
     try {
+      const formToSave: TyreRecordWithAttachmentName = {
+        ...form,
+        receipt: attachmentRef.current || "",
+        attachment_name: attachmentNameRef.current || "",
+      };
+
       if (
         editingId !== null
       ) {
@@ -672,7 +715,7 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
 
 
         await updateTyre({
-          ...form,
+          ...formToSave,
           id: editingId,
         });
 
@@ -712,7 +755,7 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
          */
 
         await addTyre(
-          form
+          formToSave
         );
       }
 
@@ -729,6 +772,13 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
 
       await loadTyres();
 
+      if (removedAttachmentRef.current) {
+        await removeStoredAttachment(removedAttachmentRef.current);
+      }
+
+      removedAttachmentRef.current = "";
+      attachmentRef.current = "";
+      attachmentNameRef.current = "";
 
       setEditingId(
         null
@@ -1101,6 +1151,7 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
                 value={form.receipt}
                 fileName={form.attachment_name}
                 onChange={(receipt) => {
+                  attachmentRef.current = receipt;
                   setForm({
                     ...form,
                     receipt,
@@ -1108,6 +1159,7 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
                   handleAutosaveBlur();
                 }}
                 onFileNameChange={(attachment_name) => {
+                  attachmentNameRef.current = attachment_name;
                   setForm({
                     ...form,
                     attachment_name,
@@ -1115,6 +1167,35 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
                   handleAutosaveBlur();
                 }}
               />
+
+              {form.receipt && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    removedAttachmentRef.current = form.receipt || "";
+                    attachmentRef.current = "";
+                    attachmentNameRef.current = "";
+                    setForm((previous) => ({
+                      ...previous,
+                      receipt: "",
+                      attachment_name: "",
+                    }));
+                    handleAutosaveBlur();
+                  }}
+                  style={{
+                    marginTop: "8px",
+                    background: "transparent",
+                    color: "#dc2626",
+                    border: "1px solid #dc2626",
+                    borderRadius: "6px",
+                    padding: "7px 12px",
+                    cursor: "pointer",
+                    fontWeight: 600,
+                  }}
+                >
+                  🗑 Remove Attachment
+                </button>
+              )}
             </div>
 
             <p
@@ -1511,6 +1592,73 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
                               >
                                 📎 {record.attachment_name}
                               </div>
+                            )}
+
+                            {isOwner && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (
+                                    !window.confirm(
+                                      "Remove this tyre receipt? The tyre record itself will not be deleted."
+                                    )
+                                  ) {
+                                    return;
+                                  }
+
+                                  void (async () => {
+                                    try {
+                                      const oldAttachment = record.receipt;
+
+                                      await updateTyre({
+                                        ...record,
+                                        receipt: "",
+                                        attachment_name: "",
+                                      });
+
+                                      await removeStoredAttachment(oldAttachment);
+                                      await loadTyres();
+
+                                      if (editingId === record.id) {
+                                        removedAttachmentRef.current = "";
+                                        attachmentRef.current = "";
+                                        attachmentNameRef.current = "";
+                                        setForm((previous) => ({
+                                          ...previous,
+                                          receipt: "",
+                                          attachment_name: "",
+                                        }));
+                                      }
+
+                                      alert("Attachment removed successfully.");
+                                    } catch (error) {
+                                      console.error(
+                                        "Failed to remove tyre attachment:",
+                                        error
+                                      );
+                                      alert(
+                                        error instanceof Error
+                                          ? error.message
+                                          : "Failed to remove attachment."
+                                      );
+                                    }
+                                  })();
+                                }}
+                                style={{
+                                  display: "block",
+                                  marginTop: "8px",
+                                  background: "transparent",
+                                  color: "#dc2626",
+                                  border: "1px solid #dc2626",
+                                  borderRadius: "6px",
+                                  padding: "6px 10px",
+                                  cursor: "pointer",
+                                  fontWeight: 600,
+                                  fontSize: "12px",
+                                }}
+                              >
+                                🗑 Remove
+                              </button>
                             )}
 
                             </>

@@ -920,7 +920,7 @@ function Tracker({ onNavigate }: TrackerProps) {
       setSessions((current) =>
         current.map((item) =>
           item.id === session.id
-            ? { ...item, invoice: null }
+            ? { ...item, invoice: "" }
             : item
         )
       );

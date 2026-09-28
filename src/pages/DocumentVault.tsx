@@ -2060,39 +2060,49 @@ export default function DocumentVault({
 
                           {record.file ? (
 
-                            <>
-
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                void downloadAttachment(
-                                  record.file,
-                                  record.attachment_name || record.title
-                                )
-                              }
-                              className="downloadButton"
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "6px",
+                                alignItems: "flex-start",
+                              }}
                             >
-                              ⬇
-                              Download
-                            </button>
-
-                            {isOwner && (
                               <button
                                 type="button"
-                                className="deleteButton"
+                                className="downloadButton"
                                 onClick={() =>
-                                  void handleRemoveAttachment(record)
+                                  void downloadAttachment(
+                                    record.file,
+                                    record.attachment_name || record.title
+                                  )
                                 }
-                                style={{
-                                  marginTop: "6px",
-                                }}
                               >
-                                🗑 Remove
+                                ⬇ Download
                               </button>
-                            )}
 
-                            {record.attachment_name && (
+                              {isOwner && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void handleRemoveAttachment(record)
+                                  }
+                                  style={{
+                                    padding: "6px 10px",
+                                    border: "1px solid #dc2626",
+                                    borderRadius: "6px",
+                                    background: "transparent",
+                                    color: "#dc2626",
+                                    cursor: "pointer",
+                                    fontSize: "12px",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  🗑 Remove
+                                </button>
+                              )}
+
+                              {record.attachment_name && (
                               <div
                                 style={{
                                   marginTop: "5px",
@@ -2103,9 +2113,8 @@ export default function DocumentVault({
                               >
                                 📎 {record.attachment_name}
                               </div>
-                            )}
-
-                            </>
+                              )}
+                            </div>
 
                           ) : (
                             "-"

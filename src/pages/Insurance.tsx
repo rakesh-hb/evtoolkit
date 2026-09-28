@@ -587,6 +587,15 @@ export default function Insurance({
   const draftLoadedRef =
     useRef(false);
 
+  const attachmentRef = useRef(form.attachment);
+  const attachmentNameRef = useRef(form.attachment_name);
+  const removedAttachmentRef = useRef("");
+
+  useEffect(() => {
+    attachmentRef.current = form.attachment || "";
+    attachmentNameRef.current = form.attachment_name || "";
+  }, [form.attachment, form.attachment_name]);
+
   const getDraftKey = () =>
     editingId !== null
       ? `insurance:${editingId}`
@@ -1139,6 +1148,10 @@ export default function Insurance({
       record.id
     );
 
+    removedAttachmentRef.current = "";
+    attachmentRef.current = record.attachment || "";
+    attachmentNameRef.current = record.attachment_name || "";
+
     setForm(
       record
     );
@@ -1149,6 +1162,72 @@ export default function Insurance({
     });
   }
 
+
+  async function removeStoredAttachment(attachment: string) {
+    if (!attachment) return;
+
+    if (
+      attachment.startsWith("data:") ||
+      attachment.startsWith("http://") ||
+      attachment.startsWith("https://")
+    ) {
+      return;
+    }
+
+    const { error } = await supabase.storage
+      .from("premium_plus_attachments")
+      .remove([attachment]);
+
+    if (error) {
+      console.error("Failed to remove stored insurance attachment:", error);
+    }
+  }
+
+  async function handleRemoveAttachment(record: InsuranceRecord) {
+    if (record.user_id !== currentUserId) {
+      alert("You can only remove attachments from your own insurance policies.");
+      return;
+    }
+
+    if (!record.attachment) return;
+
+    if (
+      !window.confirm(
+        "Remove this insurance document? The insurance policy itself will not be deleted."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await removeStoredAttachment(record.attachment);
+
+      await updateInsurance(record.id, {
+        ...record,
+        attachment: "",
+        attachment_name: "",
+      });
+
+      await loadPolicies();
+
+      if (editingId === record.id) {
+        setForm((previous) => ({
+          ...previous,
+          attachment: "",
+          attachment_name: "",
+        }));
+      }
+
+      alert("Attachment removed successfully.");
+    } catch (error) {
+      console.error("Failed to remove insurance attachment:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to remove attachment."
+      );
+    }
+  }
 
   /*
    * =========================================================
@@ -1378,6 +1457,12 @@ export default function Insurance({
     }
 
     try {
+      const formToSave: InsuranceRecord = {
+        ...form,
+        attachment: attachmentRef.current || "",
+        attachment_name: attachmentNameRef.current || "",
+      };
+
       if (
         editingId !== null
       ) {
@@ -1394,7 +1479,7 @@ export default function Insurance({
 
         await updateInsurance(
           editingId,
-          form
+          formToSave
         );
 
         alert(
@@ -1429,7 +1514,7 @@ export default function Insurance({
           id,
           user_id,
           ...newPolicy
-        } = form;
+        } = formToSave;
 
         await addInsurance(
           newPolicy as Omit<
@@ -1456,6 +1541,31 @@ export default function Insurance({
       draftLoadedRef.current = false;
 
       await loadPolicies();
+
+      if (removedAttachmentRef.current) {
+        const attachmentToRemove = removedAttachmentRef.current;
+
+        if (
+          !attachmentToRemove.startsWith("data:") &&
+          !attachmentToRemove.startsWith("http://") &&
+          !attachmentToRemove.startsWith("https://")
+        ) {
+          const { error } = await supabase.storage
+            .from("premium_plus_attachments")
+            .remove([attachmentToRemove]);
+
+          if (error) {
+            console.error(
+              "Failed to remove stored insurance attachment:",
+              error
+            );
+          }
+        }
+      }
+
+      removedAttachmentRef.current = "";
+      attachmentRef.current = "";
+      attachmentNameRef.current = "";
 
       setEditingId(
         null
@@ -2298,6 +2408,16 @@ export default function Insurance({
                   setForm(nextForm);
                   handleAutosaveBlur();
                 }}
+                onRemove={() => {
+                  removedAttachmentRef.current = form.attachment || "";
+                  attachmentRef.current = "";
+                  attachmentNameRef.current = "";
+                  setForm((previous) => ({
+                    ...previous,
+                    attachment: "",
+                    attachment_name: "",
+                  }));
+                }}
                 onFileNameChange={(attachment_name) => {
                   const nextForm = {
                     ...form,
@@ -2664,6 +2784,28 @@ export default function Insurance({
                               ⬇ Download
                             </button>
 
+                            {record.user_id === currentUserId && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void removeRecentInsuranceAttachment(record)
+                                }
+                                style={{
+                                  padding: "6px 10px",
+                                  border: "1px solid #dc2626",
+                                  borderRadius: "6px",
+                                  background: "transparent",
+                                  color: "#dc2626",
+                                  cursor: "pointer",
+                                  fontSize: "12px",
+                                  fontWeight: 600,
+                                  marginLeft: "6px",
+                                }}
+                              >
+                                🗑 Remove
+                              </button>
+                            )}
+
                             {record.attachment_name && (
                               <div
                                 style={{
@@ -2676,6 +2818,7 @@ export default function Insurance({
                                 📎 {record.attachment_name}
                               </div>
                             )}
+
 
                             </>
 

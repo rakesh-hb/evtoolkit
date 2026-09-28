@@ -193,6 +193,8 @@ export default function ServiceHistory({
   const attachmentRef = useRef(form.attachment);
   const attachmentNameRef = useRef(form.attachment_name);
 
+  const removedAttachmentRef = useRef("");
+
   const getDraftKey = () =>
     editingId !== null
       ? `service-history:${editingId}`
@@ -719,6 +721,7 @@ export default function ServiceHistory({
     );
 
     setEditingId(null);
+    removedAttachmentRef.current = "";
     setForm({
       ...emptyRecord,
       vehicle: primaryVehicleName,
@@ -927,6 +930,11 @@ export default function ServiceHistory({
 
       await loadRecords();
 
+      if (removedAttachmentRef.current) {
+        await removeStoredAttachment(removedAttachmentRef.current);
+      }
+      removedAttachmentRef.current = "";
+
       setEditingId(
         null
       );
@@ -970,6 +978,75 @@ export default function ServiceHistory({
           JSON.stringify(
             error
           )
+      );
+    }
+  }
+
+
+  async function removeStoredAttachment(attachment: string) {
+    if (!attachment) return;
+
+    if (
+      attachment.startsWith("data:") ||
+      attachment.startsWith("http://") ||
+      attachment.startsWith("https://")
+    ) {
+      return;
+    }
+
+    const { error } = await supabase.storage
+      .from("premium_plus_attachments")
+      .remove([attachment]);
+
+    if (error) {
+      console.error("Failed to remove stored service attachment:", error);
+    }
+  }
+
+  async function removeRecentServiceAttachment(record: ServiceRecord) {
+    if (!record.attachment || !record.id) return;
+
+    if (!currentUserId || record.user_id !== currentUserId) return;
+
+    const confirmed = window.confirm(
+      "Remove the attachment from this service record?\n\nThe attachment will be permanently removed."
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from("service_history")
+        .update({
+          attachment: "",
+          attachment_name: "",
+        })
+        .eq("id", record.id)
+        .eq("user_id", currentUserId);
+
+      if (error) {
+        throw error;
+      }
+
+      await removeStoredAttachment(record.attachment);
+      await loadRecords();
+
+      if (editingId === record.id) {
+        attachmentRef.current = "";
+        attachmentNameRef.current = "";
+        setForm((previous) => ({
+          ...previous,
+          attachment: "",
+          attachment_name: "",
+        }));
+      }
+
+      alert("Attachment removed successfully.");
+    } catch (error: any) {
+      console.error("Failed to remove service attachment:", error);
+      alert(
+        error?.message ||
+          "Failed to remove the attachment."
       );
     }
   }
@@ -1055,6 +1132,7 @@ export default function ServiceHistory({
       record.id
     );
 
+    removedAttachmentRef.current = "";
     attachmentRef.current = record.attachment || "";
     attachmentNameRef.current = record.attachment_name || "";
 
@@ -1866,6 +1944,16 @@ export default function ServiceHistory({
                     attachment,
                   }));
                 }}
+                onRemove={() => {
+                  removedAttachmentRef.current = form.attachment || "";
+                  attachmentRef.current = "";
+                  attachmentNameRef.current = "";
+                  setForm((previous) => ({
+                    ...previous,
+                    attachment: "",
+                    attachment_name: "",
+                  }));
+                }}
                 onAttachmentChange={(attachment, attachment_name) => {
                   attachmentRef.current = attachment;
                   attachmentNameRef.current = attachment_name;
@@ -2188,6 +2276,28 @@ export default function ServiceHistory({
                               Download
                             </button>
 
+                            {record.user_id === currentUserId && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void removeRecentServiceAttachment(record)
+                                }
+                                style={{
+                                  padding: "6px 10px",
+                                  border: "1px solid #dc2626",
+                                  borderRadius: "6px",
+                                  background: "transparent",
+                                  color: "#dc2626",
+                                  cursor: "pointer",
+                                  fontSize: "12px",
+                                  fontWeight: 600,
+                                  marginLeft: "6px",
+                                }}
+                              >
+                                🗑 Remove
+                              </button>
+                            )}
+
                             {record.attachment_name && (
                               <div
                                 style={{
@@ -2200,6 +2310,7 @@ export default function ServiceHistory({
                                 📎 {record.attachment_name}
                               </div>
                             )}
+
 
                             </>
 
