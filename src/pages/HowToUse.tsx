@@ -3,15 +3,16 @@ import { useState } from "react";
 interface InfoSectionProps {
   title: string;
   children: React.ReactNode;
-  defaultOpen?: boolean;
+  isOpen: boolean;
+  onToggle: () => void;
 }
 
 function InfoSection({
   title,
   children,
-  defaultOpen = false,
+  isOpen,
+  onToggle,
 }: InfoSectionProps) {
-  const [open, setOpen] = useState(defaultOpen);
 
   return (
     <div
@@ -24,7 +25,7 @@ function InfoSection({
     >
       <button
         type="button"
-        onClick={() => setOpen((previous) => !previous)}
+        onClick={onToggle}
         style={{
           width: "100%",
           border: "none",
@@ -52,11 +53,11 @@ function InfoSection({
             color: "#6b7280",
           }}
         >
-          {open ? "−" : "+"}
+          {isOpen ? "−" : "+"}
         </span>
       </button>
 
-      {open && (
+      {isOpen && (
         <div
           style={{
             padding: "18px",
@@ -73,6 +74,14 @@ function InfoSection({
 }
 
 export default function HowToUse() {
+  const [openSection, setOpenSection] = useState<string | null>(
+    "1. Getting Started"
+  );
+
+  function toggleSection(title: string) {
+    setOpenSection((current) => (current === title ? null : title));
+  }
+
   return (
     <div
       style={{
@@ -90,59 +99,64 @@ export default function HowToUse() {
         }}
       >
         {/* Header */}
-        <div
-          style={{
-            marginBottom: "22px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              marginBottom: "8px",
-            }}
-          >
-            <div
-              style={{
-                width: "44px",
-                height: "44px",
-                borderRadius: "12px",
-                background: "#fff7ed",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "24px",
-                flexShrink: 0,
-              }}
-            >
-              📖
-            </div>
+<div
+  style={{
+    marginBottom: "22px",
+    textAlign: "center",
+  }}
+>
+  <div
+    style={{
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: "10px",
+    }}
+  >
+    <div
+      style={{
+        width: "44px",
+        height: "44px",
+        borderRadius: "12px",
+        background: "#fff7ed",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: "24px",
+        flexShrink: 0,
+      }}
+    >
+      📖
+    </div>
 
-            <div>
-              <h1
-                style={{
-                  margin: 0,
-                  fontSize: "26px",
-                  fontWeight: 700,
-                  color: "#111827",
-                }}
-              >
-                How to Use EV Toolkit
-              </h1>
+    <div>
+      <h1
+        style={{
+          margin: 0,
+          fontSize: "26px",
+          fontWeight: 700,
+          color: "#111827",
+          lineHeight: 1.2,
+        }}
+      >
+        How to Use EV Toolkit
+      </h1>
 
-              <p
-                style={{
-                  margin: "5px 0 0",
-                  fontSize: "14px",
-                  color: "#6b7280",
-                }}
-              >
-                A quick guide to the main features of EV Toolkit.
-              </p>
-            </div>
-          </div>
-        </div>
+      <p
+        style={{
+          margin: "6px 0 0",
+          fontSize: "14px",
+          color: "#f97316",
+          fontWeight: 700,
+          lineHeight: 1.3,
+        }}
+      >
+        A quick guide to the main features of EV Toolkit.
+      </p>
+    </div>
+  </div>
+</div>
 
         {/* Guide sections */}
         <div
@@ -154,7 +168,8 @@ export default function HowToUse() {
         >
           <InfoSection
             title="1. Getting Started"
-            defaultOpen
+            isOpen={openSection === "1. Getting Started"}
+            onToggle={() => toggleSection("1. Getting Started")}
           >
             <p style={{ margin: "0 0 12px" }}>
               EV Toolkit is designed to help you manage your EV ownership
@@ -175,7 +190,11 @@ export default function HowToUse() {
             </p>
           </InfoSection>
 
-          <InfoSection title="2. Dashboard">
+          <InfoSection
+            title="2. Dashboard"
+            isOpen={openSection === "2. Dashboard"}
+            onToggle={() => toggleSection("2. Dashboard")}
+          >
             <p style={{ margin: "0 0 12px" }}>
               The Dashboard provides a quick overview of your EV information
               and recent activity.
@@ -194,7 +213,11 @@ export default function HowToUse() {
             </ul>
           </InfoSection>
 
-          <InfoSection title="3. Charging Tracker">
+          <InfoSection
+            title="3. Charging Tracker"
+            isOpen={openSection === "3. Charging Tracker"}
+            onToggle={() => toggleSection("3. Charging Tracker")}
+          >
             <p style={{ margin: "0 0 12px" }}>
               Charging Tracker is used to record your charging sessions.
             </p>
@@ -212,7 +235,11 @@ export default function HowToUse() {
             </p>
           </InfoSection>
 
-          <InfoSection title="4. Planner">
+          <InfoSection
+            title="4. Planner"
+            isOpen={openSection === "4. Planner"}
+            onToggle={() => toggleSection("4. Planner")}
+          >
             <p style={{ margin: "0 0 12px" }}>
               Planner helps you estimate charging and trip-related information
               using the inputs available in the application.
@@ -225,7 +252,11 @@ export default function HowToUse() {
             </p>
           </InfoSection>
 
-          <InfoSection title="5. Service History">
+          <InfoSection
+            title="5. Service History"
+            isOpen={openSection === "5. Service History"}
+            onToggle={() => toggleSection("5. Service History")}
+          >
             <p style={{ margin: "0 0 12px" }}>
               Service History is used to maintain a chronological record of
               vehicle servicing and maintenance.
@@ -242,7 +273,11 @@ export default function HowToUse() {
             </p>
           </InfoSection>
 
-          <InfoSection title="6. Tyre History">
+          <InfoSection
+            title="6. Tyre History"
+            isOpen={openSection === "6. Tyre History"}
+            onToggle={() => toggleSection("6. Tyre History")}
+          >
             <p style={{ margin: "0 0 12px" }}>
               Tyre History is used to maintain tyre-related records.
             </p>
@@ -258,7 +293,11 @@ export default function HowToUse() {
             </p>
           </InfoSection>
 
-          <InfoSection title="7. Insurance">
+          <InfoSection
+            title="7. Insurance"
+            isOpen={openSection === "7. Insurance"}
+            onToggle={() => toggleSection("7. Insurance")}
+          >
             <p style={{ margin: "0 0 12px" }}>
               Insurance is used to maintain your vehicle insurance information.
             </p>
@@ -275,7 +314,11 @@ export default function HowToUse() {
             </p>
           </InfoSection>
 
-          <InfoSection title="8. Document Vault">
+          <InfoSection
+            title="8. Document Vault"
+            isOpen={openSection === "8. Document Vault"}
+            onToggle={() => toggleSection("8. Document Vault")}
+          >
             <p style={{ margin: "0 0 12px" }}>
               Document Vault is intended to keep important EV and vehicle
               documents organised and accessible.
@@ -288,7 +331,11 @@ export default function HowToUse() {
             </p>
           </InfoSection>
 
-          <InfoSection title="9. Analytics">
+          <InfoSection
+            title="9. Analytics"
+            isOpen={openSection === "9. Analytics"}
+            onToggle={() => toggleSection("9. Analytics")}
+          >
             <p style={{ margin: "0 0 12px" }}>
               Analytics provides a detailed view of your charging activity,
               energy consumption, costs, trends and recent charging sessions.
@@ -305,7 +352,11 @@ export default function HowToUse() {
             </p>
           </InfoSection>
 
-          <InfoSection title="10. Settings, Vehicles & Backup">
+          <InfoSection
+            title="10. Settings, Vehicles & Backup"
+            isOpen={openSection === "10. Settings, Vehicles & Backup"}
+            onToggle={() => toggleSection("10. Settings, Vehicles & Backup")}
+          >
             <p style={{ margin: "0 0 12px" }}>
               Settings contains the application's supported configuration
               options.
@@ -330,7 +381,11 @@ export default function HowToUse() {
             </p>
           </InfoSection>
 
-          <InfoSection title="11. User Profile">
+          <InfoSection
+            title="11. User Profile"
+            isOpen={openSection === "11. User Profile"}
+            onToggle={() => toggleSection("11. User Profile")}
+          >
             <p style={{ margin: "0 0 12px" }}>
               User Profile contains your account-related information.
             </p>
@@ -346,7 +401,11 @@ export default function HowToUse() {
             </p>
           </InfoSection>
 
-          <InfoSection title="12. Family Sharing">
+          <InfoSection
+            title="12. Family Sharing"
+            isOpen={openSection === "12. Family Sharing"}
+            onToggle={() => toggleSection("12. Family Sharing")}
+          >
             <p style={{ margin: "0 0 12px" }}>
               EV Toolkit supports family-oriented information sharing where
               available under your subscription.
@@ -364,7 +423,11 @@ export default function HowToUse() {
             </p>
           </InfoSection>
 
-          <InfoSection title="13. Subscription Features">
+          <InfoSection
+            title="13. Subscription Features"
+            isOpen={openSection === "13. Subscription Features"}
+            onToggle={() => toggleSection("13. Subscription Features")}
+          >
             <p style={{ margin: "0 0 12px" }}>
               EV Toolkit provides Free, Premium and Premium Plus access levels.
             </p>
@@ -380,7 +443,11 @@ export default function HowToUse() {
             </p>
           </InfoSection>
 
-          <InfoSection title="14. Important Tips">
+          <InfoSection
+            title="14. Important Tips"
+            isOpen={openSection === "14. Important Tips"}
+            onToggle={() => toggleSection("14. Important Tips")}
+          >
             <ul
               style={{
                 margin: 0,
