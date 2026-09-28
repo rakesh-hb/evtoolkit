@@ -1046,7 +1046,9 @@ function Settings({ onNavigate }: SettingsProps) {
         : "this month";
 
 
-  async function handleSaveBackupSchedule() {
+  async function handleSaveBackupSchedule(
+    enabledOverride?: boolean
+  ) {
     if (!currentUserId) {
       alert("Authentication required.");
       return;
@@ -1082,7 +1084,7 @@ function Settings({ onNavigate }: SettingsProps) {
     try {
       const payload = {
         user_id: currentUserId,
-        enabled: backupEnabled,
+        enabled: enabledOverride ?? backupEnabled,
         frequency: backupFrequency,
         run_time: backupTime,
         weekday:
@@ -1127,7 +1129,7 @@ function Settings({ onNavigate }: SettingsProps) {
       }
 
       alert(
-        backupEnabled
+        (enabledOverride ?? backupEnabled)
           ? "Automatic backup schedule saved successfully."
           : "Automatic backup has been disabled."
       );
@@ -3997,13 +3999,22 @@ function Settings({ onNavigate }: SettingsProps) {
                   type="checkbox"
                   checked={backupEnabled}
                   disabled={savingBackupSchedule}
-                  onChange={(e) =>
-                    setBackupEnabled(e.target.checked)
-                  }
+                  onChange={(e) => {
+                    const nextEnabled = e.target.checked;
+                    const previousEnabled = backupEnabled;
+
+                    setBackupEnabled(nextEnabled);
+
+                    void handleSaveBackupSchedule(nextEnabled).catch(() => {
+                      setBackupEnabled(previousEnabled);
+                    });
+                  }}
                   style={{ width: 18, height: 18 }}
                 />
                 <span>
-                  Enable Automatic Backup
+                  {backupEnabled
+                    ? "Disable Automatic Backup"
+                    : "Enable Automatic Backup"}
                 </span>
               </label>
 
