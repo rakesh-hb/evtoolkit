@@ -1608,12 +1608,11 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
 
                                   void (async () => {
                                     try {
-                                      const oldAttachment = record.receipt;
+                                      const oldAttachment = record.receipt || "";
 
                                       await updateTyre({
                                         ...record,
                                         receipt: "",
-                                        attachment_name: "",
                                       });
 
                                       await removeStoredAttachment(oldAttachment);

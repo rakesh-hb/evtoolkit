@@ -2788,7 +2788,7 @@ export default function Insurance({
                               <button
                                 type="button"
                                 onClick={() =>
-                                  void removeRecentInsuranceAttachment(record)
+                                  void handleRemoveAttachment(record)
                                 }
                                 style={{
                                   padding: "6px 10px",
