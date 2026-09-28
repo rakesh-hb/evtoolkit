@@ -2193,9 +2193,8 @@ function Settings({ onNavigate }: SettingsProps) {
                 lineHeight: 1.5,
               }}
             >
-              Razorpay Test Mode is currently being used.
               Premium access is granted only after successful
-              payment verification.
+  payment verification.
             </p>
           </>
 
