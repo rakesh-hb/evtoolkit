@@ -17,6 +17,7 @@ import CancellationPolicy from "./pages/CancellationPolicy";
 import { useAuth } from "./context/AuthContext";
 
 import SideDrawer from "./components/SideDrawer";
+import FirstLoginGuide from "./components/FirstLoginGuide";
 
 /*
  * ============================================================
@@ -122,6 +123,9 @@ function App() {
       "login" | "forgot"
     >("login");
 
+  const [showFirstLoginGuide, setShowFirstLoginGuide] =
+    useState(false);
+
   /*
    * Keep track of whether the previous
    * auth state was authenticated.
@@ -156,6 +160,17 @@ function App() {
       setDrawerOpen(
         false
       );
+
+      /*
+       * TEMPORARY TEST:
+       * Show the first-login guide whenever
+       * an authenticated session is detected.
+       *
+       * The next step will change this so it
+       * appears only for users who have not
+       * completed the guide.
+       */
+      setShowFirstLoginGuide(true);
     }
 
     wasAuthenticated.current =
@@ -675,6 +690,14 @@ function App() {
           </span>
         </button>
       </nav>
+
+      {showFirstLoginGuide && (
+        <FirstLoginGuide
+          onGetStarted={() =>
+            setShowFirstLoginGuide(false)
+          }
+        />
+      )}
     </>
   );
 }
