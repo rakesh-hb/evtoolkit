@@ -1,4 +1,5 @@
 import { useState } from "react";
+import HowToUse from "./HowToUse";
 import {
   signIn,
   signUp,
@@ -15,6 +16,9 @@ export default function Login({
   onForgotPassword,
 }: LoginProps) {
   const [registerMode, setRegisterMode] =
+    useState(false);
+
+  const [showHowToUse, setShowHowToUse] =
     useState(false);
 
 
@@ -278,6 +282,80 @@ export default function Login({
 
   return (
     <>
+      {showHowToUse && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="how-to-use-title"
+          onClick={() => setShowHowToUse(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 3000,
+            background: "rgba(2, 6, 23, 0.68)",
+            backdropFilter: "blur(3px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+            boxSizing: "border-box",
+          }}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              position: "relative",
+              width: "100%",
+              maxWidth: 1080,
+              height: "min(92vh, 900px)",
+              background: "#f5f7fb",
+              borderRadius: 18,
+              overflow: "hidden",
+              boxShadow: "0 24px 80px rgba(0,0,0,0.45)",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setShowHowToUse(false)}
+              aria-label="Close How to Use"
+              title="Close"
+              style={{
+                position: "absolute",
+                top: 12,
+                right: 12,
+                zIndex: 2,
+                width: 40,
+                height: 40,
+                border: "1px solid #dc2626",
+                borderRadius: 10,
+                background: "#dc2626",
+                color: "#ffffff",
+                cursor: "pointer",
+                fontSize: 22,
+                lineHeight: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              ×
+            </button>
+
+            <div
+              id="how-to-use-title"
+              style={{
+                width: "100%",
+                height: "100%",
+                overflowY: "auto",
+                boxSizing: "border-box",
+              }}
+            >
+              <HowToUse />
+            </div>
+          </div>
+        </div>
+      )}
+
       <div
       style={{
         minHeight: "100vh",
@@ -846,20 +924,24 @@ export default function Login({
               : "New to EV Toolkit? Create Account"}
           </button>
 
-          <a
-            href="/how-to-use"
+          <button
+            type="button"
+            onClick={() => setShowHowToUse(true)}
+            disabled={loading}
             style={{
               display: "block",
               margin: "12px auto 0",
+              border: "none",
+              background: "transparent",
               color: "#2563eb",
-              textDecoration: "none",
-              cursor: "pointer",
+              cursor: loading ? "not-allowed" : "pointer",
+              padding: 0,
               fontSize: 14,
               fontWeight: 600,
             }}
           >
             How to Use EV Toolkit
-          </a>
+          </button>
         </div>
       </div>
     </div>
