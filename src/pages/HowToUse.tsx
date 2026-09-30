@@ -17,7 +17,7 @@ function InfoSection({
   return (
     <div
       style={{
-        border: "1px solid #e5e7eb",
+        border: "1px solid rgba(148,163,184,0.20)",
         borderRadius: "14px",
         background: "#ffffff",
         overflow: "hidden",
@@ -29,7 +29,7 @@ function InfoSection({
         style={{
           width: "100%",
           border: "none",
-          background: "#f8fafc",
+          background: "#ffffff",
           padding: "16px 18px",
           display: "flex",
           alignItems: "center",
@@ -37,7 +37,7 @@ function InfoSection({
           gap: "12px",
           cursor: "pointer",
           textAlign: "left",
-          color: "#111827",
+          color: "#0f172a",
           fontSize: "16px",
           fontWeight: 700,
         }}
@@ -50,7 +50,7 @@ function InfoSection({
             flexShrink: 0,
             fontSize: "20px",
             lineHeight: 1,
-            color: "#6b7280",
+            color: "#64748b",
           }}
         >
           {isOpen ? "−" : "+"}
@@ -61,7 +61,7 @@ function InfoSection({
         <div
           style={{
             padding: "20px 22px 22px",
-            color: "#4b5563",
+            color: "#334155",
             fontSize: "14px",
             lineHeight: 1.7,
           }}
@@ -85,14 +85,80 @@ export default function HowToUse() {
   return (
     <div
       style={{
+        position: "relative",
         width: "100%",
         minHeight: "100%",
         boxSizing: "border-box",
         padding: "28px 20px 32px",
+        background:
+          "radial-gradient(circle at 15% 15%, rgba(37,99,235,0.16), transparent 28%), radial-gradient(circle at 85% 80%, rgba(14,165,233,0.12), transparent 30%), #07111f",
+        color: "#f8fafc",
+        overflow: "hidden",
       }}
     >
       <div
+        aria-hidden="true"
         style={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          background:
+            "linear-gradient(120deg, transparent 0%, rgba(59,130,246,0.08) 48%, transparent 52%)",
+          backgroundSize: "220% 220%",
+          animation: "evEnergySweep 7s linear infinite",
+        }}
+      />
+
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          top: "10%",
+          left: "-40px",
+          width: "180px",
+          height: "180px",
+          borderRadius: "50%",
+          border: "1px solid rgba(56,189,248,0.22)",
+          boxShadow:
+            "0 0 35px rgba(37,99,235,0.16), inset 0 0 35px rgba(56,189,248,0.08)",
+          animation: "evPulse 4s ease-in-out infinite",
+          pointerEvents: "none",
+        }}
+      />
+
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          right: "-55px",
+          bottom: "8%",
+          width: "210px",
+          height: "210px",
+          borderRadius: "50%",
+          border: "1px solid rgba(14,165,233,0.20)",
+          boxShadow:
+            "0 0 45px rgba(14,165,233,0.14), inset 0 0 40px rgba(37,99,235,0.08)",
+          animation: "evPulse 5s ease-in-out infinite reverse",
+          pointerEvents: "none",
+        }}
+      />
+
+      <style>{`
+        @keyframes evEnergySweep {
+          0% { background-position: 200% 0; }
+          100% { background-position: -20% 100%; }
+        }
+
+        @keyframes evPulse {
+          0%, 100% { transform: scale(0.92); opacity: 0.45; }
+          50% { transform: scale(1.08); opacity: 0.85; }
+        }
+      `}</style>
+
+      <div
+        style={{
+          position: "relative",
+          zIndex: 1,
           width: "100%",
           maxWidth: "1000px",
           margin: "0 auto",
@@ -119,7 +185,7 @@ export default function HowToUse() {
         width: "44px",
         height: "44px",
         borderRadius: "12px",
-        background: "#fff7ed",
+        background: "linear-gradient(145deg, #172554, #0f172a)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -136,7 +202,7 @@ export default function HowToUse() {
           margin: 0,
           fontSize: "26px",
           fontWeight: 700,
-          color: "#111827",
+          color: "#ffffff",
           lineHeight: 1.2,
         }}
       >
@@ -484,9 +550,9 @@ export default function HowToUse() {
             marginTop: "24px",
             padding: "16px 18px",
             borderRadius: "12px",
-            background: "#fff7ed",
-            border: "1px solid #fed7aa",
-            color: "#7c2d12",
+            background: "#ffffff",
+            border: "1px solid rgba(148,163,184,0.20)",
+            color: "#334155",
             fontSize: "13px",
             lineHeight: 1.5,
           }}
