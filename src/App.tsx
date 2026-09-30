@@ -255,6 +255,10 @@ function App() {
     loading,
   ]);
 
+  const isHowToUsePage =
+    window.location.pathname ===
+    "/how-to-use";
+
   const isResetPassword =
     window.location.pathname ===
     "/reset-password";
@@ -438,6 +442,12 @@ function App() {
    * PASSWORD RESET
    * ============================================================
    */
+
+  if (isHowToUsePage) {
+    return (
+      <HowToUse />
+    );
+  }
 
   if (isResetPassword) {
     return (
