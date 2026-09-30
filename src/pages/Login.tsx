@@ -304,7 +304,6 @@ export default function Login({
           <div
             onClick={(event) => event.stopPropagation()}
             style={{
-              position: "relative",
               width: "100%",
               maxWidth: 1080,
               height: "min(92vh, 900px)",
@@ -312,40 +311,66 @@ export default function Login({
               borderRadius: 18,
               overflow: "hidden",
               boxShadow: "0 24px 80px rgba(0,0,0,0.45)",
+              display: "flex",
+              flexDirection: "column",
             }}
           >
-            <button
-              type="button"
-              onClick={() => setShowHowToUse(false)}
-              aria-label="Close How to Use"
-              title="Close"
+            <div
               style={{
-                position: "absolute",
-                top: 12,
-                right: 12,
-                zIndex: 2,
-                width: 40,
-                height: 40,
-                border: "1px solid #dc2626",
-                borderRadius: 10,
-                background: "#dc2626",
-                color: "#ffffff",
-                cursor: "pointer",
-                fontSize: 22,
-                lineHeight: 1,
+                flexShrink: 0,
+                minHeight: 60,
+                padding: "10px 14px 10px 18px",
+                boxSizing: "border-box",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                background: "#ffffff",
+                borderBottom: "1px solid #e5e7eb",
               }}
             >
-              ×
-            </button>
+              <div
+                style={{
+                  fontSize: 15,
+                  fontWeight: 800,
+                  color: "#111827",
+                }}
+              >
+                How to Use EV Toolkit
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowHowToUse(false)}
+                aria-label="Close How to Use"
+                title="Close"
+                style={{
+                  width: 40,
+                  height: 40,
+                  flexShrink: 0,
+                  border: "1px solid #dc2626",
+                  borderRadius: 9,
+                  background: "#dc2626",
+                  color: "#ffffff",
+                  cursor: "pointer",
+                  fontSize: 22,
+                  lineHeight: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 700,
+                }}
+              >
+                ×
+              </button>
+            </div>
 
             <div
               id="how-to-use-title"
               style={{
                 width: "100%",
-                height: "100%",
+                flex: "1 1 auto",
+                minHeight: 0,
                 overflowY: "auto",
                 boxSizing: "border-box",
               }}
