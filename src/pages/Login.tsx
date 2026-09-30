@@ -866,9 +866,8 @@ export default function Login({
         </div>
       </div>
     </div>
-  );
 
-      {showHowToUse && (
+    {showHowToUse && (
         <div
           role="dialog"
           aria-modal="true"
@@ -1040,6 +1039,6 @@ export default function Login({
             </div>
           </div>
         </div>
-      )}
-
+    )}
+  );
 }
