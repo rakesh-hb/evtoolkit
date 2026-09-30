@@ -307,7 +307,7 @@ export default function Login({
               width: "100%",
               maxWidth: 1080,
               height: "min(92vh, 900px)",
-              background: "#f5f7fb",
+              background: "#07111f",
               borderRadius: 18,
               overflow: "hidden",
               boxShadow: "0 24px 80px rgba(0,0,0,0.45)",
@@ -325,15 +325,15 @@ export default function Login({
                 alignItems: "center",
                 justifyContent: "space-between",
                 gap: 12,
-                background: "#ffffff",
-                borderBottom: "1px solid #e5e7eb",
+                background: "#0f1b2d",
+                borderBottom: "1px solid rgba(148,163,184,0.18)",
               }}
             >
               <div
                 style={{
                   fontSize: 15,
                   fontWeight: 800,
-                  color: "#111827",
+                  color: "#ffffff",
                 }}
               >
                 How to Use EV Toolkit
