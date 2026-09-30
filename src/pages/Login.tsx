@@ -17,8 +17,6 @@ export default function Login({
   const [registerMode, setRegisterMode] =
     useState(false);
 
-  const [showHowToUse, setShowHowToUse] =
-    useState(false);
 
   const [firstName, setFirstName] =
     useState("");
@@ -848,199 +846,24 @@ export default function Login({
               : "New to EV Toolkit? Create Account"}
           </button>
 
-          <button
-            type="button"
-            onClick={() => setShowHowToUse(true)}
+          <a
+            href="/how-to-use"
             style={{
               display: "block",
               margin: "12px auto 0",
-              border: "none",
-              background: "transparent",
               color: "#2563eb",
+              textDecoration: "none",
               cursor: "pointer",
               fontSize: 14,
               fontWeight: 600,
             }}
           >
             How to Use EV Toolkit
-          </button>
+          </a>
         </div>
       </div>
     </div>
 
-    {showHowToUse && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="how-to-use-title"
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 1000,
-            background: "rgba(15, 23, 42, 0.65)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16,
-          }}
-          onClick={() => setShowHowToUse(false)}
-        >
-          <div
-            className="card"
-            style={{
-              width: 760,
-              maxWidth: "100%",
-              maxHeight: "90vh",
-              overflow: "hidden",
-              position: "relative",
-              padding: 24,
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              aria-label="Close How to Use guide"
-              onClick={() => setShowHowToUse(false)}
-              style={{
-                position: "absolute",
-                top: 14,
-                right: 14,
-                width: 34,
-                height: 34,
-                border: "none",
-                borderRadius: 8,
-                background: "#dc2626",
-                color: "#ffffff",
-                fontSize: 22,
-                lineHeight: 1,
-                cursor: "pointer",
-                fontWeight: 700,
-              }}
-            >
-              ×
-            </button>
-
-            <div
-              style={{
-                overflowY: "auto",
-                maxHeight: "calc(90vh - 48px)",
-                paddingRight: 8,
-              }}
-            >
-              <h2
-                id="how-to-use-title"
-                style={{
-                  marginTop: 0,
-                  marginBottom: 6,
-                  paddingRight: 44,
-                }}
-              >
-                ⚡ How to Use EV Toolkit
-              </h2>
-
-              <p
-                style={{
-                  color: "#6b7280",
-                  marginTop: 0,
-                  marginBottom: 22,
-                }}
-              >
-                A quick guide to the main features of EV Toolkit.
-              </p>
-
-              <p>
-                EV Toolkit is a complete EV ownership companion designed to help you manage your EV information from one place — from charging and planning to service history, tyres, insurance, documents and analytics.
-              </p>
-
-              <h3>1. Getting Started</h3>
-              <p>EV Toolkit is designed to help you manage your EV ownership information from one place.</p>
-              <p>After signing in, start by checking your vehicle information and Primary Vehicle selection in Settings. The selected Primary Vehicle is used by supported parts of the application when displaying vehicle-related information.</p>
-              <p>You can use the Dashboard as your starting point and then move between Charging Tracker, Planner, Analytics and the vehicle record sections from the application menu.</p>
-
-              <h3>2. Dashboard</h3>
-              <p>The Dashboard provides a quick overview of your EV information and recent activity.</p>
-              <p>Review your selected vehicle, view charging activity and key totals, review recent activity, and use the available dashboard cards to navigate to related features.</p>
-
-              <h3>3. Charging Tracker</h3>
-              <p>Charging Tracker is used to record your charging sessions.</p>
-              <p>Enter the information available for a charging session, such as date, energy, cost and other supported details.</p>
-              <p>Saved charging sessions are used by Analytics to calculate charging activity, energy and cost information.</p>
-              <p>Keep charging records accurate because Analytics depends on the underlying Tracker data.</p>
-
-              <h3>4. Planner</h3>
-              <p>Planner helps you estimate charging and trip-related information using the inputs available in the application.</p>
-              <p>Use the available vehicle, battery, charging and trip inputs to estimate energy requirements, charging time, range and charging cost where supported.</p>
-
-              <h3>5. Service History</h3>
-              <p>Service History is used to maintain a chronological record of vehicle servicing and maintenance.</p>
-              <p>Use it to record completed maintenance work, service information, dates, mileage, costs and other supported details.</p>
-              <p>Supporting receipts or documents can be attached where the feature is available for your subscription.</p>
-
-              <h3>6. Tyre History</h3>
-              <p>Tyre History is used to maintain tyre-related records.</p>
-              <p>Record tyre replacements and other significant tyre-related information supported by the page. Keep separate records when a new tyre set or significant tyre-related event needs to be retained.</p>
-
-              <h3>7. Insurance</h3>
-              <p>Insurance is used to maintain your vehicle insurance information.</p>
-              <p>You can record supported information such as the insurance company, policy number, policy type, dates, premium, IDV, add-ons, agent details and notes.</p>
-              <p>Supporting policy documents can be attached where available for your subscription.</p>
-
-              <h3>8. Document Vault</h3>
-              <p>Document Vault is intended to keep important EV and vehicle documents organised and accessible.</p>
-              <p>Use descriptive filenames so that documents remain easy to identify later. Document storage and upload capabilities depend on the subscription plan.</p>
-
-              <h3>9. Analytics</h3>
-              <p>Analytics provides a detailed view of your charging activity, energy consumption, costs, trends and recent charging sessions.</p>
-              <p>Analytics uses the charging-session records stored by Charging Tracker as its underlying source data.</p>
-              <p>The page also provides reporting and PDF export functionality where available.</p>
-
-              <h3>10. Settings, Vehicles &amp; Backup</h3>
-              <p>Settings contains the application's supported configuration options.</p>
-              <p>Manage vehicle-related settings; select your Primary Vehicle; manage family-related settings where available; review backup options available for your subscription; and manage subscription-related features.</p>
-              <p>Review your settings before entering large amounts of ownership data so that the application uses the intended preferences.</p>
-
-              <h3>11. User Profile</h3>
-              <p>User Profile contains your account-related information.</p>
-              <p>You can review and update supported profile information and manage your password through the profile area.</p>
-              <p>Keep your account information current so that your EV Toolkit account remains easy to manage.</p>
-
-              <h3>12. Family Sharing</h3>
-              <p>EV Toolkit supports family-oriented information sharing where available under your subscription.</p>
-              <p>Shared information can be viewed according to the application's family access rules, while ownership protections continue to control who can modify or delete protected records.</p>
-              <p>Family-member availability and limits depend on the subscription plan.</p>
-
-              <h3>13. Subscription Features</h3>
-              <p>EV Toolkit provides Free, Premium and Premium Plus access levels.</p>
-              <p>Feature availability and record limits depend on the active subscription plan.</p>
-              <p>Premium Plus includes additional capabilities such as supported cloud attachment storage and related backup features.</p>
-
-              <h3>14. Important Tips</h3>
-              <ul style={{ lineHeight: 1.7, paddingLeft: 22 }}>
-                <li>Keep charging records accurate because they are used by Analytics.</li>
-                <li>Keep vehicle and insurance information up to date.</li>
-                <li>Use descriptive names for uploaded documents.</li>
-                <li>Review your Primary Vehicle when managing multiple vehicles.</li>
-                <li>Keep exported reports and backups in a secure location.</li>
-                <li>Review recipients carefully before sharing reports, screenshots or documents containing personal information.</li>
-              </ul>
-
-              <div
-                style={{
-                  marginTop: 20,
-                  padding: 14,
-                  borderRadius: 10,
-                  background: "#f3f4f6",
-                  color: "#4b5563",
-                  fontSize: 13,
-                  lineHeight: 1.5,
-                }}
-              >
-                Tip: You can return to the How to Use page anytime from the How to Use option in the side menu after signing in.
-              </div>
-            </div>
-          </div>
-        </div>
-    )}
     </>
   );
 }
