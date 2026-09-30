@@ -60,10 +60,10 @@ function InfoSection({
       {isOpen && (
         <div
           style={{
-            padding: "18px",
+            padding: "20px 22px 22px",
             color: "#4b5563",
             fontSize: "14px",
-            lineHeight: 1.65,
+            lineHeight: 1.7,
           }}
         >
           {children}
@@ -88,7 +88,7 @@ export default function HowToUse() {
         width: "100%",
         minHeight: "100%",
         boxSizing: "border-box",
-        padding: "20px",
+        padding: "28px 20px 32px",
       }}
     >
       <div
@@ -111,7 +111,7 @@ export default function HowToUse() {
       flexDirection: "column",
       alignItems: "center",
       justifyContent: "center",
-      gap: "10px",
+      gap: "12px",
     }}
   >
     <div
@@ -145,7 +145,7 @@ export default function HowToUse() {
 
       <p
         style={{
-          margin: "6px 0 0",
+          margin: "8px 0 0",
           fontSize: "14px",
           color: "#f97316",
           fontWeight: 700,
@@ -163,7 +163,7 @@ export default function HowToUse() {
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: "12px",
+            gap: "14px",
           }}
         >
           <InfoSection
@@ -481,8 +481,8 @@ export default function HowToUse() {
         {/* Bottom tip */}
         <div
           style={{
-            marginTop: "18px",
-            padding: "14px 16px",
+            marginTop: "24px",
+            padding: "16px 18px",
             borderRadius: "12px",
             background: "#fff7ed",
             border: "1px solid #fed7aa",
