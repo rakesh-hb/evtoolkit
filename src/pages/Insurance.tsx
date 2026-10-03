@@ -1680,12 +1680,18 @@ export default function Insurance({
                   value={
                     editingId !== null
                       ? form.vehicle
-                      : vehicleSearch
+                      : showVehicleSuggestions
+                        ? vehicleSearch
+                        : form.vehicle
                   }
                   disabled={editingId !== null}
                   onFocus={() => {
                     if (editingId === null) {
                       setShowVehicleSuggestions(true);
+
+                      if (!vehicleSearch) {
+                        setVehicleSearch(form.vehicle);
+                      }
                     }
                   }}
                   onChange={(e) => {
@@ -1696,7 +1702,7 @@ export default function Insurance({
 
                     setForm((previous) => ({
                       ...previous,
-                      vehicle: "",
+                      vehicle: value,
                     }));
                   }}
                   onBlur={(e) => {
@@ -1719,11 +1725,16 @@ export default function Insurance({
                   type="button"
                   aria-label="Show vehicle list"
                   disabled={editingId !== null}
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     if (editingId === null) {
                       setShowVehicleSuggestions(
                         (open) => !open
                       );
+
+                      if (!showVehicleSuggestions) {
+                        setVehicleSearch("");
+                      }
                     }
                   }}
                   style={{
