@@ -1269,11 +1269,21 @@ export default function ServiceHistory({
                 <input
                   type="text"
                   placeholder="Type vehicle name to search..."
-                  value={editingId !== null ? form.vehicle : vehicleSearch}
+                  value={
+                    editingId !== null
+                      ? form.vehicle
+                      : showVehicleSuggestions
+                        ? vehicleSearch
+                        : form.vehicle
+                  }
                   disabled={editingId !== null}
                   onFocus={() => {
                     if (editingId === null) {
                       setShowVehicleSuggestions(true);
+
+                      if (!vehicleSearch) {
+                        setVehicleSearch(form.vehicle);
+                      }
                     }
                   }}
                   onChange={(e) => {
@@ -1283,7 +1293,7 @@ export default function ServiceHistory({
 
                     setForm((previous) => ({
                       ...previous,
-                      vehicle: "",
+                      vehicle: value,
                     }));
                   }}
                   onBlur={(e) => {
@@ -1300,9 +1310,14 @@ export default function ServiceHistory({
                   type="button"
                   aria-label="Show vehicle list"
                   disabled={editingId !== null}
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     if (editingId === null) {
                       setShowVehicleSuggestions((open) => !open);
+
+                      if (!showVehicleSuggestions) {
+                        setVehicleSearch("");
+                      }
                     }
                   }}
                   style={{
