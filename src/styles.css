@@ -901,15 +901,24 @@ select:focus {
   background: #16a34a;
   color: white;
   padding: 6px 14px;
+  border: none;
+  outline: none;
+  box-shadow: none;
   border-radius: 6px;
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;
   transition: background 0.2s;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .downloadButton:hover {
   background: #15803d;
+}
+
+.downloadButton:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
 }
 
 .restoreButton {

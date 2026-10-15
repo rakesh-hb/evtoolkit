@@ -1,4 +1,8 @@
-import { FileText } from "lucide-react";
+import { Download, FileText, Share2, X } from "lucide-react";
+import { useState } from "react";
+import { Capacitor } from "@capacitor/core";
+import { Directory, Filesystem } from "@capacitor/filesystem";
+import { Share } from "@capacitor/share";
 import { toPng } from "html-to-image";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -551,7 +555,10 @@ function addCoverPage(pdf: jsPDF, reportData: any) {
   );
 }
 
-async function exportAnalyticsPDF(reportData: any) {
+async function exportAnalyticsPDF(
+  reportData: any,
+  action: "download" | "share"
+) {
   const pdf = new jsPDF({
     orientation: "portrait",
     unit: "mm",
@@ -936,9 +943,91 @@ async function exportAnalyticsPDF(reportData: any) {
     `${pad(generatedAt.getMinutes())}-` +
     `${pad(generatedAt.getSeconds())}`;
 
-  pdf.save(
-    `EVToolkit_Analytics_Report_${fileTimestamp}.pdf`
-  );
+  const fileName =
+    `EVToolkit_Analytics_Report_${fileTimestamp}.pdf`;
+
+  const pdfBlob = pdf.output("blob");
+
+  // Web: Download directly, or use the browser share sheet when supported.
+  if (!Capacitor.isNativePlatform()) {
+    if (action === "download") {
+      pdf.save(fileName);
+      return;
+    }
+
+    const file = new File([pdfBlob], fileName, {
+      type: "application/pdf",
+    });
+
+    if (
+      typeof navigator.share === "function" &&
+      typeof navigator.canShare === "function" &&
+      navigator.canShare({ files: [file] })
+    ) {
+      await navigator.share({
+        title: fileName,
+        text: "EV Toolkit Analytics Report",
+        files: [file],
+      });
+    } else {
+      // Fall back to a normal download on browsers without file sharing.
+      pdf.save(fileName);
+    }
+    return;
+  }
+
+  const pdfBase64 = await blobToBase64(pdfBlob);
+
+  // Native Download: save the PDF to the device Documents directory.
+  if (action === "download") {
+    await Filesystem.writeFile({
+      path: fileName,
+      data: pdfBase64,
+      directory: Directory.Documents,
+    });
+    alert(`PDF saved to Documents: ${fileName}`);
+    return;
+  }
+
+  // Native Share: write to cache and open the Android/iOS share sheet.
+  const savedFile = await Filesystem.writeFile({
+    path: fileName,
+    data: pdfBase64,
+    directory: Directory.Cache,
+  });
+
+  await Share.share({
+    title: fileName,
+    text: "EV Toolkit Analytics Report",
+    url: savedFile.uri,
+    dialogTitle: "Share PDF report",
+  });
+}
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onloadend = () => {
+      if (typeof reader.result !== "string") {
+        reject(new Error("Unable to process the PDF file."));
+        return;
+      }
+
+      const separator = reader.result.indexOf(",");
+      resolve(
+        separator >= 0
+          ? reader.result.slice(separator + 1)
+          : reader.result
+      );
+    };
+
+    reader.onerror = () => {
+      reject(new Error("Unable to process the PDF file."));
+    };
+
+    reader.readAsDataURL(blob);
+  });
 }
 
 async function getCurrentUserDetails() {
@@ -995,38 +1084,115 @@ function createReportSnapshot(reportData: any) {
 export default function ReportToolbar({
   reportData,
 }: ReportToolbarProps) {
-  const handleExportPDF = async () => {
+  const [showFileActionDialog, setShowFileActionDialog] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportPDF = async (action: "download" | "share") => {
+    if (isExporting) return;
+
+    setIsExporting(true);
     try {
-      console.log("Export button clicked");
-
-      const reportSnapshot =
-        createReportSnapshot(reportData);
-
-      const userDetails =
-        await getCurrentUserDetails();
-
+      const reportSnapshot = createReportSnapshot(reportData);
+      const userDetails = await getCurrentUserDetails();
       reportSnapshot.userDetails = userDetails;
 
-      await exportAnalyticsPDF(reportSnapshot);
-
-      console.log("Analytics PDF generated and saved");
+      await exportAnalyticsPDF(reportSnapshot, action);
+      setShowFileActionDialog(false);
     } catch (error) {
       console.error("Failed to export PDF:", error);
-      alert("Failed to generate PDF report.");
+      alert("Failed to generate PDF report. Please try again.");
+    } finally {
+      setIsExporting(false);
     }
   };
 
   return (
-    <div className="reportToolbar">
+    <div className="reportToolbar" style={{ position: "relative" }}>
       <button
         className="reportButton"
-        onClick={handleExportPDF}
+        onClick={() => setShowFileActionDialog(true)}
         type="button"
+        disabled={isExporting}
       >
         <FileText size={18} />
         Export PDF
       </button>
+
+      {showFileActionDialog && (
+        <div
+          role="presentation"
+          onClick={() => !isExporting && setShowFileActionDialog(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            background: "rgba(0, 0, 0, 0.58)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="report-file-action-title"
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: 360,
+              background: "#111827",
+              color: "#f9fafb",
+              border: "1px solid #374151",
+              borderRadius: 16,
+              padding: 22,
+              boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
+              <h3 id="report-file-action-title" style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>
+                Export analytics report
+              </h3>
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={() => setShowFileActionDialog(false)}
+                disabled={isExporting}
+                style={{ border: 0, background: "transparent", color: "#d1d5db", cursor: "pointer", padding: 4 }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <p style={{ margin: "0 0 18px", color: "#9ca3af", fontSize: 13 }}>
+              Choose how you want to handle the PDF file.
+            </p>
+            <button
+              type="button"
+              onClick={() => void handleExportPDF("download")}
+              disabled={isExporting}
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "13px 14px", borderRadius: 10, border: "1px solid #374151", background: "#1f2937", color: "#f9fafb", textAlign: "left", cursor: isExporting ? "wait" : "pointer", marginBottom: 10 }}
+            >
+              <Download size={19} />
+              <span>
+                <strong style={{ display: "block", fontSize: 14 }}>{isExporting ? "Preparing PDF…" : "Download PDF"}</strong>
+                <span style={{ display: "block", color: "#9ca3af", fontSize: 12, marginTop: 3 }}>Save a copy to your device</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleExportPDF("share")}
+              disabled={isExporting}
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "13px 14px", borderRadius: 10, border: "1px solid #374151", background: "#1f2937", color: "#f9fafb", textAlign: "left", cursor: isExporting ? "wait" : "pointer" }}
+            >
+              <Share2 size={19} />
+              <span>
+                <strong style={{ display: "block", fontSize: 14 }}>Share PDF</strong>
+                <span style={{ display: "block", color: "#9ca3af", fontSize: 12, marginTop: 3 }}>Send it to another app or person</span>
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-

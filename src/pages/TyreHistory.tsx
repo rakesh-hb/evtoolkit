@@ -19,6 +19,7 @@ import {
 
 import { getCurrentUserId } from "../services/authHelper";
 import { supabase } from "../lib/supabase";
+import { downloadAttachment } from "../services/attachmentService";
 
 import {
   getCurrentPlan,
@@ -1570,16 +1571,19 @@ export default function TyreHistory({ onNavigate }: TyreHistoryProps) {
                             <>
 
 
-                            <a
-                              href={
-                                record.receipt
-                              }
-                              download={record.attachment_name || `${record.brand}-${record.model}-Receipt`}
+                            <button
+                              type="button"
                               className="downloadButton"
+                              onClick={() =>
+                                void downloadAttachment(
+                                  record.receipt || "",
+                                  record.attachment_name || `${record.brand}-${record.model}-Receipt`
+                                )
+                              }
                             >
                               ⬇
                               Download
-                            </a>
+                            </button>
 
                             {record.attachment_name && (
                               <div
