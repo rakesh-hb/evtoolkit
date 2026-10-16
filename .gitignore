@@ -27,3 +27,10 @@ dist-ssr
 .env
 .env.*
 !.env.example
+# Android / Gradle generated files
+android/.gradle/
+android/**/build/
+android/local.properties
+android/captures/
+android/.externalNativeBuild/
+android/.cxx/

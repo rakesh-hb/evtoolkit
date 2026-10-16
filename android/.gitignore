@@ -1,0 +1,16 @@
+.gradle/
+**/build/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+*.jks
+*.keystore
+
+# Capacitor-generated web assets
+app/src/main/assets/public/
+app/src/main/assets/capacitor.config.json
+app/src/main/assets/capacitor.plugins.json
+
+# Generated Cordova plugin module build output
+capacitor-cordova-android-plugins/build/
