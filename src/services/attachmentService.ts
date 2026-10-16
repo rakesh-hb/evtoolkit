@@ -152,7 +152,7 @@ function chooseAttachmentAction(fileName: string): Promise<AttachmentAction> {
     const downloadButton = makeActionButton(
       "Download file",
       Capacitor.isNativePlatform()
-        ? "Save a copy to EV Toolkit's Documents storage"
+        ? "Save a copy to EV Toolkit's private storage"
         : "Save a copy using your browser",
       "download",
       "⬇"
@@ -166,12 +166,7 @@ function chooseAttachmentAction(fileName: string): Promise<AttachmentAction> {
     );
     shareButton.style.marginBottom = "0";
 
-    dialog.append(
-      header,
-      description,
-      downloadButton,
-      shareButton
-    );
+    dialog.append(header, description, downloadButton, shareButton);
     overlay.appendChild(dialog);
 
     overlay.addEventListener("click", (event) => {
@@ -276,15 +271,16 @@ export async function downloadAttachment(
     const base64 = await blobToBase64(blob);
 
     if (action === "download") {
+      // App-private storage avoids Android shared-storage permission errors.
       await Filesystem.writeFile({
         path: safeFileName,
         data: base64,
-        directory: Directory.Documents,
+        directory: Directory.Data,
         recursive: true,
       });
 
       alert(
-        `Saved "${safeFileName}" to EV Toolkit's Documents storage. ` +
+        `Saved "${safeFileName}" to EV Toolkit's private storage. ` +
           "To save it in the phone's public Downloads folder, choose Share and select a file-saving app."
       );
       return;
