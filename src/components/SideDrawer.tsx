@@ -39,6 +39,7 @@ const sections = [
       { key: "refund", icon: "↩", label: "Return & Refund Policy" },
       { key: "cancellation", icon: "×", label: "Cancellation Policy" },
       { key: "about", icon: "i", label: "About Us" },
+      { key: "delete-account", icon: "✉", label: "Account Deletion" },
     ],
   },
 ];
@@ -673,7 +674,31 @@ export default function SideDrawer({
                 "rgba(248,113,113,0.32)";
             }}
           >
-            ⏻ Logout
+            <span
+              aria-hidden="true"
+              style={{
+                display: "inline-flex",
+                width: "16px",
+                height: "16px",
+                marginRight: "7px",
+                verticalAlign: "middle",
+              }}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 2v10" />
+                <path d="M6.2 5.8a8 8 0 1 0 11.6 0" />
+              </svg>
+            </span>
+            Logout
           </button>
         </div>
       </div>
