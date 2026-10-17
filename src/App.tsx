@@ -11,9 +11,9 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Terms from "./pages/Terms";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import AccountDeletion from "./pages/AccountDeletion";
 import RefundPolicy from "./pages/RefundPolicy";
 import CancellationPolicy from "./pages/CancellationPolicy";
-import AccountDeletion from "./pages/AccountDeletion";
 
 import { useAuth } from "./context/AuthContext";
 import { supabase } from "./lib/supabase";
@@ -256,6 +256,9 @@ function App() {
     loading,
   ]);
 
+  const isAccountDeletionPage =
+    window.location.pathname === "/delete-account";
+
   const isHowToUsePage =
     window.location.pathname ===
     "/how-to-use";
@@ -297,17 +300,6 @@ function App() {
       "/privacy" ||
     window.location.pathname ===
       "/privacy-policy";
-
-  /*
-   * ============================================================
-   * ACCOUNT DELETION
-   * ============================================================
-   *
-   * Public page — no authentication required.
-   */
-
-  const isAccountDeletionPage =
-    window.location.pathname === "/delete-account";
 
   /*
    * ============================================================
@@ -363,11 +355,6 @@ function App() {
    * ============================================================
    */
 
-  // Keep the account-deletion information accessible without login.
-  if (isAccountDeletionPage) {
-    return <AccountDeletion />;
-  }
-
   if (loading) {
     return (
       <div
@@ -410,6 +397,18 @@ function App() {
     return (
       <PrivacyPolicy />
     );
+  }
+
+  /*
+   * ============================================================
+   * ACCOUNT DELETION
+   * ============================================================
+   *
+   * Public page — no authentication required.
+   */
+
+  if (isAccountDeletionPage) {
+    return <AccountDeletion />;
   }
 
   /*
@@ -642,6 +641,9 @@ function App() {
         return (
           <CancellationPolicy />
         );
+
+      case "delete-account":
+        return <AccountDeletion />;
 
       default:
         return (
