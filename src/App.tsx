@@ -13,6 +13,7 @@ import Terms from "./pages/Terms";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import RefundPolicy from "./pages/RefundPolicy";
 import CancellationPolicy from "./pages/CancellationPolicy";
+import AccountDeletion from "./pages/AccountDeletion";
 
 import { useAuth } from "./context/AuthContext";
 import { supabase } from "./lib/supabase";
@@ -299,6 +300,17 @@ function App() {
 
   /*
    * ============================================================
+   * ACCOUNT DELETION
+   * ============================================================
+   *
+   * Public page — no authentication required.
+   */
+
+  const isAccountDeletionPage =
+    window.location.pathname === "/delete-account";
+
+  /*
+   * ============================================================
    * RETURN & REFUND POLICY
    * ============================================================
    *
@@ -350,6 +362,11 @@ function App() {
    * LOADING
    * ============================================================
    */
+
+  // Keep the account-deletion information accessible without login.
+  if (isAccountDeletionPage) {
+    return <AccountDeletion />;
+  }
 
   if (loading) {
     return (
