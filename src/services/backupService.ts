@@ -1,3 +1,6 @@
+
+import { Capacitor, registerPlugin } from "@capacitor/core";
+import { Directory, Filesystem } from "@capacitor/filesystem";
 import { supabase } from "../lib/supabase";
 
 import { getChargingSessions } from "./chargingService";
@@ -6,27 +9,111 @@ import { getTyres } from "./tyreService";
 import { getDocuments } from "./documentVaultService";
 import { getInsurance } from "./insuranceService";
 
-export async function createBackup() {
+const BACKUP_FILE_TYPE = "application/json";
+
+interface SaveFilePlugin {
+  saveFile(options: {
+    fileName: string;
+    mimeType: string;
+    sourceUri: string;
+  }): Promise<{ cancelled: boolean; uri?: string }>;
+}
+
+const SaveFile = registerPlugin<SaveFilePlugin>("SaveFile");
+
+function getSafeFileName(fileName: string): string {
+  const cleaned = fileName
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_")
+    .trim();
+
+  return cleaned || "EVToolkit_Backup.json";
+}
+
+async function blobToBase64(blob: Blob): Promise<string> {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let binary = "";
+  const chunkSize = 0x8000;
+
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(
+      ...bytes.subarray(offset, Math.min(offset + chunkSize, bytes.length))
+    );
+  }
+
+  return btoa(binary);
+}
+
+function downloadOnWeb(blob: Blob, fileName: string): void {
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = objectUrl;
+  link.download = fileName;
+  link.style.display = "none";
+
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+}
+
+async function downloadOnAndroid(
+  blob: Blob,
+  fileName: string
+): Promise<boolean> {
+  const base64 = await blobToBase64(blob);
+  const tempPath = `backup-${Date.now()}.json`;
+
+  const cachedFile = await Filesystem.writeFile({
+    path: tempPath,
+    data: base64,
+    directory: Directory.Cache,
+    recursive: true,
+  });
+
   try {
-    const [
-      charging,
-      service,
-      tyres,
-      documents,
-      insurance,
-    ] = await Promise.all([
-      getChargingSessions(),
-      getServiceRecords(),
-      getTyres(),
-      getDocuments(),
-      getInsurance(),
-    ]);
+    const result = await SaveFile.saveFile({
+      fileName,
+      mimeType: BACKUP_FILE_TYPE,
+      sourceUri: cachedFile.uri,
+    });
+
+    if (result.cancelled) {
+      return false;
+    }
+
+    return true;
+  } finally {
+    try {
+      await Filesystem.deleteFile({
+        path: tempPath,
+        directory: Directory.Cache,
+      });
+    } catch (cleanupError) {
+      console.warn(
+        "Could not remove temporary backup file:",
+        cleanupError
+      );
+    }
+  }
+}
+
+export async function createBackup(): Promise<void> {
+  try {
+    const [charging, service, tyres, documents, insurance] =
+      await Promise.all([
+        getChargingSessions(),
+        getServiceRecords(),
+        getTyres(),
+        getDocuments(),
+        getInsurance(),
+      ]);
 
     const backup = {
       app: "EV Toolkit",
       version: 1,
       createdAt: new Date().toISOString(),
-
       charging,
       service,
       tyres,
@@ -34,28 +121,13 @@ export async function createBackup() {
       insurance,
     };
 
-    const json = JSON.stringify(
-      backup,
-      null,
-      2
-    );
-
+    const json = JSON.stringify(backup, null, 2);
     const blob = new Blob([json], {
-      type: "application/json",
+      type: BACKUP_FILE_TYPE,
     });
 
-    const url =
-      URL.createObjectURL(blob);
+    const today = new Date().toISOString().split("T")[0];
 
-    const a =
-      document.createElement("a");
-
-    const today = new Date()
-      .toISOString()
-      .split("T")[0];
-
-    // Use the signed-in user's first and last name in the
-    // backup filename so exported backups are easy to identify.
     const {
       data: { user },
       error: userError,
@@ -69,66 +141,58 @@ export async function createBackup() {
     }
 
     const firstName =
-      user?.user_metadata?.first_name
-        ?.toString()
-        .trim() || "";
+      user?.user_metadata?.first_name?.toString().trim() || "";
 
     const lastName =
-      user?.user_metadata?.last_name
-        ?.toString()
-        .trim() || "";
+      user?.user_metadata?.last_name?.toString().trim() || "";
 
-    const userName =
-      [firstName, lastName]
-        .filter(Boolean)
-        .join("_")
-        .replace(/[^A-Za-z0-9_-]/g, "");
+    const userName = [firstName, lastName]
+      .filter(Boolean)
+      .join("_")
+      .replace(/[^A-Za-z0-9_-]/g, "");
 
-    const fileNameUser =
-      userName || "User";
+    const fileNameUser = userName || "User";
 
-    a.href = url;
+    const fileName = getSafeFileName(
+      `EVToolkit_Backup_${fileNameUser}_${today}.json`
+    );
 
-    a.download =
-      `EVToolkit_Backup_${fileNameUser}_${today}.json`;
+    // Android: let the user choose the destination using the
+    // native Android Save As document picker.
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android") {
+      const saved = await downloadOnAndroid(blob, fileName);
 
-    document.body.appendChild(a);
+      if (!saved) {
+        return;
+      }
+    } else {
+      // Web and other platforms retain the browser download behavior.
+      downloadOnWeb(blob, fileName);
+    }
 
-    a.click();
-
-    document.body.removeChild(a);
-
-    URL.revokeObjectURL(url);
-
-    // Record the successful backup in Supabase so the
-    // Settings page can show the correct Last Backup time.
+    // Record the successful backup in Supabase.
+    // This records the backup operation, not the physical file location.
     if (userError) {
       console.error(
         "Could not get current user for backup registry:",
         userError
       );
     } else if (user) {
-      const hashBuffer =
-        await crypto.subtle.digest(
-          "SHA-256",
-          new TextEncoder().encode(json)
-        );
+      const hashBuffer = await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(json)
+      );
 
-      const backupHash = Array.from(
-        new Uint8Array(hashBuffer)
-      )
-        .map((byte) =>
-          byte.toString(16).padStart(2, "0")
-        )
+      const backupHash = Array.from(new Uint8Array(hashBuffer))
+        .map((byte) => byte.toString(16).padStart(2, "0"))
         .join("");
 
-      const { error: registryError } =
-        await supabase
-          .from("backup_registry")
-          .insert({
-            user_id: user.id,
-            backup_hash: backupHash,
-          });
+      const { error: registryError } = await supabase
+        .from("backup_registry")
+        .insert({
+          user_id: user.id,
+          backup_hash: backupHash,
+        });
 
       if (registryError) {
         console.error(
@@ -138,379 +202,168 @@ export async function createBackup() {
       }
     }
 
-    alert(
-      "Backup created successfully."
-    );
-  } catch (err: any) {
-    console.error(
-      "Backup creation error:",
-      err
-    );
+    alert("Backup created successfully.");
+  } catch (err: unknown) {
+    console.error("Backup creation error:", err);
 
     alert(
-      err?.message ||
-        "Failed to create backup."
+      err instanceof Error
+        ? err.message
+        : "Failed to create backup."
     );
   }
 }
 
-export async function restoreBackup(
-  file: File
-) {
+export async function restoreBackup(file: File): Promise<void> {
   try {
-    // ============================================================
-    // Read backup file
-    // ============================================================
-
-    const text =
-      await file.text();
+    // Read backup file.
+    const text = await file.text();
 
     let backup: any;
 
     try {
-      backup =
-        JSON.parse(text);
+      backup = JSON.parse(text);
     } catch {
-      throw new Error(
-        "The selected file is not valid JSON."
-      );
+      throw new Error("The selected file is not valid JSON.");
     }
 
-    // ============================================================
-    // Validate backup
-    // ============================================================
-
-    if (
-      !backup ||
-      typeof backup !== "object"
-    ) {
-      throw new Error(
-        "Invalid backup file."
-      );
+    // Validate backup.
+    if (!backup || typeof backup !== "object") {
+      throw new Error("Invalid backup file.");
     }
 
-    if (
-      backup.app !==
-      "EV Toolkit"
-    ) {
+    if (backup.app !== "EV Toolkit") {
       throw new Error(
         "Invalid backup file. This file was not created by EV Toolkit."
       );
     }
 
-    if (
-      backup.version !== 1
-    ) {
-      throw new Error(
-        "Unsupported backup version."
-      );
+    if (backup.version !== 1) {
+      throw new Error("Unsupported backup version.");
     }
 
-    // ============================================================
-    // Validate backup sections
-    // ============================================================
+    // Validate backup sections.
+    const charging = Array.isArray(backup.charging)
+      ? backup.charging
+      : [];
 
-    const charging =
-      Array.isArray(
-        backup.charging
-      )
-        ? backup.charging
-        : [];
+    const service = Array.isArray(backup.service)
+      ? backup.service
+      : [];
 
-    const service =
-      Array.isArray(
-        backup.service
-      )
-        ? backup.service
-        : [];
+    const tyres = Array.isArray(backup.tyres)
+      ? backup.tyres
+      : [];
 
-    const tyres =
-      Array.isArray(
-        backup.tyres
-      )
-        ? backup.tyres
-        : [];
+    const documents = Array.isArray(backup.documents)
+      ? backup.documents
+      : [];
 
-    const documents =
-      Array.isArray(
-        backup.documents
-      )
-        ? backup.documents
-        : [];
+    const insurance = Array.isArray(backup.insurance)
+      ? backup.insurance
+      : [];
 
-    const insurance =
-      Array.isArray(
-        backup.insurance
-      )
-        ? backup.insurance
-        : [];
-
-    // ============================================================
-    // Confirm restore
-    // ============================================================
-
-    const confirmed =
-      window.confirm(
-        "Merge this backup with your existing data?\n\n" +
-          "• Existing records will be kept.\n" +
-          "• Records allowed by your current plan will be imported.\n" +
-          "• Duplicate or plan-limited records may be skipped."
-      );
+    // Confirm restore.
+    const confirmed = window.confirm(
+      "Merge this backup with your existing data?\n\n" +
+        "• Existing records will be kept.\n" +
+        "• Records allowed by your current plan will be imported.\n" +
+        "• Duplicate or plan-limited records may be skipped."
+    );
 
     if (!confirmed) {
       return;
     }
 
-    // ============================================================
-    // Charging
-    // ============================================================
+    // Charging.
+    const mappedCharging = charging.map((r: any) => ({
+      vehicle: r.vehicle,
+      charger: r.charger,
+      station: r.station,
+      energy: r.energy,
+      cost: r.cost,
+      date: r.date,
+      invoice: r.invoice ?? "",
+    }));
 
-    const mappedCharging =
-      charging.map(
-        (r: any) => ({
-          vehicle:
-            r.vehicle,
+    // Service history.
+    const mappedService = service.map((r: any) => ({
+      vehicle: r.vehicle,
+      service_date: r.service_date ?? r.date,
+      odometer: r.odometer,
+      service_type: r.service_type ?? r.serviceType,
+      workshop: r.workshop ?? r.serviceCenter,
+      cost: r.cost ?? r.amount,
+      notes: r.notes ?? "",
+      attachment: r.attachment ?? "",
+    }));
 
-          charger:
-            r.charger,
+    // Tyres.
+    const mappedTyres = tyres.map((r: any) => ({
+      brand: r.brand,
+      model: r.model,
+      size: r.size,
+      purchase_date: r.purchase_date ?? r.purchaseDate,
+      install_date: r.install_date ?? r.installDate,
+      odometer: r.odometer,
+      cost: r.cost,
+      dealer: r.dealer,
+      warranty_months: r.warranty_months ?? r.warrantyMonths,
+      receipt: r.receipt ?? "",
+      notes: r.notes ?? "",
+    }));
 
-          station:
-            r.station,
+    // Documents.
+    const mappedDocuments = documents.map((r: any) => ({
+      title: r.title,
+      category: r.category,
+      vehicle: r.vehicle,
+      document_date: r.document_date ?? r.documentDate,
+      file: r.file,
+      notes: r.notes ?? "",
+    }));
 
-          energy:
-            r.energy,
+    // Insurance.
+    const mappedInsurance = insurance.map((p: any) => ({
+      vehicle: p.vehicle,
+      company: p.company,
+      policy_number: p.policy_number,
+      policy_type: p.policy_type,
+      start_date: p.start_date,
+      expiry_date: p.expiry_date,
+      premium: p.premium,
+      idv: p.idv,
+      addons: p.addons,
+      agent: p.agent,
+      contact_number: p.contact_number,
+      notes: p.notes ?? "",
+      attachment: p.attachment ?? "",
+    }));
 
-          cost:
-            r.cost,
-
-          date:
-            r.date,
-
-          invoice:
-            r.invoice ?? "",
-        })
-      );
-
-    // ============================================================
-    // Service History
-    // ============================================================
-
-    const mappedService =
-      service.map(
-        (r: any) => ({
-          vehicle:
-            r.vehicle,
-
-          service_date:
-            r.service_date ??
-            r.date,
-
-          odometer:
-            r.odometer,
-
-          service_type:
-            r.service_type ??
-            r.serviceType,
-
-          workshop:
-            r.workshop ??
-            r.serviceCenter,
-
-          cost:
-            r.cost ??
-            r.amount,
-
-          notes:
-            r.notes ?? "",
-
-          attachment:
-            r.attachment ?? "",
-        })
-      );
-
-    // ============================================================
-    // Tyres
-    // ============================================================
-
-    const mappedTyres =
-      tyres.map(
-        (r: any) => ({
-          brand:
-            r.brand,
-
-          model:
-            r.model,
-
-          size:
-            r.size,
-
-          purchase_date:
-            r.purchase_date ??
-            r.purchaseDate,
-
-          install_date:
-            r.install_date ??
-            r.installDate,
-
-          odometer:
-            r.odometer,
-
-          cost:
-            r.cost,
-
-          dealer:
-            r.dealer,
-
-          warranty_months:
-            r.warranty_months ??
-            r.warrantyMonths,
-
-          receipt:
-            r.receipt ?? "",
-
-          notes:
-            r.notes ?? "",
-        })
-      );
-
-    // ============================================================
-    // Documents
-    // ============================================================
-
-    const mappedDocuments =
-      documents.map(
-        (r: any) => ({
-          title:
-            r.title,
-
-          category:
-            r.category,
-
-          vehicle:
-            r.vehicle,
-
-          document_date:
-            r.document_date ??
-            r.documentDate,
-
-          file:
-            r.file,
-
-          notes:
-            r.notes ?? "",
-        })
-      );
-
-    // ============================================================
-    // Insurance
-    // ============================================================
-
-    const mappedInsurance =
-      insurance.map(
-        (p: any) => ({
-          vehicle:
-            p.vehicle,
-
-          company:
-            p.company,
-
-          policy_number:
-            p.policy_number,
-
-          policy_type:
-            p.policy_type,
-
-          start_date:
-            p.start_date,
-
-          expiry_date:
-            p.expiry_date,
-
-          premium:
-            p.premium,
-
-          idv:
-            p.idv,
-
-          addons:
-            p.addons,
-
-          agent:
-            p.agent,
-
-          contact_number:
-            p.contact_number,
-
-          notes:
-            p.notes ?? "",
-
-          attachment:
-            p.attachment ?? "",
-        })
-      );
-
-    // ============================================================
-    // Restore through Supabase
-    // ============================================================
-
-    const {
-      data,
-      error,
-    } =
-      await supabase.rpc(
-        "restore_backup",
-        {
-          charging:
-            mappedCharging,
-
-          service:
-            mappedService,
-
-          tyres:
-            mappedTyres,
-
-          documents:
-            mappedDocuments,
-
-          insurance:
-            mappedInsurance,
-        }
-      );
-
-    // ============================================================
-    // Handle Supabase error
-    // ============================================================
+    // Restore through Supabase.
+    const { data, error } = await supabase.rpc("restore_backup", {
+      charging: mappedCharging,
+      service: mappedService,
+      tyres: mappedTyres,
+      documents: mappedDocuments,
+      insurance: mappedInsurance,
+    });
 
     if (error) {
-      console.error(
-        "restore_backup RPC error:",
-        error
-      );
+      console.error("restore_backup RPC error:", error);
 
       throw new Error(
         `Restore failed: ${
-          error.message ||
-          "Supabase could not restore the backup."
+          error.message || "Supabase could not restore the backup."
         }`
       );
     }
 
-    // ============================================================
-    // Validate RPC response
-    // ============================================================
-
-    if (
-      !data ||
-      typeof data !== "object"
-    ) {
+    if (!data || typeof data !== "object") {
       throw new Error(
         "Restore completed but the server returned an invalid restore summary."
       );
     }
-
-    // ============================================================
-    // Extract statistics
-    // ============================================================
 
     const result = data as {
       charging?: {
@@ -518,31 +371,26 @@ export async function restoreBackup(
         inserted?: number;
         skipped?: number;
       };
-
       service?: {
         total?: number;
         inserted?: number;
         skipped?: number;
       };
-
       tyres?: {
         total?: number;
         inserted?: number;
         skipped?: number;
       };
-
       documents?: {
         total?: number;
         inserted?: number;
         skipped?: number;
       };
-
       insurance?: {
         total?: number;
         inserted?: number;
         skipped?: number;
       };
-
       summary?: {
         total?: number;
         inserted?: number;
@@ -550,35 +398,20 @@ export async function restoreBackup(
       };
     };
 
-    const chargingInserted =
-      result.charging?.inserted ?? 0;
+    const chargingInserted = result.charging?.inserted ?? 0;
+    const chargingSkipped = result.charging?.skipped ?? 0;
 
-    const chargingSkipped =
-      result.charging?.skipped ?? 0;
+    const serviceInserted = result.service?.inserted ?? 0;
+    const serviceSkipped = result.service?.skipped ?? 0;
 
-    const serviceInserted =
-      result.service?.inserted ?? 0;
+    const tyresInserted = result.tyres?.inserted ?? 0;
+    const tyresSkipped = result.tyres?.skipped ?? 0;
 
-    const serviceSkipped =
-      result.service?.skipped ?? 0;
+    const documentsInserted = result.documents?.inserted ?? 0;
+    const documentsSkipped = result.documents?.skipped ?? 0;
 
-    const tyresInserted =
-      result.tyres?.inserted ?? 0;
-
-    const tyresSkipped =
-      result.tyres?.skipped ?? 0;
-
-    const documentsInserted =
-      result.documents?.inserted ?? 0;
-
-    const documentsSkipped =
-      result.documents?.skipped ?? 0;
-
-    const insuranceInserted =
-      result.insurance?.inserted ?? 0;
-
-    const insuranceSkipped =
-      result.insurance?.skipped ?? 0;
+    const insuranceInserted = result.insurance?.inserted ?? 0;
+    const insuranceSkipped = result.insurance?.skipped ?? 0;
 
     const totalInserted =
       result.summary?.inserted ??
@@ -596,32 +429,23 @@ export async function restoreBackup(
         documentsSkipped +
         insuranceSkipped;
 
-    // ============================================================
-    // Build restore summary
-    // ============================================================
-
-    const summary =
-      [
-        "Backup restore completed.",
-        "",
-        `Charging: ${chargingInserted} imported, ${chargingSkipped} skipped`,
-        `Service: ${serviceInserted} imported, ${serviceSkipped} skipped`,
-        `Tyres: ${tyresInserted} imported, ${tyresSkipped} skipped`,
-        `Documents: ${documentsInserted} imported, ${documentsSkipped} skipped`,
-        `Insurance: ${insuranceInserted} imported, ${insuranceSkipped} skipped`,
-        "",
-        `Total imported: ${totalInserted}`,
-        `Total skipped: ${totalSkipped}`,
-      ].join("\n");
+    const summary = [
+      "Backup restore completed.",
+      "",
+      `Charging: ${chargingInserted} imported, ${chargingSkipped} skipped`,
+      `Service: ${serviceInserted} imported, ${serviceSkipped} skipped`,
+      `Tyres: ${tyresInserted} imported, ${tyresSkipped} skipped`,
+      `Documents: ${documentsInserted} imported, ${documentsSkipped} skipped`,
+      `Insurance: ${insuranceInserted} imported, ${insuranceSkipped} skipped`,
+      "",
+      `Total imported: ${totalInserted}`,
+      `Total skipped: ${totalSkipped}`,
+    ].join("\n");
 
     alert(summary);
-
     window.location.reload();
-  } catch (err: any) {
-    console.error(
-      "Backup restore error:",
-      err
-    );
+  } catch (err: unknown) {
+    console.error("Backup restore error:", err);
 
     throw err;
   }

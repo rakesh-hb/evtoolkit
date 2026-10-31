@@ -1,6 +1,6 @@
 import { Download, FileText, Share2, X } from "lucide-react";
 import { useState } from "react";
-import { Capacitor } from "@capacitor/core";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 import { Directory, Filesystem } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 import { toPng } from "html-to-image";
@@ -11,6 +11,16 @@ import { supabase } from "../../lib/supabase";
 interface ReportToolbarProps {
   reportData: any;
 }
+interface SaveFilePlugin {
+  saveFile(options: {
+    fileName: string;
+    mimeType: string;
+    sourceUri: string;
+  }): Promise<{ cancelled: boolean; uri?: string }>;
+}
+
+const SaveFile = registerPlugin<SaveFilePlugin>("SaveFile");
+
 
 const PAGE_WIDTH = 210;
 const PAGE_HEIGHT = 297;
@@ -978,8 +988,45 @@ async function exportAnalyticsPDF(
 
   const pdfBase64 = await blobToBase64(pdfBlob);
 
-  // Native Download: save the PDF to the device Documents directory.
+  // Android Download: create a temporary cache file, then ask Android
+  // where to save it using the native Save As picker. Pass only the URI
+  // to the plugin, never the Base64 PDF contents.
   if (action === "download") {
+    if (Capacitor.getPlatform() === "android") {
+      const tempPath = `save-${Date.now()}-${fileName}`;
+
+      const cachedFile = await Filesystem.writeFile({
+        path: tempPath,
+        data: pdfBase64,
+        directory: Directory.Cache,
+        recursive: true,
+      });
+
+      try {
+        const result = await SaveFile.saveFile({
+          fileName,
+          mimeType: "application/pdf",
+          sourceUri: cachedFile.uri,
+        });
+
+        if (result.cancelled) return;
+
+        alert(`PDF saved successfully: ${fileName}`);
+      } finally {
+        try {
+          await Filesystem.deleteFile({
+            path: tempPath,
+            directory: Directory.Cache,
+          });
+        } catch (cleanupError) {
+          console.warn("Could not remove temporary PDF:", cleanupError);
+        }
+      }
+
+      return;
+    }
+
+    // Preserve the existing native save behaviour on platforms other than Android.
     await Filesystem.writeFile({
       path: fileName,
       data: pdfBase64,

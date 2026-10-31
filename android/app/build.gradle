@@ -1,37 +1,47 @@
-
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "com.evtoolkit.app"
+    namespace = "com.rockytales.evtoolkit"
+
     compileSdk = rootProject.ext.compileSdkVersion
 
     defaultConfig {
-        applicationId "com.evtoolkit.app"
+        applicationId "com.rockytales.evtoolkit"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode 3
+        versionName "1.0.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         aaptOptions {
-            // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
-            // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
 
     signingConfigs {
         release {
-            storeFile file(project.property("EVTOOLKIT_STORE_FILE"))
-            storePassword project.property("EVTOOLKIT_STORE_PASSWORD")
-            keyAlias project.property("EVTOOLKIT_KEY_ALIAS")
-            keyPassword project.property("EVTOOLKIT_KEY_PASSWORD")
+            if (project.hasProperty("EVTOOLKIT_STORE_FILE") &&
+                project.hasProperty("EVTOOLKIT_STORE_PASSWORD") &&
+                project.hasProperty("EVTOOLKIT_KEY_ALIAS") &&
+                project.hasProperty("EVTOOLKIT_KEY_PASSWORD")) {
+
+                storeFile file(project.property("EVTOOLKIT_STORE_FILE"))
+                storePassword project.property("EVTOOLKIT_STORE_PASSWORD")
+                keyAlias project.property("EVTOOLKIT_KEY_ALIAS")
+                keyPassword project.property("EVTOOLKIT_KEY_PASSWORD")
+            }
         }
     }
 
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            if (project.hasProperty("EVTOOLKIT_STORE_FILE") &&
+                project.hasProperty("EVTOOLKIT_STORE_PASSWORD") &&
+                project.hasProperty("EVTOOLKIT_KEY_ALIAS") &&
+                project.hasProperty("EVTOOLKIT_KEY_PASSWORD")) {
+                signingConfig = signingConfigs.release
+            }
+
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

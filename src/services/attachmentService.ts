@@ -1,4 +1,5 @@
-import { Capacitor } from "@capacitor/core";
+
+import { Capacitor, registerPlugin } from "@capacitor/core";
 import { Directory, Filesystem } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 import { supabase } from "../lib/supabase";
@@ -7,6 +8,16 @@ const STORAGE_BUCKET = "premium_plus_attachments";
 const SIGNED_URL_EXPIRY_SECONDS = 60 * 10;
 
 type AttachmentAction = "download" | "share" | "cancel";
+
+interface SaveFilePlugin {
+  saveFile(options: {
+    fileName: string;
+    mimeType: string;
+    sourceUri: string;
+  }): Promise<{ cancelled: boolean; uri?: string }>;
+}
+
+const SaveFile = registerPlugin<SaveFilePlugin>("SaveFile");
 
 function getSafeFileName(fileName: string): string {
   const cleaned = (fileName || "attachment")
@@ -31,10 +42,11 @@ async function blobToBase64(blob: Blob): Promise<string> {
 }
 
 /**
- * File action dialog styled to match the Analytics Report export dialog.
- * Used by pages that call downloadAttachment(), keeping file actions consistent.
+ * Shows a consistent dialog for downloading or sharing an attachment.
  */
-function chooseAttachmentAction(fileName: string): Promise<AttachmentAction> {
+function chooseAttachmentAction(
+  fileName: string
+): Promise<AttachmentAction> {
   return new Promise((resolve) => {
     let resolved = false;
 
@@ -146,13 +158,14 @@ function chooseAttachmentAction(fileName: string): Promise<AttachmentAction> {
       textBox.append(strong, subtext);
       button.append(iconBox, textBox);
       button.addEventListener("click", () => finish(action));
+
       return button;
     };
 
     const downloadButton = makeActionButton(
       "Download file",
       Capacitor.isNativePlatform()
-        ? "Save a copy to EV Toolkit's private storage"
+        ? "Choose where to save the file on your phone"
         : "Save a copy using your browser",
       "download",
       "⬇"
@@ -201,7 +214,6 @@ async function shareOnWeb(blob: Blob, fileName: string): Promise<void> {
     return;
   }
 
-  // Browsers without file sharing support fall back to a normal download.
   downloadOnWeb(blob, fileName);
 }
 
@@ -214,6 +226,7 @@ function downloadOnWeb(blob: Blob, fileName: string): void {
   document.body.appendChild(link);
   link.click();
   link.remove();
+
   window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
 }
 
@@ -247,6 +260,7 @@ export async function downloadAttachment(
     }
 
     const response = await fetch(url);
+
     if (!response.ok) {
       throw new Error(
         `Unable to download the attachment (HTTP ${response.status}).`
@@ -259,6 +273,7 @@ export async function downloadAttachment(
 
     if (action === "cancel") return;
 
+    // Keep web download and sharing behavior unchanged.
     if (!Capacitor.isNativePlatform()) {
       if (action === "download") {
         downloadOnWeb(blob, safeFileName);
@@ -268,23 +283,49 @@ export async function downloadAttachment(
       return;
     }
 
-    const base64 = await blobToBase64(blob);
-
+    // Native Android download: write to cache first, then pass only
+    // the file URI to the plugin. Never pass the Base64 contents
+    // through the activity-result call.
     if (action === "download") {
-      // App-private storage avoids Android shared-storage permission errors.
-      await Filesystem.writeFile({
-        path: safeFileName,
+      const base64 = await blobToBase64(blob);
+      const tempPath = `save-${Date.now()}-${safeFileName}`;
+
+      const cachedFile = await Filesystem.writeFile({
+        path: tempPath,
         data: base64,
-        directory: Directory.Data,
+        directory: Directory.Cache,
         recursive: true,
       });
 
-      alert(
-        `Saved "${safeFileName}" to EV Toolkit's private storage. ` +
-          "To save it in the phone's public Downloads folder, choose Share and select a file-saving app."
-      );
+      try {
+        const result = await SaveFile.saveFile({
+          fileName: safeFileName,
+          mimeType: blob.type || "application/octet-stream",
+          sourceUri: cachedFile.uri,
+        });
+
+        if (result.cancelled) return;
+
+        alert(`Saved "${safeFileName}" successfully.`);
+      } finally {
+        try {
+          await Filesystem.deleteFile({
+            path: tempPath,
+            directory: Directory.Cache,
+          });
+        } catch (cleanupError) {
+          console.warn(
+            "Could not remove temporary attachment:",
+            cleanupError
+          );
+        }
+      }
+
       return;
     }
+
+    // Keep the existing native share flow.
+    const base64 = await blobToBase64(blob);
 
     const cachedFile = await Filesystem.writeFile({
       path: safeFileName,
