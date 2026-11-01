@@ -1,5 +1,6 @@
-import { useState } from "react";
-import HowToUse from "./HowToUse";
+import { lazy, Suspense, useState } from "react";
+
+const HowToUse = lazy(() => import("./HowToUse"));
 import {
   signIn,
   signUp,
@@ -380,7 +381,24 @@ export default function Login({
                 boxSizing: "border-box",
               }}
             >
-              <HowToUse />
+              <Suspense
+                fallback={
+                  <div
+                    style={{
+                      minHeight: 240,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#cbd5e1",
+                      fontSize: 14,
+                    }}
+                  >
+                    Loading How to Use...
+                  </div>
+                }
+              >
+                <HowToUse />
+              </Suspense>
             </div>
           </div>
         </div>
