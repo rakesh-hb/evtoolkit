@@ -20,6 +20,7 @@ import { supabase } from "./lib/supabase";
 
 import SideDrawer from "./components/SideDrawer";
 import FirstLoginGuide from "./components/FirstLoginGuide";
+import WhatsNewPopup from "./components/WhatsNewPopup";
 
 /*
  * ============================================================
@@ -91,6 +92,8 @@ const HowToUse =
     import("./pages/HowToUse")
   );
 
+  const WhatsNewPage = lazy(() => import("./components/WhatsNew"));
+
 /*
  * ============================================================
  * PAGE LOADING FALLBACK
@@ -133,6 +136,22 @@ function App() {
   const [showFirstLoginGuide, setShowFirstLoginGuide] =
     useState(false);
 
+  const [showWhatsNew, setShowWhatsNew] =
+    useState(false);
+
+  const [activeAnnouncement, setActiveAnnouncement] =
+    useState<{
+      id: string;
+      version: string;
+      title: string;
+      message: string;
+    } | null>(null);
+
+  const [pendingFirstLoginGuide, setPendingFirstLoginGuide] =
+    useState(false);
+
+  const authCheckId = useRef(0);
+
   /*
    * Keep track of whether the previous
    * auth state was authenticated.
@@ -154,107 +173,122 @@ function App() {
       return;
     }
 
-    const isAuthenticated =
-      !!session;
+    const isAuthenticated = !!session;
 
-    if (
-      isAuthenticated &&
-      !wasAuthenticated.current
-    ) {
-      setPage(
-        "dashboard"
-      );
+    if (isAuthenticated && !wasAuthenticated.current) {
+      const currentCheckId = ++authCheckId.current;
+      const userId = session.user.id;
 
-      setDrawerOpen(
-        false
-      );
+      setPage("dashboard");
+      setDrawerOpen(false);
+      setShowWhatsNew(false);
+      setActiveAnnouncement(null);
+      setShowFirstLoginGuide(false);
+      setPendingFirstLoginGuide(false);
 
-      /*
-       * Check whether this user has previously
-       * dismissed the automatic How to Use guide.
-       */
+      const checkLoginAnnouncementsAndGuide = async () => {
+        let shouldShowGuide = true;
+        let announcementToShow: {
+          id: string;
+          version: string;
+          title: string;
+          message: string;
+        } | null = null;
 
-      const checkHowToUsePreference =
-        async () => {
-          try {
-            const {
-              data,
-              error,
-            } = await supabase
-              .from(
-                "user_vehicle_preferences"
-              )
-              .select(
-                "how_to_use_dismissed"
-              )
-              .eq(
-                "user_id",
-                session.user.id
-              )
-              .maybeSingle();
+        // Check the existing How to Use preference without changing it.
+        try {
+          const { data, error } = await supabase
+            .from("user_vehicle_preferences")
+            .select("how_to_use_dismissed")
+            .eq("user_id", userId)
+            .maybeSingle();
 
-            if (error) {
-              console.error(
-                "Failed to load How to Use preference:",
-                error
-              );
-
-              /*
-               * If the preference cannot be loaded,
-               * do not block the application.
-               */
-
-              setShowFirstLoginGuide(
-                true
-              );
-
-              return;
-            }
-
-            /*
-             * No preference row means this user has
-             * not dismissed the guide yet.
-             */
-
-            if (
-              !data ||
-              data.how_to_use_dismissed !== true
-            ) {
-              setShowFirstLoginGuide(
-                true
-              );
-            } else {
-              setShowFirstLoginGuide(
-                false
-              );
-            }
-          } catch (error) {
+          if (error) {
             console.error(
-              "Unexpected error loading How to Use preference:",
+              "Failed to load How to Use preference:",
               error
             );
-
-            /*
-             * If the preference cannot be loaded,
-             * keep the guide available.
-             */
-
-            setShowFirstLoginGuide(
-              true
-            );
+          } else {
+            shouldShowGuide =
+              !data || data.how_to_use_dismissed !== true;
           }
-        };
+        } catch (error) {
+          console.error(
+            "Unexpected error loading How to Use preference:",
+            error
+          );
+        }
 
-      void checkHowToUsePreference();
+        // Find the newest active release announcement.
+        try {
+          const { data: announcement, error: announcementError } =
+            await supabase
+              .from("app_announcements")
+              .select("id, version, title, message")
+              .eq("is_active", true)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+          if (announcementError) {
+            console.error(
+              "Failed to load What's New announcement:",
+              announcementError
+            );
+          } else if (announcement) {
+            const { data: acknowledgement, error: acknowledgementError } =
+              await supabase
+                .from("user_announcement_acknowledgements")
+                .select("announcement_id")
+                .eq("announcement_id", announcement.id)
+                .eq("user_id", userId)
+                .maybeSingle();
+
+            if (acknowledgementError) {
+              console.error(
+                "Failed to check What's New acknowledgement:",
+                acknowledgementError
+              );
+              // Show the announcement if its acknowledgement status is unknown.
+              announcementToShow = announcement;
+            } else if (!acknowledgement) {
+              announcementToShow = announcement;
+            }
+          }
+        } catch (error) {
+          console.error(
+            "Unexpected error loading What's New announcement:",
+            error
+          );
+        }
+
+        // Ignore stale results if the user logged out or changed accounts.
+        if (authCheckId.current !== currentCheckId) {
+          return;
+        }
+
+        setPendingFirstLoginGuide(shouldShowGuide);
+
+        if (announcementToShow) {
+          setActiveAnnouncement(announcementToShow);
+          setShowWhatsNew(true);
+        } else {
+          setShowFirstLoginGuide(shouldShowGuide);
+        }
+      };
+
+      void checkLoginAnnouncementsAndGuide();
+    } else if (!isAuthenticated && wasAuthenticated.current) {
+      // Clear account-specific overlays when the user logs out.
+      authCheckId.current += 1;
+      setShowWhatsNew(false);
+      setActiveAnnouncement(null);
+      setShowFirstLoginGuide(false);
+      setPendingFirstLoginGuide(false);
     }
 
-    wasAuthenticated.current =
-      isAuthenticated;
-
-  }, [
-    session,
-    loading,
-  ]);
+    wasAuthenticated.current = isAuthenticated;
+  }, [session, loading]);
 
   const isAccountDeletionPage =
     window.location.pathname === "/delete-account";
@@ -622,6 +656,11 @@ function App() {
           <HowToUse />
         );
 
+      case "whatsnew":
+        return (
+          <WhatsNewPage />
+        );
+
       case "terms":
         return (
           <Terms />
@@ -799,33 +838,49 @@ function App() {
         </button>
       </nav>
 
+      {showWhatsNew && activeAnnouncement && session?.user?.id && (
+        <WhatsNewPopup
+          announcement={activeAnnouncement}
+          onAcknowledge={async () => {
+            const { error } = await supabase
+              .from("user_announcement_acknowledgements")
+              .insert({
+                announcement_id: activeAnnouncement.id,
+                user_id: session.user.id,
+              });
+
+            // A duplicate acknowledgement means it was already saved.
+            if (error && error.code !== "23505") {
+              console.error(
+                "Failed to save What's New acknowledgement:",
+                error
+              );
+              throw error;
+            }
+
+            setShowWhatsNew(false);
+            setActiveAnnouncement(null);
+
+            if (pendingFirstLoginGuide) {
+              setShowFirstLoginGuide(true);
+            }
+          }}
+        />
+      )}
+
       {showFirstLoginGuide && (
         <FirstLoginGuide
-          onGetStarted={async (
-            dontShowAgain
-          ) => {
-            if (
-              dontShowAgain &&
-              session?.user?.id
-            ) {
+          onGetStarted={async (dontShowAgain) => {
+            if (dontShowAgain && session?.user?.id) {
               try {
-                const {
-                  error,
-                } = await supabase
-                  .from(
-                    "user_vehicle_preferences"
-                  )
+                const { error } = await supabase
+                  .from("user_vehicle_preferences")
                   .upsert(
                     {
-                      user_id:
-                        session.user.id,
-                      how_to_use_dismissed:
-                        true,
+                      user_id: session.user.id,
+                      how_to_use_dismissed: true,
                     },
-                    {
-                      onConflict:
-                        "user_id",
-                    }
+                    { onConflict: "user_id" }
                   );
 
                 if (error) {
@@ -833,12 +888,6 @@ function App() {
                     "Failed to save How to Use preference:",
                     error
                   );
-
-                  /*
-                   * Keep the guide open if the user's
-                   * preference could not be saved.
-                   */
-
                   return;
                 }
               } catch (error) {
@@ -846,12 +895,6 @@ function App() {
                   "Unexpected error saving How to Use preference:",
                   error
                 );
-
-                /*
-                 * Keep the guide open if the preference
-                 * could not be saved.
-                 */
-
                 return;
               }
             }

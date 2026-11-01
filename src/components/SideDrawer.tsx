@@ -15,6 +15,12 @@ interface SideDrawerProps {
 
 const sections = [
   {
+    title: "Updates",
+    items: [
+      { key: "whatsnew", icon: "✨", label: "What's New" },
+    ],
+  },
+  {
     title: "Maintenance",
     items: [
       { key: "service", icon: "🔧", label: "Service History" },

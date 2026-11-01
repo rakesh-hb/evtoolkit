@@ -84,6 +84,9 @@ function Analytics({
   const [subscriptionLoading, setSubscriptionLoading] =
     useState(true);
 
+  const [showSavingsInfo, setShowSavingsInfo] =
+    useState(false);
+
 
   /*
    * ============================================================
@@ -2913,9 +2916,112 @@ function Analytics({
             "linear-gradient(145deg, rgba(120,53,15,0.18), rgba(15,23,42,0.96))",
         }}
       >
-        <h3>
-          🌱 Approximate EV Savings & CO₂ Avoided
-        </h3>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "12px",
+            flexWrap: "wrap",
+            marginBottom: "10px",
+          }}
+        >
+          <h3 style={{ margin: 0 }}>
+            🌱 Approximate EV Savings & CO₂ Avoided
+          </h3>
+
+          <button
+            type="button"
+            onClick={() => setShowSavingsInfo((current) => !current)}
+            aria-expanded={showSavingsInfo}
+            aria-controls="ev-savings-calculation-info"
+            aria-label="Information about EV savings and CO2 calculations"
+            title="How these estimates are calculated"
+            style={{
+              width: "28px",
+              height: "28px",
+              flex: "0 0 28px",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: "1px solid rgba(249,115,22,0.65)",
+              borderRadius: "50%",
+              background: "rgba(249,115,22,0.12)",
+              color: "#fdba74",
+              fontSize: "15px",
+              fontWeight: 800,
+              cursor: "pointer",
+            }}
+          >
+            i
+          </button>
+        </div>
+
+        {showSavingsInfo && (
+          <div
+            id="ev-savings-calculation-info"
+            role="region"
+            aria-label="How EV savings are calculated"
+            style={{
+              marginBottom: "16px",
+              padding: "14px",
+              border: "1px solid rgba(249,115,22,0.3)",
+              borderRadius: "10px",
+              background: "rgba(15,23,42,0.72)",
+              color: SECONDARY_TEXT,
+              fontSize: "12px",
+              lineHeight: 1.65,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "10px",
+                marginBottom: "8px",
+              }}
+            >
+              <strong style={{ color: PRIMARY_TEXT, fontSize: "14px" }}>
+                How EV Savings Are Calculated
+              </strong>
+              <button
+                type="button"
+                onClick={() => setShowSavingsInfo(false)}
+                aria-label="Close calculation information"
+                style={{
+                  border: 0,
+                  background: "transparent",
+                  color: SECONDARY_TEXT,
+                  fontSize: "18px",
+                  cursor: "pointer",
+                  padding: "0 4px",
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <p style={{ margin: "0 0 8px" }}>
+              The estimates use the following benchmark assumptions:
+            </p>
+            <ul style={{ margin: "0 0 10px", paddingLeft: "20px" }}>
+              <li>Estimated EV distance = Total charging energy (kWh) × 6 km/kWh</li>
+              <li>Equivalent petrol used = Estimated distance (km) ÷ 15 km/litre</li>
+              <li>Equivalent diesel used = Estimated distance (km) ÷ 20 km/litre</li>
+              <li>Petrol comparison cost = Equivalent petrol used × ₹110/litre</li>
+              <li>Diesel comparison cost = Equivalent diesel used × ₹100/litre</li>
+              <li>Estimated savings = Equivalent fuel cost − Actual EV charging cost</li>
+            </ul>
+
+            <p style={{ margin: "0 0 6px" }}>
+              <strong style={{ color: PRIMARY_TEXT }}>Important:</strong> Petrol at ₹110/litre and diesel at ₹100/litre are illustrative benchmark prices, not live or state-specific prices. State-based fuel prices will be introduced after the pending API integration is configured.
+            </p>
+            <p style={{ margin: 0 }}>
+              Actual fuel prices and vehicle efficiency may vary. CO₂ avoided is an approximate tailpipe comparison; emissions from electricity generation are not subtracted.
+            </p>
+          </div>
+        )}
 
         <p
           style={{

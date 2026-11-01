@@ -1,3 +1,4 @@
+
 import { supabase } from "../lib/supabase";
 
 /*
@@ -235,7 +236,9 @@ export async function resetPassword(
 export async function updateProfile(
   firstName: string,
   lastName: string,
-  phone: string
+  phone: string,
+  state: string,
+  city: string
 ) {
   const {
     data,
@@ -248,6 +251,8 @@ export async function updateProfile(
         last_name:
           lastName,
         phone,
+        state,
+        city,
         full_name:
           `${firstName} ${lastName}`.trim(),
       },

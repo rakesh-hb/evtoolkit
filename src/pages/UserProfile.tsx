@@ -1,3 +1,4 @@
+
 import {
   useEffect,
   useState,
@@ -47,6 +48,45 @@ interface RazorpayWindow extends Window {
   ) => RazorpayCheckoutInstance;
 }
 
+const INDIAN_STATES_AND_UTS = [
+  "Andhra Pradesh",
+  "Arunachal Pradesh",
+  "Assam",
+  "Bihar",
+  "Chhattisgarh",
+  "Goa",
+  "Gujarat",
+  "Haryana",
+  "Himachal Pradesh",
+  "Jharkhand",
+  "Karnataka",
+  "Kerala",
+  "Madhya Pradesh",
+  "Maharashtra",
+  "Manipur",
+  "Meghalaya",
+  "Mizoram",
+  "Nagaland",
+  "Odisha",
+  "Punjab",
+  "Rajasthan",
+  "Sikkim",
+  "Tamil Nadu",
+  "Telangana",
+  "Tripura",
+  "Uttar Pradesh",
+  "Uttarakhand",
+  "West Bengal",
+  "Andaman and Nicobar Islands",
+  "Chandigarh",
+  "Dadra and Nagar Haveli and Daman and Diu",
+  "Delhi",
+  "Jammu and Kashmir",
+  "Ladakh",
+  "Lakshadweep",
+  "Puducherry",
+];
+
 export default function UserProfile() {
   const [firstName, setFirstName] =
     useState("");
@@ -55,6 +95,12 @@ export default function UserProfile() {
     useState("");
 
   const [phone, setPhone] =
+    useState("");
+
+  const [state, setState] =
+    useState("");
+
+  const [city, setCity] =
     useState("");
 
   const [email, setEmail] =
@@ -146,6 +192,16 @@ export default function UserProfile() {
           ?.phone || ""
       );
 
+      setState(
+        user.user_metadata
+          ?.state || ""
+      );
+
+      setCity(
+        user.user_metadata
+          ?.city || ""
+      );
+
       setEmail(
         user.email || ""
       );
@@ -183,13 +239,29 @@ export default function UserProfile() {
       return;
     }
 
+    if (!state.trim()) {
+      alert(
+        "Please select your state."
+      );
+      return;
+    }
+
+    if (!city.trim()) {
+      alert(
+        "Please enter your city."
+      );
+      return;
+    }
+
     try {
       setSavingProfile(true);
 
       await updateProfile(
         firstName.trim(),
         lastName.trim(),
-        phone.trim()
+        phone.trim(),
+        state.trim(),
+        city.trim()
       );
 
       alert(
@@ -668,6 +740,49 @@ export default function UserProfile() {
                 setPhone(
                   e.target.value
                 )
+              }
+            />
+          </div>
+
+          <div>
+            <label>
+              State *
+            </label>
+
+            <select
+              value={state}
+              onChange={(e) => {
+                setState(e.target.value);
+              }}
+            >
+              <option value="">
+                Select State / Union Territory
+              </option>
+
+              {INDIAN_STATES_AND_UTS.map(
+                (stateName) => (
+                  <option
+                    key={stateName}
+                    value={stateName}
+                  >
+                    {stateName}
+                  </option>
+                )
+              )}
+            </select>
+          </div>
+
+          <div>
+            <label>
+              City *
+            </label>
+
+            <input
+              type="text"
+              value={city}
+              placeholder="Enter your city"
+              onChange={(e) =>
+                setCity(e.target.value)
               }
             />
           </div>
