@@ -1,25 +1,25 @@
 import { useState } from "react";
 
-interface Announcement {
+interface WhatsNewAnnouncement {
   id: string;
   version: string;
   title: string;
   message: string;
 }
 
-interface WhatsNewPopupProps {
-  announcement: Announcement;
+interface WhatsNewProps {
+  announcement: WhatsNewAnnouncement;
   onAcknowledge: () => Promise<void>;
 }
 
-export default function WhatsNewPopup({
+export default function WhatsNew({
   announcement,
   onAcknowledge,
-}: WhatsNewPopupProps) {
+}: WhatsNewProps) {
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  async function handleAcknowledge() {
+  const handleAcknowledge = async () => {
     if (saving) return;
 
     setSaving(true);
@@ -28,17 +28,18 @@ export default function WhatsNewPopup({
     try {
       await onAcknowledge();
     } catch (error) {
-      console.error("Failed to acknowledge announcement:", error);
+      console.error("Unable to acknowledge What's New:", error);
       setErrorMessage(
         "We couldn't save your acknowledgement. Please try again."
       );
     } finally {
       setSaving(false);
     }
-  }
+  };
 
   return (
     <div
+      role="presentation"
       style={{
         position: "fixed",
         inset: 0,
@@ -46,118 +47,108 @@ export default function WhatsNewPopup({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: 20,
-        background: "rgba(2, 6, 23, 0.78)",
-        backdropFilter: "blur(7px)",
+        padding: 16,
+        background: "rgba(0, 0, 0, 0.72)",
       }}
     >
-      <div
+      <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="whats-new-title"
+        aria-describedby="whats-new-message"
         style={{
-          position: "relative",
-          width: "100%",
-          maxWidth: 520,
-          maxHeight: "85vh",
+          width: "min(100%, 560px)",
+          maxHeight: "min(80vh, 680px)",
           overflowY: "auto",
           boxSizing: "border-box",
-          padding: "30px",
+          padding: "28px 26px 24px",
           borderRadius: 20,
-          border: "1px solid rgba(59,130,246,0.3)",
-          background: "var(--card-bg, #111827)",
-          color: "var(--text-primary, #f8fafc)",
-          boxShadow: "0 25px 80px rgba(0,0,0,0.5)",
+          background: "#ffffff",
+          color: "#172033",
+          boxShadow: "0 24px 80px rgba(0, 0, 0, 0.32)",
+          fontFamily: "inherit",
         }}
       >
         <div
           style={{
-            width: 54,
-            height: 54,
-            display: "flex",
+            display: "inline-flex",
             alignItems: "center",
-            justifyContent: "center",
-            borderRadius: 16,
-            marginBottom: 20,
-            background: "rgba(59,130,246,0.15)",
-            fontSize: 27,
-          }}
-          aria-hidden="true"
-        >
-          ✨
-        </div>
-
-        <div
-          style={{
-            marginBottom: 9,
-            color: "#f59e0b",
+            gap: 7,
+            padding: "6px 11px",
+            borderRadius: 999,
+            background: "#fff2e8",
+            color: "#d96516",
             fontSize: 12,
-            fontWeight: 800,
-            letterSpacing: "0.1em",
+            fontWeight: 700,
+            letterSpacing: 0.4,
             textTransform: "uppercase",
           }}
         >
-          EV Toolkit · What's New
-        </div>
-
-        <div
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            padding: "5px 11px",
-            marginBottom: 15,
-            borderRadius: 999,
-            background: "rgba(59,130,246,0.15)",
-            color: "#60a5fa",
-            fontSize: 12,
-            fontWeight: 800,
-          }}
-        >
-          Version {announcement.version}
+          <span aria-hidden="true">✨</span>
+          What's New · {announcement.version}
         </div>
 
         <h2
           id="whats-new-title"
           style={{
-            margin: "0 0 14px",
+            margin: "18px 0 12px",
+            color: "#111827",
             fontSize: 25,
-            lineHeight: 1.3,
-            fontWeight: 800,
-            color: "var(--text-primary, #f8fafc)",
+            lineHeight: 1.25,
+            fontWeight: 750,
           }}
         >
           {announcement.title}
         </h2>
 
-        <p
+        <div
+          id="whats-new-message"
           style={{
-            margin: 0,
-            color: "var(--text-secondary, #cbd5e1)",
+            color: "#4b5563",
             fontSize: 15,
-            lineHeight: 1.8,
+            lineHeight: 1.7,
             whiteSpace: "pre-wrap",
             overflowWrap: "anywhere",
           }}
         >
           {announcement.message}
-        </p>
+        </div>
+
+        {typeof navigator !== "undefined" &&
+          (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+            (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) && (
+            <section
+              aria-label="Add EV Toolkit to your Home Screen"
+              style={{
+                marginTop: 20, padding: "14px 16px", borderRadius: 12,
+                background: "#eff6ff", border: "1px solid #bfdbfe", color: "#1e3a8a",
+              }}
+            >
+              <strong style={{ display: "block", marginBottom: 7 }}>
+                📱 Add EV Toolkit to your Home Screen
+              </strong>
+              <ol style={{ margin: 0, paddingLeft: 21, fontSize: 13, lineHeight: 1.7 }}>
+                <li>Open EV Toolkit in Safari.</li>
+                <li>Tap <strong>Share</strong>.</li>
+                <li>Select <strong>More</strong>.</li>
+                <li>Select <strong>Add to Home Screen</strong>.</li>
+                <li>Tap <strong>Add</strong>.</li>
+              </ol>
+            </section>
+          )}
 
         {errorMessage && (
-          <div
+          <p
             role="alert"
             style={{
-              marginTop: 20,
-              padding: 12,
-              borderRadius: 10,
-              border: "1px solid rgba(239,68,68,0.35)",
-              background: "rgba(127,29,29,0.15)",
-              color: "#fca5a5",
+              margin: "18px 0 0",
+              color: "#b42318",
               fontSize: 13,
               lineHeight: 1.5,
             }}
           >
             {errorMessage}
-          </div>
+          </p>
         )}
 
         <button
@@ -166,23 +157,22 @@ export default function WhatsNewPopup({
           disabled={saving}
           style={{
             width: "100%",
-            marginTop: 28,
-            padding: "13px 20px",
+            minHeight: 48,
+            marginTop: 26,
+            padding: "12px 18px",
             border: "none",
             borderRadius: 12,
-            background: saving
-              ? "#475569"
-              : "linear-gradient(135deg, #2563eb, #1d4ed8)",
+            background: saving ? "#9ca3af" : "#f47721",
             color: "#ffffff",
             fontSize: 15,
-            fontWeight: 800,
+            fontWeight: 700,
             cursor: saving ? "not-allowed" : "pointer",
-            opacity: saving ? 0.75 : 1,
+            opacity: saving ? 0.8 : 1,
           }}
         >
           {saving ? "Saving..." : "Got it"}
         </button>
-      </div>
+      </section>
     </div>
   );
 }

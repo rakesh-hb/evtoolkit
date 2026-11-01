@@ -21,6 +21,11 @@ export default function Login({
   const [showHowToUse, setShowHowToUse] =
     useState(false);
 
+  const isIOSDevice =
+    typeof navigator !== "undefined" &&
+    (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+
 
   const [firstName, setFirstName] =
     useState("");
@@ -418,6 +423,29 @@ export default function Login({
             ? "Create your EV Toolkit account"
             : "Sign in to continue"}
         </p>
+
+        {isIOSDevice && (
+          <div
+            style={{
+              marginBottom: 20,
+              padding: "12px 14px",
+              borderRadius: 10,
+              border: "1px solid #bfdbfe",
+              background: "#eff6ff",
+              color: "#1e3a8a",
+              fontSize: 12,
+              lineHeight: 1.55,
+            }}
+          >
+            <strong style={{ display: "block", marginBottom: 4, fontSize: 13 }}>
+              Add EV Toolkit to your iPhone or iPad Home Screen
+            </strong>
+            Open EV Toolkit in Safari, tap <strong>Share</strong>, select
+            <strong> More</strong>, choose <strong>Add to Home Screen</strong>,
+            and tap <strong>Add</strong>. You can then launch EV Toolkit from
+            your Home Screen like an app.
+          </div>
+        )}
 
         {registerMode && (
           <>

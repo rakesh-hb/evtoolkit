@@ -32,6 +32,12 @@ function Dashboard({
   const [loading, setLoading] =
     useState(true);
 
+  const [showIOSInstallHelp, setShowIOSInstallHelp] = useState(false);
+  const isIOSDevice =
+    typeof navigator !== "undefined" &&
+    (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+
   const {
     primaryVehicle,
     dashboardAlias,
@@ -1142,6 +1148,81 @@ function Dashboard({
         )}
 
       </div>
+
+      {isIOSDevice && (
+        <>
+          <button
+            type="button"
+            onClick={() => setShowIOSInstallHelp(true)}
+            aria-haspopup="dialog"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              width: "100%",
+              marginTop: 22,
+              padding: "14px 16px",
+              borderRadius: 13,
+              border: "1px solid rgba(59,130,246,0.48)",
+              background: "rgba(30,64,175,0.16)",
+              color: "#bfdbfe",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            <span aria-hidden="true" style={{ fontSize: 19 }}>ⓘ</span>
+            Are you an iOS user? Add EV Toolkit to your Home Screen
+          </button>
+
+          {showIOSInstallHelp && (
+            <div
+              role="presentation"
+              onClick={() => setShowIOSInstallHelp(false)}
+              style={{
+                position: "fixed", inset: 0, zIndex: 10000,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                padding: 16, background: "rgba(2,6,23,0.78)",
+              }}
+            >
+              <section
+                role="dialog" aria-modal="true"
+                aria-labelledby="ios-install-title"
+                onClick={(event) => event.stopPropagation()}
+                style={{
+                  width: "100%", maxWidth: 420, padding: 22,
+                  borderRadius: 16, border: "1px solid rgba(59,130,246,0.45)",
+                  background: "#0f172a", color: "#e2e8f0",
+                  boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+                }}
+              >
+                <h3 id="ios-install-title" style={{ margin: "0 0 12px", color: "#fff" }}>
+                  Add EV Toolkit to your Home Screen
+                </h3>
+                <p style={{ margin: "0 0 14px", color: "#cbd5e1", fontSize: 13, lineHeight: 1.55 }}>
+                  Open EV Toolkit in Safari, then follow these steps:
+                </p>
+                <ol style={{ margin: "0 0 18px", paddingLeft: 22, lineHeight: 1.9, fontSize: 14 }}>
+                  <li>Tap <strong>Share</strong>.</li>
+                  <li>Select <strong>More</strong>.</li>
+                  <li>Select <strong>Add to Home Screen</strong>.</li>
+                  <li>Tap <strong>Add</strong>.</li>
+                </ol>
+                <button
+                  type="button" onClick={() => setShowIOSInstallHelp(false)}
+                  style={{ width: "100%", padding: "11px 14px", border: 0,
+                    borderRadius: 10, background: "#2563eb", color: "#fff",
+                    fontWeight: 700, cursor: "pointer" }}
+                >
+                  Close
+                </button>
+              </section>
+            </div>
+          )}
+        </>
+      )}
+
     </>
   );
 }

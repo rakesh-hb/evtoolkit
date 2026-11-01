@@ -13,6 +13,11 @@ export default function About({
   const [showMoreInformation, setShowMoreInformation] =
     useState(false);
 
+  const isIOSDevice =
+    typeof navigator !== "undefined" &&
+    (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+
   async function handleContactSupport() {
     try {
       const {
@@ -136,6 +141,22 @@ export default function About({
           />
         </div>
       </div>
+
+      {isIOSDevice && (
+        <div className="card" style={{ border: "1px solid rgba(59,130,246,0.42)" }}>
+          <h3>📱 Add EV Toolkit to your Home Screen</h3>
+          <p style={{ marginBottom: 8 }}>
+            You can launch EV Toolkit from your iPhone or iPad Home Screen like an app.
+          </p>
+          <ol style={{ margin: 0, paddingLeft: 22, lineHeight: 1.8 }}>
+            <li>Open EV Toolkit in Safari.</li>
+            <li>Tap <strong>Share</strong>.</li>
+            <li>Select <strong>More</strong>.</li>
+            <li>Select <strong>Add to Home Screen</strong>.</li>
+            <li>Tap <strong>Add</strong>.</li>
+          </ol>
+        </div>
+      )}
 
       <div className="card">
         <h3>🚗 What is EV Toolkit?</h3>

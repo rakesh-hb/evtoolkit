@@ -544,6 +544,28 @@ export default function HowToUse() {
           </InfoSection>
         </div>
 
+        <div
+          style={{
+            marginTop: "18px", padding: "16px 18px", borderRadius: "14px",
+            background: "#eff6ff", border: "1px solid #bfdbfe",
+            color: "#1e3a8a", fontSize: "13px", lineHeight: 1.65,
+          }}
+        >
+          <h3 style={{ margin: "0 0 8px", color: "#1e40af" }}>
+            📱 Add EV Toolkit to your iPhone or iPad Home Screen
+          </h3>
+          <p style={{ margin: "0 0 8px" }}>
+            You can use EV Toolkit as a web app and launch it from your Home Screen.
+            Open EV Toolkit in Safari, then follow these steps:
+          </p>
+          <ol style={{ margin: 0, paddingLeft: 22 }}>
+            <li>Tap <strong>Share</strong>.</li>
+            <li>Select <strong>More</strong>.</li>
+            <li>Select <strong>Add to Home Screen</strong>.</li>
+            <li>Tap <strong>Add</strong>.</li>
+          </ol>
+        </div>
+
         {/* Bottom tip */}
         <div
           style={{
