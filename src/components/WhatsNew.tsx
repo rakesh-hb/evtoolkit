@@ -11,11 +11,7 @@ interface Announcement {
 
 function formatAnnouncementDate(value: string) {
   const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Date unavailable";
-  }
-
+  if (Number.isNaN(date.getTime())) return "Date unavailable";
   return new Intl.DateTimeFormat("en-IN", {
     day: "numeric",
     month: "long",
@@ -44,9 +40,7 @@ export default function WhatsNewPage() {
 
       if (error) {
         console.error("Failed to load release announcements:", error);
-        setErrorMessage(
-          "We couldn't load the release updates. Please try again."
-        );
+        setErrorMessage("We couldn't load the release updates. Please try again.");
         setAnnouncements([]);
       } else {
         setAnnouncements(data ?? []);
@@ -56,7 +50,6 @@ export default function WhatsNewPage() {
     }
 
     void loadAnnouncements();
-
     return () => {
       mounted = false;
     };
@@ -90,7 +83,6 @@ export default function WhatsNewPage() {
           <span aria-hidden="true">✨</span>
           EV Toolkit Updates
         </div>
-
         <h1
           style={{
             margin: 0,
@@ -102,7 +94,6 @@ export default function WhatsNewPage() {
         >
           What's New
         </h1>
-
         <p
           style={{
             margin: "10px 0 0",
@@ -116,6 +107,65 @@ export default function WhatsNewPage() {
           Previous release notes remain available here.
         </p>
       </header>
+
+      <section
+        aria-labelledby="live-fuel-prices-update"
+        style={{
+          marginBottom: 18,
+          padding: "22px 22px 20px",
+          borderRadius: 16,
+          border: "1px solid rgba(34,197,94,0.28)",
+          background:
+            "linear-gradient(145deg, rgba(20,83,45,0.18), var(--card-bg, rgba(255,255,255,0.04)))",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+        }}
+      >
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 7,
+            marginBottom: 10,
+            color: "#86efac",
+            fontSize: 11,
+            fontWeight: 800,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+          }}
+        >
+          <span aria-hidden="true">⛽</span>
+          Analytics improvement
+        </div>
+        <h2
+          id="live-fuel-prices-update"
+          style={{
+            margin: "0 0 10px",
+            color: "var(--text-primary, #f8fafc)",
+            fontSize: 19,
+            lineHeight: 1.35,
+            fontWeight: 750,
+          }}
+        >
+          Live Local Fuel Prices in EV Savings
+        </h2>
+        <p
+          style={{
+            margin: 0,
+            color: "var(--text-secondary, #cbd5e1)",
+            fontSize: 14,
+            lineHeight: 1.75,
+          }}
+        >
+          The Approximate EV Savings &amp; CO₂ Avoided section now uses
+          petrol and diesel prices retrieved from API Mitra for the city
+          saved in your User Profile. If a city price is unavailable, EV
+          Toolkit tries the saved state. The displayed prices include the
+          provider's last-updated time. If live prices cannot be retrieved,
+          the calculation clearly identifies that it is using fallback
+          benchmark prices instead. Keep your City and State up to date in
+          User Profile for the most relevant lookup.
+        </p>
+      </section>
 
       {loading && (
         <div
@@ -199,7 +249,6 @@ export default function WhatsNewPage() {
                 >
                   Version {announcement.version}
                 </span>
-
                 <time
                   dateTime={announcement.created_at}
                   style={{
@@ -211,7 +260,6 @@ export default function WhatsNewPage() {
                   {formatAnnouncementDate(announcement.created_at)}
                 </time>
               </div>
-
               <h2
                 style={{
                   margin: "0 0 10px",
@@ -223,7 +271,6 @@ export default function WhatsNewPage() {
               >
                 {announcement.title}
               </h2>
-
               <p
                 style={{
                   margin: 0,

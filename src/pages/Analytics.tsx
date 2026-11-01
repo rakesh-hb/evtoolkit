@@ -60,6 +60,23 @@ type ExpandedChart =
   | null;
 
 
+interface FuelPriceValue {
+  price: number;
+  unit?: string;
+}
+
+interface FuelPriceResponse {
+  status: string;
+  city?: string;
+  price: {
+    location: string;
+    location_type?: string;
+    updated_at: string;
+    petrol?: FuelPriceValue;
+    diesel?: FuelPriceValue;
+  };
+}
+
 interface AnalyticsProps {
   onNavigate?: (page: string) => void;
 }
@@ -87,6 +104,15 @@ function Analytics({
   const [showSavingsInfo, setShowSavingsInfo] =
     useState(false);
 
+  const [fuelPrices, setFuelPrices] =
+    useState<FuelPriceResponse | null>(null);
+
+  const [fuelPriceLoading, setFuelPriceLoading] =
+    useState(true);
+
+  const [fuelPriceError, setFuelPriceError] =
+    useState("");
+
 
   /*
    * ============================================================
@@ -97,7 +123,89 @@ function Analytics({
   useEffect(() => {
     loadSessions();
     loadSubscriptionPlan();
+    loadFuelPrices();
   }, []);
+
+  async function loadFuelPrices() {
+    setFuelPriceLoading(true);
+    setFuelPriceError("");
+
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError) throw userError;
+
+      if (!user) {
+        throw new Error("Please sign in to view local fuel prices.");
+      }
+
+      const city = String(user.user_metadata?.city ?? "").trim();
+      const state = String(user.user_metadata?.state ?? "").trim();
+      const locations = [city, state].filter(
+        (location, index, all) =>
+          location &&
+          all.findIndex(
+            (item) => item.toLowerCase() === location.toLowerCase()
+          ) === index
+      );
+
+      if (locations.length === 0) {
+        throw new Error(
+          "Add your city and state in User Profile to view local fuel prices."
+        );
+      }
+
+      let lastError: unknown = null;
+
+      for (const location of locations) {
+        try {
+          const { data, error } = await supabase.functions.invoke(
+            `fuel-prices?city=${encodeURIComponent(location)}`,
+            { method: "GET" }
+          );
+
+          if (error) throw error;
+
+          const result = data as FuelPriceResponse | null;
+          const petrol = Number(result?.price?.petrol?.price);
+          const diesel = Number(result?.price?.diesel?.price);
+
+          if (
+            result?.status !== "ok" ||
+            !result.price?.location ||
+            !Number.isFinite(petrol) ||
+            !Number.isFinite(diesel)
+          ) {
+            throw new Error(`Fuel prices are unavailable for ${location}.`);
+          }
+
+          setFuelPrices(result);
+          setFuelPriceError("");
+          return;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      console.error("Unable to load city/state fuel prices:", lastError);
+      throw new Error(
+        "Live fuel prices are currently unavailable for your city or state. Showing benchmark prices instead."
+      );
+    } catch (error) {
+      console.error("Fuel price loading error:", error);
+      setFuelPrices(null);
+      setFuelPriceError(
+        error instanceof Error
+          ? error.message
+          : "Unable to load live fuel prices. Showing benchmark prices instead."
+      );
+    } finally {
+      setFuelPriceLoading(false);
+    }
+  }
 
   async function loadSubscriptionPlan() {
     try {
@@ -200,8 +308,8 @@ function Analytics({
    * EV:       6.0 km per kWh
    * Petrol:  15.0 km per litre
    * Diesel:  20.0 km per litre
-   * Petrol:  ₹110 per litre
-   * Diesel:  ₹100 per litre
+   * Fuel prices: live API Mitra city/state prices when available;
+   * otherwise fallback benchmarks of ₹110 petrol / ₹100 diesel.
    *
    * CO2 factors are based on published fuel emission factors:
    * petrol ≈ 2.32 kg CO2/L
@@ -216,8 +324,23 @@ function Analytics({
   const APPROX_EV_KM_PER_KWH = 6;
   const APPROX_PETROL_KM_PER_LITRE = 15;
   const APPROX_DIESEL_KM_PER_LITRE = 20;
-  const APPROX_PETROL_PRICE_PER_LITRE = 110;
-  const APPROX_DIESEL_PRICE_PER_LITRE = 100;
+  const BENCHMARK_PETROL_PRICE_PER_LITRE = 110;
+  const BENCHMARK_DIESEL_PRICE_PER_LITRE = 100;
+  const APPROX_PETROL_PRICE_PER_LITRE =
+    Number(fuelPrices?.price?.petrol?.price) ||
+    BENCHMARK_PETROL_PRICE_PER_LITRE;
+  const APPROX_DIESEL_PRICE_PER_LITRE =
+    Number(fuelPrices?.price?.diesel?.price) ||
+    BENCHMARK_DIESEL_PRICE_PER_LITRE;
+  const hasLiveFuelPrices = Boolean(fuelPrices?.price);
+  const fuelPriceLocation = fuelPrices?.price?.location ?? "";
+  const fuelPriceUpdatedAt = fuelPrices?.price?.updated_at
+    ? new Date(fuelPrices.price.updated_at).toLocaleString("en-IN", {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone: "Asia/Kolkata",
+      })
+    : "";
   const APPROX_PETROL_CO2_KG_PER_LITRE = 2.32;
   const APPROX_DIESEL_CO2_KG_PER_LITRE = 2.70;
 
@@ -872,6 +995,11 @@ function Analytics({
     averageCost,
 
     approximateDistanceKm,
+    petrolPricePerLitre: APPROX_PETROL_PRICE_PER_LITRE,
+    dieselPricePerLitre: APPROX_DIESEL_PRICE_PER_LITRE,
+    fuelPriceLocation,
+    fuelPriceUpdatedAt,
+    hasLiveFuelPrices,
     approximatePetrolCostSavings,
     approximateDieselCostSavings,
     approximatePetrolCo2AvoidedKg,
@@ -3003,25 +3131,98 @@ function Analytics({
             </div>
 
             <p style={{ margin: "0 0 8px" }}>
-              The estimates use the following benchmark assumptions:
+              EV Toolkit now uses locally relevant fuel prices from API Mitra
+              for this comparison. The app looks up the city saved in your
+              User Profile first and tries the saved state if a city price is
+              unavailable.
             </p>
             <ul style={{ margin: "0 0 10px", paddingLeft: "20px" }}>
               <li>Estimated EV distance = Total charging energy (kWh) × 6 km/kWh</li>
               <li>Equivalent petrol used = Estimated distance (km) ÷ 15 km/litre</li>
               <li>Equivalent diesel used = Estimated distance (km) ÷ 20 km/litre</li>
-              <li>Petrol comparison cost = Equivalent petrol used × ₹110/litre</li>
-              <li>Diesel comparison cost = Equivalent diesel used × ₹100/litre</li>
+              <li>Petrol comparison cost = Equivalent petrol used × ₹{APPROX_PETROL_PRICE_PER_LITRE.toFixed(2)}/litre</li>
+              <li>Diesel comparison cost = Equivalent diesel used × ₹{APPROX_DIESEL_PRICE_PER_LITRE.toFixed(2)}/litre</li>
               <li>Estimated savings = Equivalent fuel cost − Actual EV charging cost</li>
             </ul>
 
-            <p style={{ margin: "0 0 6px" }}>
-              <strong style={{ color: PRIMARY_TEXT }}>Important:</strong> Petrol at ₹110/litre and diesel at ₹100/litre are illustrative benchmark prices, not live or state-specific prices. State-based fuel prices will be introduced after the pending API integration is configured.
-            </p>
+            {hasLiveFuelPrices && fuelPriceUpdatedAt && (
+              <p style={{ margin: "0 0 6px" }}>
+                <strong style={{ color: PRIMARY_TEXT }}>Last updated:</strong>{" "}
+                {fuelPriceUpdatedAt} IST
+              </p>
+            )}
             <p style={{ margin: 0 }}>
-              Actual fuel prices and vehicle efficiency may vary. CO₂ avoided is an approximate tailpipe comparison; emissions from electricity generation are not subtracted.
+              The distance and fuel-efficiency figures are estimates, not
+              vehicle-specific measurements. CO₂ avoided is an approximate
+              tailpipe comparison; emissions from electricity generation
+              are not subtracted.
             </p>
           </div>
         )}
+
+        <div
+          style={{
+            marginBottom: "14px",
+            padding: "10px 12px",
+            borderRadius: "10px",
+            border: hasLiveFuelPrices
+              ? "1px solid rgba(34,197,94,0.28)"
+              : "1px solid rgba(249,115,22,0.28)",
+            background: hasLiveFuelPrices
+              ? "rgba(34,197,94,0.07)"
+              : "rgba(249,115,22,0.07)",
+            color: SECONDARY_TEXT,
+            fontSize: "12px",
+            lineHeight: 1.55,
+          }}
+        >
+          {fuelPriceLoading ? (
+            <span>Loading local petrol and diesel prices…</span>
+          ) : hasLiveFuelPrices ? (
+            <>
+              <strong style={{ color: "#86efac" }}>Live fuel prices</strong>
+              {" · "}
+              {fuelPriceLocation}
+              {" · Petrol: ₹"}
+              {APPROX_PETROL_PRICE_PER_LITRE.toFixed(2)}
+              {"/L · Diesel: ₹"}
+              {APPROX_DIESEL_PRICE_PER_LITRE.toFixed(2)}
+              {"/L"}
+              {fuelPriceUpdatedAt && (
+                <div style={{ marginTop: "3px", color: MUTED_TEXT }}>
+                  Provider updated: {fuelPriceUpdatedAt} (IST)
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <strong style={{ color: "#fdba74" }}>Benchmark fuel prices in use</strong>
+              {" · Petrol: ₹110.00/L · Diesel: ₹100.00/L"}
+              {fuelPriceError && (
+                <div style={{ marginTop: "3px", color: MUTED_TEXT }}>
+                  {fuelPriceError}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => void loadFuelPrices()}
+                disabled={fuelPriceLoading}
+                style={{
+                  marginTop: "8px",
+                  padding: "5px 9px",
+                  border: "1px solid rgba(249,115,22,0.4)",
+                  borderRadius: "6px",
+                  background: "rgba(249,115,22,0.1)",
+                  color: "#fdba74",
+                  cursor: fuelPriceLoading ? "not-allowed" : "pointer",
+                  fontSize: "11px",
+                }}
+              >
+                Retry fuel price lookup
+              </button>
+            </>
+          )}
+        </div>
 
         <p
           style={{
@@ -3032,10 +3233,10 @@ function Analytics({
             color: SECONDARY_TEXT,
           }}
         >
-          Approximate comparison using benchmark vehicle efficiency,
-          fuel prices and tailpipe CO₂ factors. These figures are
-          estimates, not measured fuel consumption or actual fuel
-          purchases. EV electricity-generation emissions are not included.
+          Approximate comparison using estimated vehicle efficiency,
+          local fuel prices when available, and tailpipe CO₂ factors.
+          These figures are estimates, not measured fuel consumption or
+          actual fuel purchases. EV electricity-generation emissions are not included.
         </p>
 
         <div

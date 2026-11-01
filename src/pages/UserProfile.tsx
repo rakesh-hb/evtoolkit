@@ -785,6 +785,17 @@ export default function UserProfile() {
                 setCity(e.target.value)
               }
             />
+
+            <p
+              style={{
+                fontSize: 12,
+                color: "#6b7280",
+                marginTop: 6,
+                lineHeight: 1.5,
+              }}
+            >
+              Your city and state are used to display local petrol and diesel prices in Analytics.
+            </p>
           </div>
 
           <div>
